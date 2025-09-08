@@ -1,0 +1,7254 @@
+[
+  {
+    "code": "AAE 101",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO AEROSPACE ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 331",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "MECHANICS OF AEROSPACE STRUCTUES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 335",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "ORBITAL MECHANICS I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 336",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "ORBITAL MECHANICS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 338",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "ANALYSIS OF AEROSPACE STRUCTURAL MECHANICS I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 341",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AERODYNAMICS I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 342",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AERODYNAMICS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 343",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "THERMODYNAMICS FOR AEROSPACE ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 345",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT MATERIALS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 347",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT FLIGHT PRINCIPLES I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 348",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT FLIGHT PRINCIPLES II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 352",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT DYNAMICS AND CONTROL",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 361",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AEROSPACE TEHCNOLOGY LABORATORY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 362",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AEROSPACE TECHNOLOGY LAB II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 372",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AEROSPACE NUMERICAL METHODS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 411",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "CONTROL SYSTEMS OF AAE",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 431",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT AND SPACECRAFT PROPULSION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 433",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "COMBUSTION PROCESSES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 437",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "ANALYSISNOF AEROSPACE STRUCTURAL MECHANICS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 443",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO TURBULENT FLOWS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 453",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "DYNAMICS AND CONTROL OF SPACECRAFTS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 463",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT PERFORMANCE",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 465",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AEROSPACE SYSTEMS DESIGN",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 535",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT MAINTENANCE MANAGEMENT",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 543",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "HEAT TRANSFER",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 545",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "SYSTEMS MODELLING AND SIMULATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 546",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "COMPUTATIONAL FLUID DYNAMICS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 555",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT STABILITY AND CONTROL",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 562",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT CONCEPTUAL DESIGN II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 5633",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "GAS TURBINE PROPULSION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 565",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRCRAFT CONCEPTUAL DESIGN I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 571",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "RELIABILITY AND QUALITY ASSURANCE",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "AAE 572",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "SPACE SYSTEMS ENGINEERING",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "AAE 574",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "SPACECRAFT FLIGHT",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "AAE 576",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "SPACE VEHICLE DEVELOPMENT",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "AAE 578",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AVIONICS SYSTEMS ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 582",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AVIATION SAFETY AND LAW",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 586",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "AIRPORT DESIGN AND MANAGEMENT",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AAE 592",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "RESEARCH PROJECT",
+    "type": "CORE",
+    "units": 6,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AFE 101",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "HEALTH COMMUNICATION",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AFE 103",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "LEADERSHIP STUDIES",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AFE 124",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "FRENCH LANGUAGE I",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AFE 128",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "IGBO LANGUAGE I",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AFE 202",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "FOOD PRODUCTION",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AFE 203",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "FRENCH LANGUAGE II",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AFE 207",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "IGBO LANGUAGE II",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "AFE 301",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "PRACTICAL ENTREPRENEURSHIP",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ANA 225",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "HUMAN ANATOMY I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ANA 226",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "HUMAN ANATOMY II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BCH 204",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "GENERAL BIOCHEMISTRY II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BCH 209",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "GENERAL BIOCHEMISTRY I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BIO 101",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "GENERAL BIOLOGY I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BIO 102",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "GENERAL BIOLOGY II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BIO 107",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "GENERAL PRACTICAL BIOLOGY I",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BIO 108",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "GENERAL PRACTICAL BIOLOGY",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 102",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO BIOMEDICAL ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 311",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "MEASUREMENT AND INSTRUMENTATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 312",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOLOGICAL SYSTEMS CONTROL AND MODELLING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 313",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL ELECTRONICS ENGINEERING I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 314",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL ELECTRONICS ENGINEERING II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 317",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL ENGINEERING LAB I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 318",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL ENGINEERING LAB II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 321",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "MECHANICS OF BIOLOGICAL FLUIDS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 322",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "SYSTEMS BIOENGINEERING I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 323",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "THEORY OF DESIGN FOR BIOMEDICAL DEVICES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 328",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO CLINICAL ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 331",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "THERMODYNAMICS OF BIOLOGICAL SYSTEMS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 341",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMATERIALS ENGINEERING I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 342",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMECHANICS I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 352",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO MOLECULAR AND CELL BIOLOGY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 362",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "MECHANISMS OF BIOMEDICAL DEVICES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 411",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "DIGITAL CONTROL SYSTEMS FOR BME",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 413",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO BIONIC PROSTHESIS AND ORTHOTICS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 423",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "SYSTEMS BIOENGINEERING II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 431",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "CLINICAL REFRIDGIRATION AND AIR CONDITIONING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 441",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMATERIALS ENGINEERING II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 443",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMECHANICS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 453",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO PHARMACOLOGY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 461",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL ENGINEERING DESIGN",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 463",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL WORKSHOP AND MANUFACTURING PROCESSES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 511",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "ARTIFICIAL NEURAL NETWORKS FOR BIOMEDICAL APPLICATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 512",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "RELIABILITY AND SAFETY OF BIOMEDICAL EQUIPMENT",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 513",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "EMBEDDED SYSTEMS FOR BIOMEDICAL APPLICATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 515",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIO-INFORMATICS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 516",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "ADVANCED BIO-SIGNAL PROCESSING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 518",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL RADIATION TECHNOLOGY AND IMAGE PROCESSING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 521",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "HEAT TRANSFER IN LIVING TISSUES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 524",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOSAFETY AND HOSPITAL HEALTH ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 532",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO CARDIOVASCULAR FLUID MECHANICS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 552",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO GENERAL PATHOLOGY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 553",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "TISSUE ENGINEERING AND REGENERATIVE MEDICINE",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 561",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "COMPUTER AIDED DESIGN AND ANALYSIS FOR MEDICAL DEVICES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 571",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL ENGINEERING INDUSTRIES",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "BME 572",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "CLINICAL APPLICATION OF HUMAN COMPUTER INTERACTION",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "BME 573",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "BIOMEDICAL TELEMETRY",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "BME 574",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "APPLICATION OF MICROFLUIDICS IN MEDICAL TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "BME 575",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO BIO-TRANSPORT PROCESSES",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "BME 576",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "SKELETAL TISSUE MECHANICS",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "BME 590",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "RESEARCH PROJECT I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BME 592",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "RESEARCH PROJECT II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "BMW 315",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "COMPUTER APPLICATION FOR BIOLOGICAL SYSTEMS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 302",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL ENGINEERING LABORATORY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 311",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO MATERIAL AND ENERGY BALANCES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 312",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "TRANSPORT PHENOMENA II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 313",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "TRANSPORT PHENOMENA I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 314",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL KINETICS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 315",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL ENGINEERING THERMODYNAMICS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 316",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "SEPERATION PROCESSES I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 317",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "BIOCHEMICAL ENGINEERING I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 318",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "SCIENCE OF MATERIALS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 319",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "POLYMER PROCESS ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 320",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PROCESS MODELLING AND STIMULATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 321",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PROCESS INSTRUMENTATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 323",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PARTICLE TECHNOLOGY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 401",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL ENGINEERING LABORATORY II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 411",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "TRANSPORT PHENOMENA III",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 413",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL REACTION ENGINEERING I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 415",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL ENGINEERING THERMODYNAMICS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 417",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PLANT DESIGN I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 419",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "SEPERATION PROCESS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 421",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL ENGINEERING ANALYSIS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 423",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "ENVIRONMENTAL ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 500",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "RESEARCH PROJECT",
+    "type": "CORE",
+    "units": 6,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 501",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL ENGINEERING LABORATORY III",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 511",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PROCESS OPTIMISATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 512",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "LOSS PREVENTION IN PROCESS INDUSTRIES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 513",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "CHEMICAL REACTION ENGINEERING II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 514",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PROCESS CONTROL II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 515",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PROCESS CONTROL I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 516",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "RESERVOIR ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 517",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "SEPERATION PROCESSES III",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 518",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PLANT DESIGN II",
+    "type": "CORE",
+    "units": 5,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 519",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "POLYMER SCIENCE AND TECHNOLOGY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 520",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROCHEMICAL SCIENCE AND TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHE 521",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "BIOCHEMICAL ENGINEERING II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHE 522",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "FERMENTATION TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHE 523",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "TECHNOLOGY PF FOSSIL FUEL PROCESSING",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHE 524",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "COAL PROCESSING TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHE 525",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "SUGAR TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHE 526",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "CEMENT AND CEMENT TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHE 527",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "DETERGENT TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHE 529",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PULP AND PAPER TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHE 531",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "PETROLEUM REFINING TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CHM 101",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL CHEMISTRY I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHM 102",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL CHEMISTRY II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHM 107",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL PRACTICAL CHEMISTRY 1",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CHM 108",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL PRACTICAL CHEMISTRY II",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 101",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO COMPUTER ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 302",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "OBJECT ORIENTED PROGRAMMING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 304",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "COMPUTER ARCHITECTURE AND ORGANIZATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 307",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "COMPUTER ENGINEERING LABORATORY",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 308",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "COMPUTER ENGINEERING LABORATORY",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 310",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "ANALYSIS OF ALGORITHMS AND DATA STRUCTURES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 341",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "SOFTWARE DEVELOPMENT TECHNIQUES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 405",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "NUMERICAL COMPUTATIONS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 409",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "PROTOTYPING TECHNIQUES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 411",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "COMPUTER ENGINEERING LABORATORY III",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 413",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "OPERATING SYSTEM",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 415",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "ASSEMBLY LANGUAGE PROGRAMMING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 427",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "DATA COMMUNICATION AND NETWORKS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 441",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "CONTROL THEORY AND SYSTEMS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 501",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "ARTIFICIAL NEUTRAL NETWORK",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 502",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 503",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "COMPUTER SECURITY TECNIQUES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 504",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "EMBEDDED SYSTEMS DESIGN",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 505",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "SOFTWARE ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 506",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "DIGITAL SYSTEM DESIGN WITH VDHL",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 507",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "MODELLING AND SIMULATION OF COMPUTER SYSTEMS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 508",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "COMPUTER GRAPHICS AND ANIMATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 509",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "MICROPROCESSOR SYSTEM AND INTERFACING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 511",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "DIGITAL SIGNAL PROCESSING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 512",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "RELIABILITY AND MAINTAINABILITY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 514",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "CYBER-PRENEURSHIP AND CYBER LAW",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "COE 515",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "NATURAL LANGUAGE AND SPEECH PROCESSING",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "COE 516",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "DIGITAL IMAGING PROCESSING",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "COE 517",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "FUZZY LOGIC AND PROGRAMMING",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "COE 518",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "CRYPTOGRAPHY PRINCIPLES AND APPLICATIONS",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "COE 519",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "ROBOTIC AND AUTOMATION",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "COE 520",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO MOBILE COMPUTING",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "COE 522",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "DESIGN AND INSTALLATION OF ELECTRICAL DEVICES AND ICT",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "COE 599",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING"
+    ],
+    "title": "PROJECT",
+    "type": "CORE",
+    "units": 6,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CV E 511",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "CIVIL ENGINEERING SEMINAR",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 301",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "BASIC CIVIL ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 302",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "BASIC HYDROLOGY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 303",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "FLUID MECHANICS FOR CIVIL ENGINEERS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 304",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "STRUCTURAL MECHANICS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 305",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "ADVANCED STRENGTH OF MATERIALS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 306",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "SOIL MECHANICS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 307",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "CIVIL ENGINEERING MATERIALS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 308",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "STRUCTURAL DESIGN I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 309",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "THEORY OF STRUCTURES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 310",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "ENGINEERING SURVEYING II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 311",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "ENGINEERING SURVEYING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 312",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "CIVIL ENGINEERING DRAWING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 313",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "ENGINEERING GEOLOGY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 401",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "CIVIL ENGINEERING PRACTICE",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 403",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "HYDRAULICS ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 405",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "STRUCTURAL ANALYSIS I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 407",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "STRUCTURAL DESIGN II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 409",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "FOUNDATION ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 411",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "HIGHWAY ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 502",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "WATER AND WASTEWATER ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 503",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "STRUCTURAL ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 504",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "ADVANCED STRUCTURAL ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 505",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "WATER RESOURCES ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 506",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "HIGHWAY AND TRANSPORTATION ENGINEERING II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 507",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "HIGHWAY & TRANSPORTATION ENGINEERING I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 508",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "GEOTECHNICAL ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 509",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "STRUCTURAL ANALYSIS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 510",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "CONSTRUCTION ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "CVE 517",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "ENVIRONMENTAL ENGINEERING",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CVE 518",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "DRAINAGE AND IRRIGATION ENGINEERING",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CVE 519",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "BUILDING SERVICES ENGINEERING",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "CVE 572",
+    "offered_by_programs": [
+      "CIVIL ENGINEERING"
+    ],
+    "title": "FINAL YEAR PROJECT",
+    "type": "CORE",
+    "units": 6,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 101",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO ELECTRICAL AND ELECTRONICS ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 313",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRONICS I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 314",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRONICS II (ANALOGUE)",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 315",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTROMAGNETIC FIELD AND WAVES I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 316",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTROMAGNETIC FIELD AND WAVE THEORY II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 317",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRICAL/ELECTRONICS LABORATORY I",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 318",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRICAL/ELECTRONIC LABORATORY",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 319",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "MEASUREMENT AND INSTRUMENTATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 321",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRIC CIRCUIT THEORY I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 322",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRIC CIRCUIT THEORY II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 324",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "LINEAR SYSTEMS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 325",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "ELECTRICAL MACHINES I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 326",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "ELECTRICAL MACHINES II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 328",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "COMMUNICATION PRINCIPLES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 341",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "SOFTWARE DEVELOPMENT TECHNIQUES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 405",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "NUMERICAL COMPUTATIONS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 415",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ASSEMBLY LANGUAGE PROGRAMMING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 423",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRICAL/ELECTRONICS LABORATORY III",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 427",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "DATA COMMUNICATION AND NETWORKS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 431",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRIC POWER PRINCIPLES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 441",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "CONTROL THEORY AND SERVOMECHANISM",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 471",
+    "offered_by_programs": [
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "DIGITAL ELECTRONICS AND SYSTEMS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 502",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRICAL SERVICES DESIGN",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 504",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "EMBEDDED SYSTEM",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 506",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "DIGITAL SYSTEM DESIGN WITH VDHL PROGRAMMING",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 507",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "MODELLING AND SIMULATION OF ELECTRICAL AND ELECTRONICS SYSTEMS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 509",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ADVANCED ELECTRONICS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 511",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "DIGITAL SIGNAL PROCESSING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 512",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "DIGITAL COMMUNICATION",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 514",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "RELIABILITY ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 523",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "INDUSTRIAL ELECTRONICS DESIGNS",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 535",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "HIGH FREQUENCY AND MICROWAVE ELECTRONICS",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 553",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "POWER SYSTEMS ENGINEERING",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 554",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "POWER SYSTEMS COMMUNICATION AND CONTROL",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 555",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "HIGH VOLTAGE ENGINEERING",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 556",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRIC DRIVES AND APPLICATIONS",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 558",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "ELECTRICAL ENERGY CONVERSION AND STORAGE",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 561",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "CONTROL ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 562",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "POWER ELECTRONICS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 564",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "SEMINARS ON USE OF ENGINEERING SOFTWARE PACKAGES IN ELECTRICAL/ELECTRONICS FIELD",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "EEE 565",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "MODERN CONTROL ENGINEERING",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 566",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "CONTROL ENGINEERING III (NON-LINEAR AND PROCESS AUTOMATION)",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 576",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "MICROCOMPUTER TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 578",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "BROADCASTING AND INTERNET TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "EEE 599",
+    "offered_by_programs": [
+      "ELECTRICAL AND ELECTRONICS ENGINEERING"
+    ],
+    "title": "STUDENT PROJECT",
+    "type": "CORE",
+    "units": 6,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 201",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO SCIENCE OF MATERIALS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 203",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "STRENGTH OF MATERIALS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 204",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO MECHATRONICS ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 214",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "FLUID MECHANICS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 221",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "BASIC ELECTRICAL ENGINEERING I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 222",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "BASIC ELECTRICAL ENGINEERING II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 223",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "COMPUTER APPLICATIONS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 224",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "COMPUTER PROGRAMMING AND APPLICATIONS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 231",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING DRAWING I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 232",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING DRAWING II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 233",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING MECHANICS I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 234",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING MECHANICS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 235",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING THERMODYNAMICS I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 261",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "WORKSHOP TECHNOLOGY I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 262",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "WORKSHOP TECHNOLOGY II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 281",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING MATHEMATICS I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 282",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING MATHEMATICS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 284",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEER IN SOCIETY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 290",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "STUDENTS' WORK EXPERIENCE PROGRAMME (SWEP I)",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 341",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "COMPUTER PROGRAMMING AND APPLICATIONS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 381",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING MATHEMATICS III",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 382",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING MATHEMATICS IV",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 384",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING ECONOMICS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 390",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "STUDENTS' WORK EXPERIENCE PROGRAMME (SWEP II)",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 485",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "TECHNICAL WRITING AND PRESENTATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 490",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "STUDENTS' INDUSTRIAL WORK EXPERIENCE SCHEME (SIWES)",
+    "type": "CORE",
+    "units": 6,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "ENG 583",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING MANAGEMENT AND LAW",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "GET 101",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEER IN SOCIETY",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "GET 102",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING GRAPHICS AND SOLID MODELLING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "GST 111",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "COMMUNICATION IN ENGLISH I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "GST 112",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "NIGERIAN PEOPLE AND CULTURE",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "GST 201",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PEACE STUDIES AND CONFLICT RESOLUTION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "GST 202",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PHILOSOPHY AND SUSTAINABLE DEVELOPMENT",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "GST 212",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENTREPRENEURSHIP AND INNOVATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "GST 301",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PRACTICAL ENTREPRENEURSHIP SKILLS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 301",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MECHANICAL ACTUATION DESIGN",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 304",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "SIGNALS AND SYSTEMS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 305",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "FLUID MECHANICS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 306",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MANUFACTURING TECHNOLOGY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 307",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "COMPUTER SOFTWARE ENGINEERING I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 308",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "ELECTROMECHANICAL DEVICES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 309",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "ELECTRONICS I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 310",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "COMPUTER HARDWARE ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 311",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "ELECTROMAGNETIC THEORY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 312",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "ELECTRIC CIRCUIT THEORY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 314",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "FLUIDICS AND VIRTUAL LABORATORY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 315",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "CIRCUIT AND SYSTEMS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 317",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MECHANICS OF MACHINES I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 326",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "ENGINEERING THERMODYNAMICS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 401",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "CONTROL ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 403",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "COMPUTER AIDED MANUFACTURING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 407",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MEASUREMENT AND INSTRUMENTATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 409",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "DIGITAL SYSTEMS AND PLCS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 411",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "ELECTRONICS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 413",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO ROBOTICS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 415",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "VIBRATIONS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 417",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "CAD/CAM/CNC LABORATORY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 500",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "PROJECT",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST",
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 502",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "AUTOMATION MANUFACTURING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 503",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "DIGITAL SIGNAL PROCESSING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 504",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MICRO CONTROLLERS AND EMBEDDED SYSTEMS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 505",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MICROCOMPUTERS AND MICROPROCESSOR SYSTEMS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 506",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "COMPUTER SOFTWARES ENGINEERING II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 507",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "GROUP PROJECT (ROBOT DESIGN AND MANUFACTURE)",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 508",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "SYSTEM MODELLINGS AND SIMULATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 509",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "CONTROL ENGINEERING II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 510",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "POWER ELECTRONIC DEVICES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 511",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "PROCESS AUTOMATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 513",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "PARTIAL AND FULL AUTOMATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT 514",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MEMS & VLSI",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MCT 517",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "NC AND CNC PRODUCTION MACHINES",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MCT 518",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "DESIGN OF SECURITY SYSTEMS",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MCT 519",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MICRO FABRICATION TECHNOLOGY",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MCT 520",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "RENEWABLE ENERGY RESOURCES",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MCT 521",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "MOBILE ROBOTICS",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MCT 522",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "LEAN PRODUCTION MANAGEMENT AND INDUSTRIAL LOGISTICS",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MCT 523",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "CONTROL ENGINEERING III",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MCT 527",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "HEAT AND MASS TRANSFER",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MCT405",
+    "offered_by_programs": [
+      "MECHATRONICS ENGINEERING"
+    ],
+    "title": "SENSORS AND ACTUATORS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 101",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO MECHANICAL ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 308",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "MANUFACTURING TECHNOLOGY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 311",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "MECHANICS OF MACHINES I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 312",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "MECHANICS OF MACHINES II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 313",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "STRENGTH OF MATERIALS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 317",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO AUTOCAD",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 321",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "FLUID MECHANICS I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 322",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "FLUID MECHANICS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 323",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "MACHINE AND ENGINEERING DESIGN PROCESS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 326",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "ENGINEERING THERMODYNAMICS II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 328",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "METROLOGY AND INSTRUMENTATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 341",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "COMPUTER IPROGRAMMING AND SOFTWARE DEVELOPMENT",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 342",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "COMPUTER APPLICATIONS (CAD/CAM) IN DESIGN AND MANUFACTURE",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 409",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "ADVANCED MECHANICS OF MATERIALS",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 411",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "MECHANICAL VIBRATIONS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 413",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "PRODUCTION ENGINEERING I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 433",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "MACHINE DESIGN II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 453",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "METALLURGY AND MATERIALS ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 471",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "INTERNAL COMBUSTION ENGINES",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 485",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "CONTROL SYSTEMS ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 500",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "PROJECT",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST",
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 501",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "MATERIALS HANDLING EQUIPMENT",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MEE 502",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "MANUFACTURING AUTOMATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 507",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "THEORY OF ELASTICITY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 511",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "TRIBOLOGY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 513",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "SYNTHESIS OF MECHANISM",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MEE 514",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO BIOENGINEERING (BIOMATERIALS)",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MEE 519",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "PRODUCT DESIGN",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 521",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "TURBOMACHINERY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 522",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "HYDRAULIC AND PNEUMATIC ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 526",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "PROJECT AND MAINTENANCE MANAGEMENT",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MEE 527",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "HEAT AND MASS TRANSFER",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 528",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "PIPELINE ENGHINEERING",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MEE 530",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "FRACTURE OF STRUCTURAL MATERIALS",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MEE 531",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "PRODUCTION ENGINEERING II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 535",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "REFRIDGERATION AND AIR CONDITIONING",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MEE 538",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "METROLOGY AND QUALITY CONTROL",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 540",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "MACHINE DESIGN III",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 542",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "TECHNOLOGY POLICY AND PLANNING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 543",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "ENERGY TECHNOLOGY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MEE 553",
+    "offered_by_programs": [
+      "MECHANICAL ENGINEERING"
+    ],
+    "title": "AUTOMOBILE ENGINEERING",
+    "type": "ELECTIVE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": true
+  },
+  {
+    "code": "MME 342",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING"
+    ],
+    "title": "COMPUTER APPLICATIONS (CAD/CAM)",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MTH 101",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ELEMENTARY MATHEMATICS I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MTH 102",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ELEMENTARY MATHEMATICS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "MTH 103",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ELEMENTARY MATHEMATICS III",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PEE 101",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO PETROLEUM AND GAS ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PHS 211",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "HUMAN PHYSIOLOGY I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PHS 212",
+    "offered_by_programs": [
+      "BIOMEDICAL ENGINEERING"
+    ],
+    "title": "HUMAN PHYSIOLOGY II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "200"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PHY 101",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL PHYSICS I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PHY 102",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL PHYSICS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PHY 103",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL PHYSICS III",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PHY 107",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL PRACTICAL PHYSICS 1",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PHY 108",
+    "offered_by_programs": [
+      "AERONAUTICAL ENGINEERING",
+      "BIOMEDICAL ENGINEERING",
+      "CHEMICAL ENGINEERING",
+      "CIVIL ENGINEERING",
+      "COMPUTER ENGINEERING",
+      "ELECTRICAL AND ELECTRONICS ENGINEERING",
+      "MECHANICAL ENGINEERING",
+      "MECHATRONICS ENGINEERING",
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "GENERAL PRACTICAL PHYSICS II",
+    "type": "CORE",
+    "units": 1,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 301",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM ENGINEERING LABORATORY I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 302",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM ENGINEERING LABORATORY II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 311",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM PRODUCTION ENGINEERING I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 313",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "DRILLING FLUIDS TECHNOLOGY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 315",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING ANALYSIS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 317",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "INDUSTRIAL STUDIES I",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 319",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "DRILLING TECHNOLOGY I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 322",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "RESERVOIR ENGINEERING I",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 324",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "HEAT AND MASS TRANSFER",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 326",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENGINEERING ANALYSIS II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 328",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM ENGINEERING ROCK MECHANICS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 330",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "INDUSTRIAL STUDIES II",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "300"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 401",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM ENGINEERING LABORATORY III",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 411",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "RESERVOIR ENGINEERING",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 413",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "DRILLING TECHNOLOGY II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 415",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM PRODUCTION ENGINEERING II",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 417",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "WELL LOGGING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 419",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM GEOLOGY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 421",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "APPLIED GEOPHYSICS AND PETROLEUM EXPLORATION",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 423",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "INDUSTRIAL STUDIES III",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "400"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 500",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM ENGINEERING RESEARCH PROJECT",
+    "type": "CORE",
+    "units": 6,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 511",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "RESERVOIR ENGINEERING III",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 512",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "ENHANCED OIL RECOVERY",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 513",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "DRILLING TECHNOLOGY III",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 514",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM ECONOMICS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 515",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM PRODUCTION ENGINEERING III",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 516",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "MULTIPLE PHASE FLOW IN PIPES",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 517",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "RESERVOIR MODELLING AND SIMULATION",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 518",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "OIL POLLUTION AND CONTROL",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 519",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PROCESS TECNOLOGY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 520",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "OFFSHORE OPERATIONS",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 521",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM REFINING TECHNOLOGY",
+    "type": "CORE",
+    "units": 3,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 522",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "PETROLEUM PRODUCT TRANSPORT AND STORAGE",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "SECOND"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "PTE 523",
+    "offered_by_programs": [
+      "PETROLEUM ENGINEERING"
+    ],
+    "title": "NATURAL GAS PROCESSING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "500"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  },
+  {
+    "code": "TCH 101",
+    "offered_by_programs": [
+      "CHEMICAL ENGINEERING"
+    ],
+    "title": "INTRODUCTION TO CHEMICAL ENGINEERING",
+    "type": "CORE",
+    "units": 2,
+    "levels": [
+      "100"
+    ],
+    "semesters": [
+      "FIRST"
+    ],
+    "is_elective": false
+  }
+]
