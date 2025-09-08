@@ -277,3 +277,4 @@ $env:OCR_LOG_EVERY = "5"
 - This README uses Windows and PowerShell examples. Adjust paths/commands for macOS/Linux as needed.
 - Keep secrets out of source control and console output; always set credentials via environment variables.
 # CourseGen
+# CourseGen
