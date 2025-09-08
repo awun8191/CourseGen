@@ -1,0 +1,119 @@
+###########################
+# Python
+###########################
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyc
+*.pyo
+*.pyd
+
+# Build and distribution
+build/
+develop-eggs/
+dist/
+downloads/
+sdist/
+wheels/
+lib/
+lib64/
+parts/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+###########################
+# Virtual Environments
+###########################
+venv/
+env/
+ENV/
+.env
+../.venv
+.env.local
+.env.*.local
+
+###########################
+# IDE / Editor
+###########################
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+###########################
+# Project Specific
+###########################
+chromadb_storage/
+pdf_cache.json
+uploads/
+*.sqlite3
+*.log
+
+###########################
+# Secrets & Credentials
+###########################
+**/service_token.json
+*.pem
+*.key
+
+###########################
+# Node.js
+###########################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+###########################
+# Compiled Test/Reporting Artifacts
+###########################
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+###########################
+# Optional: Ignore PDF files
+###########################
+*.pdf
+
+###########################
+# Textbooks
+###########################
+TEXTBOOKS/COMPILATION/
+TEXTBOOKS/**/*.pdf
+
+###########################
+# Cache and large files
+###########################
+**/pdf_cache.json
+**/chromadb_storage/
+**/*.pyc
+compressed/
+**/__pycache__/
+
+###########################
+# Large binary files
+###########################
+**/*.pdf
+**/*.docx
+**/*.sgy
+TEXTBOOKS/**/*.pdf
+TEXTBOOKS/**/*.docx
+TEXTBOOKS/**/*.sgy
+
+
+
+chroma_db_bge_m3
+data/gemini_cache
+data/exported_data
+
+
+services/RAG/OUTPUT_DATA
