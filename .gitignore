@@ -82,7 +82,7 @@ coverage.xml
 ###########################
 # Optional: Ignore PDF files
 ###########################
-*.pdf
+
 
 ###########################
 # Textbooks
