@@ -1,678 +1,821 @@
-"""Wrapper around the Google Gemini (new SDK) client with typed configuration.
+#!/usr/bin/env python3
+"""
+Standalone OCR engine: Gemini (load-balanced) + EasyOCR/PaddleOCR (no Tesseract).
 
-- Rotates API keys via ApiKeyManager
-- Supports typed generation config (GeminiConfig)
-- Provides robust .generate(), .ocr(), and .embed() helpers
-- .ocr() correctly constructs google-genai Parts for images + prompt
+Usage example:
+  export GEMINI_SERVICE_PATH="/home/you/your-repo/src/services/Gemini/gemini_service.py"
+  export GEMINI_MODEL="gemini-2.5-flash-lite"
+  # optional fallback if service import fails:
+  # export GEMINI_API_KEY="..."
 
-Requirements (pip):
-    google-genai>=1.30
+  python ocr_engine.py "/path/to/file.pdf" --engine gemini --dpi 300
+
+Key env:
+  GEMINI_SERVICE_PATH=/abs/path/to/src/services/Gemini/gemini_service.py
+  GEMINI_MODEL=gemini-2.5-flash-lite
+  GEMINI_API_KEY=...  (only used if service import fails)
+
+  OCR_GEMINI_MAX_EDGE=2000                 # downscale long edge before Gemini (px)
+  OCR_GEMINI_MAX_TOKENS=8192
+  OCR_GEMINI_AUTOFALLBACK=1                # if Gemini page -> empty, use local OCR
+  OCR_GEMINI_FALLBACK_ENGINE=hybrid        # easyocr|paddleocr|hybrid
+  OCR_GEMINI_FALLBACK_HAND=1               # handwriting preprocessing for fallback
+
+  OCR_HANDWRITTEN=0/1
+  OCR_UPSCALE=1.6
+  OCR_SAVE_DEBUG=0/1
+  OCR_CONF_TH=0.35
+  OCR_HANDWRITTEN_CONF_TH=0.15
+  OCR_MIN_LINES=5
+  OCR_MIN_AVG_CONF=0.50
+  OCR_LOG_LEVEL=INFO|DEBUG
+
+  EASYOCR_GPU=0/1
+  PADDLE_GPU=0/1
+  PADDLE_TEXTLINE_ORI=1
+  PADDLE_LANG=en
 """
 
 from __future__ import annotations
 
-import json
+import io
 import os
 import sys
+import json
 import time
-import re
+import logging
+import importlib
+import importlib.util
+import types
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 
-# Add the project root to the Python path to allow for absolute imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Type,
-    TypeVar,
-    Union,
+# ----------------- Optional deps -----------------
+try:
+    import numpy as np
+except Exception:
+    np = None  # type: ignore
+
+try:
+    import cv2
+except Exception:
+    cv2 = None  # type: ignore
+
+try:
+    from PIL import Image
+except Exception:
+    Image = None  # type: ignore
+
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None  # type: ignore
+
+try:
+    import easyocr
+    _HAS_EASYOCR = True
+except Exception:
+    easyocr = None  # type: ignore
+    _HAS_EASYOCR = False
+
+try:
+    from paddleocr import PaddleOCR
+    _HAS_PADDLE = True
+except Exception:
+    PaddleOCR = None  # type: ignore
+    _HAS_PADDLE = False
+
+# ----------------- Logging -----------------
+log = logging.getLogger("ocr_engine")
+if not log.handlers:
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("[%(levelname)s] %(asctime)s - %(filename)s:%(lineno)d - %(message)s"))
+    log.addHandler(h)
+log.setLevel(os.getenv("OCR_LOG_LEVEL", "INFO").upper())
+
+# ----------------- Data models -----------------
+@dataclass
+class PageMetrics:
+    page: int
+    engine: str
+    lines: int
+    avg_conf: float
+    min_conf: float
+    max_conf: float
+    dpi: Optional[int] = None
+
+@dataclass
+class OCRResult:
+    text: str
+    by_page: List[PageMetrics]
+    meta: Dict[str, Union[str, int, float, bool, None]]
+    debug_images: Optional[List["np.ndarray"]] = None
+
+# ----------------- Common helpers -----------------
+_OCR_PROMPT = (
+    "Transcribe the exact visible text from this page image into plain text.\n"
+    "Preserve the original line breaks and spacing where obvious.\n"
+    "Do not include any explanations, headings, labels, JSON, or code fences.\n"
+    "Return ONLY the text content as a single plain string."
 )
-from typing import get_origin, get_args
 
-from google import genai
-from google.genai import types as gtypes
-from google.genai import errors as genai_errors
-from pydantic import BaseModel
+def _ensure_np(img: Union["np.ndarray", "Image.Image"]) -> "np.ndarray":
+    assert np is not None, "NumPy not available"
+    if isinstance(img, np.ndarray):
+        return img
+    if Image is None:
+        raise RuntimeError("Pillow missing to convert image")
+    return np.array(img.convert("RGB"))
 
-# --- Project imports ---
-from COURSEGEN.data_models.gemini_config import GeminiConfig
-from ..Gemini.api_key_manager import ApiKeyManager  # relative import (same folder)
-try:
-    from ..Gemini.gemini_api_keys import GeminiApiKeys  # optional convenience provider
-except Exception:
-    GeminiApiKeys = None  # type: ignore
+def _to_pil(img_rgb: Union["np.ndarray", "Image.Image"]) -> "Image.Image":
+    if Image is None:
+        raise RuntimeError("Pillow required")
+    if isinstance(img_rgb, Image.Image):
+        return img_rgb.convert("RGB")
+    return Image.fromarray(img_rgb.astype("uint8"), mode="RGB")
 
-# OCR prompt (fallback text if the helper is missing)
-try:
-    from COURSEGEN.services.RAG.helpers import OCR_PROMPT
-except Exception:
-    OCR_PROMPT = (
-        "Transcribe the exact visible text from this page image into plain text.\n"
-        "Preserve the original line breaks and spacing where obvious.\n"
-        "Do not include any explanations, headings, labels, JSON, or code fences.\n"
-        "Return ONLY the text content as a single plain string."
+def _limit_long_edge(img_pil: "Image.Image", max_edge: int = 2000) -> "Image.Image":
+    if max_edge <= 0:
+        return img_pil
+    w, h = img_pil.size
+    m = max(w, h)
+    if m <= max_edge:
+        return img_pil
+    scale = max_edge / float(m)
+    new_size = (int(w * scale), int(h * scale))
+    return img_pil.resize(new_size, Image.LANCZOS)
+
+def _snapshot(s: str, n: int = 160) -> str:
+    s = (s or "").replace("\n", " ")
+    return (s[:n] + "…") if len(s) > n else s
+
+# ----------------- Handwriting preprocessing (for Easy/Paddle) -----------------
+def _deskew(gray: "np.ndarray") -> "np.ndarray":
+    if cv2 is None:
+        return gray
+    try:
+        _th, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        coords = cv2.findNonZero(bw)
+        if coords is None or len(coords) < 200:
+            return gray
+        rect = cv2.minAreaRect(coords)
+        angle = rect[-1]
+        if angle < -45:
+            angle = 90 + angle
+        M = cv2.getRotationMatrix2D((gray.shape[1] / 2, gray.shape[0] / 2), angle, 1.0)
+        return cv2.warpAffine(
+            gray, M, (gray.shape[1], gray.shape[0]),
+            flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE
+        )
+    except Exception as e:
+        log.debug(f"deskew failed: {e}")
+        return gray
+
+def _remove_shadow(gray: "np.ndarray") -> "np.ndarray":
+    if cv2 is None:
+        return gray
+    try:
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (31, 31))
+        bg = cv2.morphologyEx(gray, cv2.MORPH_OPEN, kernel)
+        no_shadow = cv2.subtract(gray, bg)
+        return cv2.normalize(no_shadow, None, 0, 255, cv2.NORM_MINMAX)
+    except Exception as e:
+        log.debug(f"shadow removal failed: {e}")
+        return gray
+
+def _adaptive_binarize(gray: "np.ndarray") -> "np.ndarray":
+    if cv2 is None:
+        return gray
+    try:
+        den = cv2.fastNlMeansDenoising(gray, h=10, templateWindowSize=7, searchWindowSize=21)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        den = clahe.apply(den)
+        bin_img = cv2.adaptiveThreshold(
+            den, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 25, 10
+        )
+        kernel = np.ones((2, 2), np.uint8)
+        return cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel, iterations=1)
+    except Exception as e:
+        log.debug(f"binarize failed: {e}")
+        return gray
+
+def _maybe_upscale(img: "np.ndarray", factor: float) -> "np.ndarray":
+    if cv2 is None or factor <= 1.01:
+        return img
+    try:
+        h, w = img.shape[:2]
+        if max(h, w) > 2400:
+            return img
+        return cv2.resize(img, (int(w * factor), int(h * factor)), interpolation=cv2.INTER_CUBIC)
+    except Exception as e:
+        log.debug(f"upscale failed: {e}")
+        return img
+
+def preprocess_for_handwriting(img_rgb: Union["np.ndarray", "Image.Image"], *, upscale: float = 1.6) -> "np.ndarray":
+    img = _ensure_np(img_rgb)
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if cv2 is not None else img.mean(axis=2).astype("uint8")
+    else:
+        gray = img
+    gray = _remove_shadow(gray)
+    gray = _deskew(gray)
+    bin_img = _adaptive_binarize(gray)
+    if len(bin_img.shape) == 2:
+        bin_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2RGB) if cv2 is not None else np.stack([bin_img] * 3, axis=-1)
+    return _maybe_upscale(bin_img, upscale)
+
+# ----------------- EasyOCR / Paddle OCR -----------------
+_EASYOCR_CACHE: Dict[Tuple[str, bool, bool], "easyocr.Reader"] = {}
+_PADDLE_CACHE: Dict[Tuple[str, bool, bool, bool, str], "PaddleOCR"] = {}
+
+def _get_easyocr(lang: str = "en", handwriting: bool = False, *, gpu_env: Optional[bool] = None) -> Optional["easyocr.Reader"]:
+    if not _HAS_EASYOCR:
+        return None
+    langs = [lang or "en"]
+    gpu = bool(int(os.getenv("EASYOCR_GPU", "0"))) if gpu_env is None else gpu_env
+    key = (langs[0], handwriting, gpu)
+    if key in _EASYOCR_CACHE:
+        return _EASYOCR_CACHE[key]
+    recog = "english_g2" if lang.startswith("en") else ("latin_g2" if lang in {"fr", "es", "pt", "it"} else "english_g2")
+    try:
+        reader = easyocr.Reader(langs, gpu=gpu, recog_network=recog)
+        _EASYOCR_CACHE[key] = reader
+        log.info(f"EasyOCR ready (langs={langs}, gpu={gpu}, recog={recog})")
+        return reader
+    except Exception as e:
+        log.warning(f"EasyOCR init failed: {e}")
+        return None
+
+def _get_paddle(lang: str = "en", *, angle: bool = False, gpu_env: Optional[bool] = None, textline: Optional[bool] = None) -> Optional["PaddleOCR"]:
+    if not _HAS_PADDLE:
+        return None
+    gpu = bool(int(os.getenv("PADDLE_GPU", "0"))) if gpu_env is None else gpu_env
+    textline = bool(int(os.getenv("PADDLE_TEXTLINE_ORI", "1"))) if textline is None else textline
+    key = (lang, gpu, textline, angle, "v1")
+    if key in _PADDLE_CACHE:
+        return _PADDLE_CACHE[key]
+    try:
+        kwargs = dict(lang=lang, use_textline_orientation=textline, use_gpu=gpu, show_log=False)
+        if angle:
+            kwargs["use_angle_cls"] = True
+        reader = PaddleOCR(**kwargs)
+        _PADDLE_CACHE[key] = reader
+        log.info(f"PaddleOCR ready (lang={lang}, gpu={gpu}, textline={textline}, angle={angle})")
+        return reader
+    except Exception as e:
+        log.warning(f"Paddle init failed: {e}")
+        return None
+
+def get_paddle_ocr(lang: str = "en", use_gpu: bool = False) -> Optional["PaddleOCR"]:
+    """Public warmup/helper for external modules."""
+    return _get_paddle(lang=lang, angle=False, gpu_env=use_gpu, textline=None)
+
+def _easy_read(reader: "easyocr.Reader", img_rgb: "np.ndarray", *, handwriting: bool) -> Tuple[List[str], List[float]]:
+    decoder = "beamsearch" if handwriting else "greedy"
+    try:
+        results = reader.readtext(
+            img_rgb,
+            decoder=decoder,
+            beamWidth=10 if handwriting else 5,
+            detail=1,
+            paragraph=False,
+            width_ths=0.5 if handwriting else 0.7,
+            height_ths=0.5 if handwriting else 0.7,
+        )
+    except Exception as e:
+        log.warning(f"EasyOCR read failed: {e}")
+        return [], []
+    lines: List[Tuple[str, float, Tuple[float, float]]] = []
+    for box, text, conf in results:
+        try:
+            xs = [p[0] for p in box]
+            ys = [p[1] for p in box]
+            cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
+            lines.append((text, float(conf), (cx, cy)))
+        except Exception:
+            continue
+    lines.sort(key=lambda t: (round(t[2][1] / 16.0), round(t[2][0] / 16.0)))
+    return [t for (t, _c, _p) in lines], [float(c) for (_t, c, _p) in lines]
+
+# ----------------- Gemini integrations -----------------
+_GEMINI_SVC_SINGLETON = None
+_GEMINI_SVC_LOADED = False
+
+def _import_gemini_service_via_dotted(path_str: str):
+    """
+    Try normal dotted import (src.services.Gemini.gemini_service) after adding repo root
+    to sys.path. Preserves relative imports inside gemini_service.py.
+    """
+    p = Path(path_str).resolve()
+    repo_root = None
+    src_dir = None
+    for anc in p.parents:
+        if anc.name == "src":
+            src_dir = anc
+            repo_root = anc.parent
+            break
+    if repo_root is None or src_dir is None:
+        return None, f"No 'src' directory found in ancestors of {p}"
+    repo_root_str = str(repo_root)
+    if repo_root_str not in sys.path:
+        sys.path.insert(0, repo_root_str)
+    dotted = ".".join(p.relative_to(repo_root).with_suffix("").parts)  # src.services.Gemini.gemini_service
+    try:
+        mod = importlib.import_module(dotted)
+    except Exception as e:
+        return None, f"import_module('{dotted}') failed: {e}"
+    svc = getattr(mod, "GeminiService", None)
+    if svc is None:
+        return None, f"GeminiService class not found in module '{dotted}'"
+    if not hasattr(svc, "ocr"):
+        return None, f"GeminiService.ocr(...) missing in module '{dotted}'"
+    return svc, None
+
+def _import_gemini_service_via_pkgstub(path_str: str):
+    """
+    Robust loader: create package stubs so relative imports in the service work
+    even when loading the file directly.
+    """
+    p = Path(path_str).resolve()
+    repo_root = None
+    src_dir = None
+    for anc in p.parents:
+        if anc.name == "src":
+            src_dir = anc
+            repo_root = anc.parent
+            break
+    if repo_root is None or src_dir is None:
+        return None, f"No 'src' directory found in ancestors of {p}"
+
+    def _ensure_pkg(name: str, path_list: List[str]):
+        pkg = sys.modules.get(name)
+        if pkg is None:
+            pkg = types.ModuleType(name)
+            pkg.__path__ = path_list  # type: ignore[attr-defined]
+            sys.modules[name] = pkg
+        else:
+            if not hasattr(pkg, "__path__"):
+                pkg.__path__ = path_list  # type: ignore[attr-defined]
+        return pkg
+
+    _ensure_pkg("src", [str(src_dir)])
+    _ensure_pkg("src.services", [str(src_dir / "services")])
+    _ensure_pkg("src.services.Gemini", [str(src_dir / "services" / "Gemini")])
+
+    mod_name = "src.services.Gemini.gemini_service"
+    spec = importlib.util.spec_from_file_location(mod_name, str(p))
+    if not spec or not spec.loader:
+        return None, f"Cannot create spec for {p}"
+    module = importlib.util.module_from_spec(spec)
+    module.__package__ = "src.services.Gemini"
+    sys.modules[mod_name] = module
+    try:
+        spec.loader.exec_module(module)  # type: ignore[attr-defined]
+    except Exception as e:
+        sys.modules.pop(mod_name, None)
+        return None, f"exec_module('{mod_name}') failed: {e}"
+
+    svc = getattr(module, "GeminiService", None)
+    if svc is None:
+        return None, "GeminiService class not found in provided file"
+    if not hasattr(svc, "ocr"):
+        return None, "GeminiService.ocr(...) method not found"
+    return svc, None
+
+def _import_gemini_service_via_file(path_str: str):
+    """Last resort raw import (works only if the service uses absolute imports)."""
+    p = Path(path_str)
+    if not p.is_file():
+        return None, f"Not a file: {path_str}"
+    spec = importlib.util.spec_from_file_location("gemini_service_ext", str(p))
+    if not spec or not spec.loader:
+        return None, f"Cannot create import spec for: {path_str}"
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+    except Exception as e:
+        return None, f"exec_module failed: {e}"
+    svc = getattr(mod, "GeminiService", None)
+    if svc is None:
+        return None, "GeminiService class not found in provided file"
+    if not hasattr(svc, "ocr"):
+        return None, "GeminiService.ocr(...) method not found"
+    return svc, None
+
+def _get_gemini_service():
+    """Initialize your load-balanced GeminiService from GEMINI_SERVICE_PATH, else None."""
+    global _GEMINI_SVC_SINGLETON, _GEMINI_SVC_LOADED
+    if _GEMINI_SVC_LOADED:
+        return _GEMINI_SVC_SINGLETON
+    _GEMINI_SVC_LOADED = True
+
+    path_env = os.getenv("GEMINI_SERVICE_PATH", "").strip()
+    if not path_env:
+        log.info(
+            "GEMINI_SERVICE_PATH not set; will use direct google-genai fallback (if GEMINI_API_KEY present)."
+        )
+        _GEMINI_SVC_SINGLETON = None
+        return None
+
+    if not Path(path_env).is_file():
+        log.warning(
+            f"GEMINI_SERVICE_PATH '{path_env}' is not a file; skipping Gemini service."
+        )
+        _GEMINI_SVC_SINGLETON = None
+        return None
+
+    # 1) Try dotted import
+    svc_cls, err = _import_gemini_service_via_dotted(path_env)
+    if svc_cls is None:
+        log.error(f"GeminiService dotted import failed: {err}")
+        # 2) Try package-stubbed import
+        svc_cls, err2 = _import_gemini_service_via_pkgstub(path_env)
+        if svc_cls is None:
+            log.error(f"GeminiService package-stub import failed: {err2}")
+            # 3) Raw file import
+            svc_cls, err3 = _import_gemini_service_via_file(path_env)
+            if svc_cls is None:
+                log.error(f"Failed to load GeminiService from {path_env}: {err3}")
+                _GEMINI_SVC_SINGLETON = None
+                return None
+
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    try:
+        _GEMINI_SVC_SINGLETON = svc_cls(model=model)
+        log.info(f"GeminiService ready (model={model}) from {path_env}")
+    except Exception as e:
+        log.error(f"GeminiService init failed: {e}")
+        _GEMINI_SVC_SINGLETON = None
+    return _GEMINI_SVC_SINGLETON
+
+def _gemini_via_service(img_pil: "Image.Image") -> str:
+    svc = _get_gemini_service()
+    if svc is None:
+        return ""
+    max_edge = int(os.getenv("OCR_GEMINI_MAX_EDGE", "2000"))
+    if max_edge > 0:
+        img_pil = _limit_long_edge(img_pil, max_edge)
+    buf = io.BytesIO()
+    img_pil.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+    try:
+        out = svc.ocr(images=[{"mime_type": "image/png", "data": img_bytes}],
+                      prompt=_OCR_PROMPT, response_model=None)
+        if isinstance(out, dict) and "result" in out:
+            return (out["result"] or "").strip()
+        if isinstance(out, str):
+            return out.strip()
+        try:
+            return str(out).strip()
+        except Exception:
+            return ""
+    except Exception as e:
+        log.error(f"GeminiService.ocr failed: {e}")
+        return ""
+
+def _gemini_via_fallback(img_pil: "Image.Image") -> str:
+    """Direct google-genai fallback (requires GEMINI_API_KEY)."""
+    try:
+        from google import genai
+        from google.genai import types as gtypes
+    except Exception:
+        log.error("google-genai not installed. `pip install google-genai`")
+        return ""
+    api_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+    if not api_key:
+        log.error("GEMINI_API_KEY not set and no GEMINI_SERVICE_PATH usable.")
+        return ""
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    max_tokens = int(os.getenv("OCR_GEMINI_MAX_TOKENS", "8192"))
+    max_edge = int(os.getenv("OCR_GEMINI_MAX_EDGE", "2000"))
+    if max_edge > 0:
+        img_pil = _limit_long_edge(img_pil, max_edge)
+    buf = io.BytesIO()
+    img_pil.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+    try:
+        client = genai.Client(api_key=api_key)
+        image_part = gtypes.Part.from_bytes(mime_type="image/png", data=img_bytes)
+        resp = client.models.generate_content(
+            model=model,
+            contents=[image_part, _OCR_PROMPT],
+            config={"temperature": 0.0, "max_output_tokens": max_tokens},
+        )
+        text = (getattr(resp, "text", None) or getattr(resp, "output_text", "") or "").strip()
+        if not text:
+            try:
+                parts_text = []
+                for cand in (getattr(resp, "candidates", []) or []):
+                    content = getattr(cand, "content", None)
+                    if content and getattr(content, "parts", None):
+                        for p in content.parts:
+                            t = getattr(p, "text", None)
+                            if t:
+                                parts_text.append(t)
+                text = "\n".join(parts_text).strip()
+            except Exception:
+                pass
+        return text
+    except Exception as e:
+        log.error(f"Gemini fallback failed: {e}")
+        return ""
+
+# ----------------- Public OCR APIs -----------------
+def ocr_image(
+    img_rgb: Union["np.ndarray", "Image.Image"],
+    *,
+    lang: str = "en",
+    handwriting: bool = False,
+    engine: str = "hybrid",  # "easyocr" | "paddleocr" | "hybrid" | "gemini"
+    dpi_hint: Optional[int] = None,
+    return_debug: bool = False,
+) -> OCRResult:
+    assert np is not None, "numpy required"
+    engine = (engine or os.getenv("OCR_ENGINE", "hybrid")).lower()
+    handwriting = bool(int(os.getenv("OCR_HANDWRITTEN", "1" if handwriting else "0")))
+    conf_th = float(os.getenv("OCR_HANDWRITTEN_CONF_TH" if handwriting else "OCR_CONF_TH", "0.15" if handwriting else "0.35"))
+    min_lines = int(os.getenv("OCR_MIN_LINES", "5"))
+    min_avg = float(os.getenv("OCR_MIN_AVG_CONF", "0.50"))
+    upscale = float(os.getenv("OCR_UPSCALE", "1.6")) if handwriting else 1.0
+
+    debug_imgs: List["np.ndarray"] = []
+
+    # Preprocess for Easy/Paddle. For Gemini, we prefer the raw page image.
+    pre_for_easy = preprocess_for_handwriting(img_rgb, upscale=upscale) if handwriting else _ensure_np(img_rgb)
+    if return_debug and engine != "gemini":
+        debug_imgs.append(pre_for_easy.copy())
+
+    # --- Gemini path ---
+    if engine == "gemini":
+        pil_img = _to_pil(img_rgb)
+        text = _gemini_via_service(pil_img) or _gemini_via_fallback(pil_img)
+
+        if not text.strip():
+            # Optional auto-fallback to a local engine
+            if bool(int(os.getenv("OCR_GEMINI_AUTOFALLBACK", "1"))):
+                fb_engine = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "hybrid").lower()
+                fb_hand = bool(int(os.getenv("OCR_GEMINI_FALLBACK_HAND", "1")))
+                if fb_engine not in ("easyocr", "paddleocr", "hybrid"):
+                    fb_engine = "hybrid"
+                log.warning(f"Gemini returned empty text; falling back to {fb_engine} (hand={int(fb_hand)})")
+                return ocr_image(
+                    img_rgb,
+                    lang=lang,
+                    handwriting=fb_hand,
+                    engine=fb_engine,      # NOT gemini (avoid recursion)
+                    dpi_hint=dpi_hint,
+                    return_debug=return_debug,
+                )
+            # If no fallback, fail loudly
+            raise RuntimeError("Gemini OCR returned empty text (check GEMINI_SERVICE_PATH or GEMINI_API_KEY).")
+
+        lines = text.splitlines()
+        metrics = [PageMetrics(page=1, engine="gemini", lines=len(lines),
+                               avg_conf=0.0, min_conf=0.0, max_conf=0.0, dpi=dpi_hint)]
+        return OCRResult(
+            text="\n".join(lines),
+            by_page=metrics,
+            meta={"engine": "gemini", "handwriting": handwriting},
+            debug_images=None
+        )
+
+    # --- EasyOCR first (if selected or hybrid) ---
+    texts: List[str] = []
+    confs: List[float] = []
+    used_engine = engine
+
+    if engine in ("easyocr", "hybrid"):
+        reader = _get_easyocr(lang=lang, handwriting=handwriting)
+        if reader is not None:
+            t0 = time.time()
+            texts, confs = _easy_read(reader, pre_for_easy, handwriting=handwriting)
+            dt = time.time() - t0
+            avg = (sum(confs) / len(confs)) if confs else 0.0
+            log.info(f"EasyOCR lines={len(texts)} avg={avg:.2f} in {dt:.2f}s")
+            used_engine = "easyocr"
+
+    # --- Hybrid fallback with Paddle (if needed) ---
+    avg = (sum(confs) / len(confs)) if confs else 0.0
+    if engine in ("hybrid", "paddleocr") and (len(texts) < min_lines or avg < min_avg):
+        if _HAS_PADDLE:
+            for angle_flag in (False, True):
+                ocr = _get_paddle(lang=lang, angle=angle_flag)
+                if ocr is None:
+                    continue
+                try:
+                    res = ocr.ocr(pre_for_easy)
+                    flat: List[Tuple[str, float]] = []
+                    for blk in res or []:
+                        for line in blk or []:
+                            try:
+                                _box, (tx, cf) = line
+                                flat.append((tx, float(cf)))
+                            except Exception:
+                                continue
+                    p_texts = [t for (t, c) in flat if t and c >= conf_th]
+                    p_confs = [c for (t, c) in flat if t and c >= conf_th]
+                    p_avg = (sum(p_confs) / len(p_confs)) if p_confs else 0.0
+                    if len(p_texts) > len(texts) or p_avg > avg:
+                        texts, confs = p_texts, p_confs
+                        used_engine = f"paddleocr(angle_cls={angle_flag})"
+                        avg = p_avg
+                    if texts and (len(texts) >= min_lines and avg >= min_avg):
+                        break
+                except Exception as e:
+                    log.warning(f"Paddle pass failed: {e}")
+
+    page_metrics = [PageMetrics(
+        page=1, engine=used_engine, lines=len(texts),
+        avg_conf=(sum(confs)/len(confs)) if confs else 0.0,
+        min_conf=min(confs) if confs else 0.0,
+        max_conf=max(confs) if confs else 0.0,
+        dpi=dpi_hint
+    )]
+
+    return OCRResult(
+        text="\n".join(texts),
+        by_page=page_metrics,
+        meta={"engine": used_engine, "handwriting": handwriting},
+        debug_images=(debug_imgs if return_debug else None)
     )
 
-T = TypeVar("T", bound=BaseModel)
+def _open_pdf(pdf_path: Path) -> "fitz.Document":
+    if fitz is None:
+        raise RuntimeError("PyMuPDF (fitz) is required for PDF OCR")
+    return fitz.open(str(pdf_path))
 
-DEFAULT_MODEL = "gemini-2.5-flash"
-EMBEDDING_MODEL = "gemini-embedding-001"
+def ocr_pdf(
+    pdf_path: Union[str, Path],
+    *,
+    lang: str = "en",
+    handwriting: bool = False,
+    dpi: int = 300,
+    engine: str = "hybrid",  # include "gemini"
+    return_debug: bool = False,
+) -> OCRResult:
+    doc = _open_pdf(Path(pdf_path))
 
-# --- sample models (you can remove if unused) ---
-class CourseOutline(BaseModel):
-    course: str
-    topics: List[str]
-    description: str
+    pages_text: List[str] = []
+    metrics: List[PageMetrics] = []
+    debug_imgs: List["np.ndarray"] = []
 
-class CoursesResponse(BaseModel):
-    courses: List[CourseOutline]
+    for i in range(len(doc)):
+        pg = doc.load_page(i)
+        zoom = max(1.0, dpi / 72.0)
+        pm = pg.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
 
+        # --- Gemini path for PDF ---
+        if engine == "gemini":
+            if Image is None:
+                raise RuntimeError("Pillow required for Gemini OCR")
+            img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
+            page_text = _gemini_via_service(img) or _gemini_via_fallback(img)
 
-class GeminiService:
-    """Simple wrapper around the new Google GenAI client with typed configuration."""
+            if not page_text.strip():
+                if bool(int(os.getenv("OCR_GEMINI_AUTOFALLBACK", "1"))):
+                    fb_engine = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "hybrid").lower()
+                    fb_hand = bool(int(os.getenv("OCR_GEMINI_FALLBACK_HAND", "1")))
+                    if fb_engine not in ("easyocr", "paddleocr", "hybrid"):
+                        fb_engine = "hybrid"
+                    log.warning(f"[p{i+1}] Gemini empty; falling back to {fb_engine} (hand={int(fb_hand)})")
 
-    def __init__(
-        self,
-        api_keys: Optional[List[str]] = None,
-        model: str = DEFAULT_MODEL,
-        generation_config: Optional[GeminiConfig] = None,
-        api_key_manager: Optional[ApiKeyManager] = None,
-    ) -> None:
-        self.model = model
-        self.default_config = generation_config or GeminiConfig()
-
-        # Resolve API keys (prefer explicit manager, else provided list, else optional provider)
-        if api_keys is None and api_key_manager is None and GeminiApiKeys is not None:
-            try:
-                gemini_keys = GeminiApiKeys()
-                api_keys = gemini_keys.get_keys()
-            except Exception:
-                api_keys = None
-
-        if api_key_manager is None:
-            if not api_keys:
-                # Allow empty manager; user can rely on GOOGLE_API_KEY env fallback in direct calls
-                api_keys = []
-            self.api_key_manager = ApiKeyManager(api_keys)
-        else:
-            self.api_key_manager = api_key_manager
-
-        self._configure_genai()
-
-    # -------------------- Client configuration --------------------
-
-    def _configure_genai(self, model: str = "flash") -> None:
-        """(Re)configure google-genai Client using the current API key for a model family."""
-        # family is 'flash'|'lite'|'pro'|'embedding'
-        family = self._get_model_name(model)
-        api_key = self.api_key_manager.get_key(family)
-        # If no key is available here, the caller must rely on GOOGLE_API_KEY/GEMINI_API_KEY envs
-        if api_key:
-            self.client = genai.Client(api_key=api_key)
-        else:
-            # Fall back to default client (will use env var if present)
-            self.client = genai.Client()
-
-    def _get_model_name(self, model_str: str) -> str:
-        s = model_str.lower()
-        if "lite" in s:
-            return "lite"
-        if "flash" in s:
-            return "flash"
-        if "pro" in s:
-            return "pro"
-        if "embedding" in s:
-            return "embedding"
-        return "flash"  # Default class
-
-    # -------------------- Config translation --------------------
-
-    def _to_generation_config(
-        self, config: Optional[GeminiConfig | Dict[str, Any]]
-    ) -> tuple[gtypes.GenerateContentConfig, Optional[list[dict[str, Any]]]]:
-        """Convert GeminiConfig or plain dict into GenerateContentConfig."""
-        if config is None:
-            config = self.default_config
-        elif isinstance(config, dict):
-            config = GeminiConfig(**config)
-        elif not isinstance(config, GeminiConfig):
-            raise TypeError("generation_config must be GeminiConfig or dict")
-
-        def _simple_type_schema(py_type: Any) -> dict[str, Any]:
-            origin = get_origin(py_type)
-            args = get_args(py_type)
-            if origin is list or origin is List:
-                item_t = args[0] if args else str
-                return {"type": "array", "items": _simple_type_schema(item_t)}
-            # Literal values
-            try:
-                from typing import Literal as _Literal
-            except Exception:
-                _Literal = None
-            if _Literal is not None and get_origin(py_type) is _Literal:
-                vals = list(get_args(py_type))
-                return {"type": "string", "enum": [str(v) for v in vals]}
-            # Nested BaseModel
-            if isinstance(py_type, type) and issubclass(py_type, BaseModel):
-                return _pydantic_to_simple_schema(py_type)
-            # Primitives
-            if py_type in (str, Any):
-                return {"type": "string"}
-            if py_type in (int,):
-                return {"type": "integer"}
-            if py_type in (float,):
-                return {"type": "number"}
-            if py_type in (bool,):
-                return {"type": "boolean"}
-            return {"type": "string"}
-
-        def _pydantic_to_simple_schema(model_cls: Type[BaseModel]) -> dict[str, Any]:
-            schema: Dict[str, Any] = {"type": "object", "properties": {}, "required": []}
-            for name, field in model_cls.model_fields.items():
-                py_t = field.annotation if field.annotation is not None else str
-                prop_schema = _simple_type_schema(py_t)
-                if field.description:
-                    prop_schema["description"] = field.description
-                schema["properties"][name] = prop_schema
-                is_required = getattr(field, "is_required", False)
-                if is_required:
-                    schema["required"].append(name)
-            if not schema["required"]:
-                schema.pop("required")
-            return schema
-
-        gen_config = gtypes.GenerateContentConfig(
-            temperature=config.temperature,
-            max_output_tokens=config.max_output_tokens,
-            top_p=config.top_p,
-            top_k=config.top_k,
-            response_mime_type=("application/json" if config.response_schema else None),
-        )
-
-        tools = None
-        if config.response_schema:
-            try:
-                if isinstance(config.response_schema, type) and issubclass(config.response_schema, BaseModel):
-                    simple_schema = _pydantic_to_simple_schema(config.response_schema)
-                else:
-                    raw = dict(config.response_schema)
-                    def _strip(d: Any) -> Any:
-                        if isinstance(d, dict):
-                            out = {}
-                            for k, v in d.items():
-                                if k in ("type", "format", "description", "enum", "properties", "items", "required"):
-                                    out[k] = _strip(v)
-                            return out
-                        elif isinstance(d, list):
-                            return [_strip(x) for x in d]
-                        else:
-                            return d
-                    simple_schema = _strip(raw)
-                # Attach schema (supported by google-genai)
-                gen_config.response_schema = simple_schema  # type: ignore[attr-defined]
-            except Exception:
-                pass
-
-        return gen_config, tools
-
-    # -------------------- Low-level generate --------------------
-
-    def _generate(
-        self,
-        parts: Iterable[Any],
-        model: str,
-        generation_config: Optional[GeminiConfig | Dict[str, Any]],
-        response_model: Optional[Type[T]] = None,
-    ) -> T | Dict[str, Any]:
-        """Perform a generation request against google-genai."""
-        try:
-            gen_config, tools = self._to_generation_config(generation_config)
-
-            # Configure per-model family key (flash/lite/pro/embedding)
-            model_name = self._get_model_name(model)
-            self._configure_genai(model_name)
-
-            response = self.client.models.generate_content(
-                model=model,
-                contents=list(parts),
-                config=gen_config,
-            )
-
-            # Extract text (robustly)
-            response_text = getattr(response, "text", "") or ""
-            if not response_text:
-                try:
-                    parts_text: list[str] = []
-                    for cand in (getattr(response, "candidates", []) or []):
-                        content = getattr(cand, "content", None)
-                        if content and getattr(content, "parts", None):
-                            for p in content.parts:
-                                t = getattr(p, "text", None)
-                                if t:
-                                    parts_text.append(t)
-                    response_text = "\n".join(parts_text).strip()
-                except Exception:
-                    response_text = ""
-
-            # Update usage heuristically
-            key = self.api_key_manager.get_key(model_name)
-            tokens = max(1, len(response_text) // 4)
-            if key:
-                self.api_key_manager.update_usage(key, model_name, int(tokens))
-
-            # If structured output isn't requested, return raw text
-            if generation_config and isinstance(generation_config, GeminiConfig) and generation_config.response_schema is None:
-                return {"result": response_text.strip()}
-            if isinstance(generation_config, dict) and generation_config.get("response_schema") is None:
-                return {"result": response_text.strip()}
-
-            # Otherwise parse to JSON-like structure when possible
-            def _extract_function_args(resp) -> Optional[Dict[str, Any]]:
-                try:
-                    candidates = getattr(resp, "candidates", None) or []
-                    for cand in candidates:
-                        content = getattr(cand, "content", None)
-                        if not content:
-                            continue
-                        parts = getattr(content, "parts", None) or []
-                        for p in parts:
-                            fc = getattr(p, "function_call", None) or getattr(p, "functionCall", None)
-                            if not fc:
-                                continue
-                            if isinstance(fc, dict):
-                                args = fc.get("args") or fc.get("arguments")
-                            else:
-                                args = getattr(fc, "args", None) or getattr(fc, "arguments", None)
-                            if args is None:
-                                continue
-                            if isinstance(args, str):
-                                try:
-                                    return json.loads(args)
-                                except Exception:
-                                    pass
-                            elif isinstance(args, dict):
-                                return args
-                    return None
-                except Exception:
-                    return None
-
-            data: Any = None
-            if tools:
-                data = _extract_function_args(response)
-
-            if data is None:
-                cleaned_text = (response_text or "").strip()
-                if cleaned_text.startswith("```json"):
-                    cleaned_text = cleaned_text[7:]
-                if cleaned_text.endswith("```"):
-                    cleaned_text = cleaned_text[:-3]
-                cleaned_text = cleaned_text.strip()
-
-                try:
-                    data = json.loads(cleaned_text)
-                except json.JSONDecodeError:
-                    # Try to extract a balanced JSON object/array from the text
-                    def _extract_balanced_json(s: str) -> Optional[str]:
-                        start = None
-                        opener = closer = None
-                        for i, ch in enumerate(s):
-                            if ch in "{[":
-                                start = i
-                                opener = ch
-                                closer = "}" if ch == "{" else "]"
-                                break
-                        if start is None:
-                            return None
-                        depth = 0
-                        in_string = False
-                        escaped = False
-                        for j in range(start, len(s)):
-                            ch = s[j]
-                            if in_string:
-                                if escaped:
-                                    escaped = False
-                                elif ch == "\\":
-                                    escaped = True
-                                elif ch == '"':
-                                    in_string = False
-                                continue
-                            else:
-                                if ch == '"':
-                                    in_string = True
-                                    continue
-                                if ch == opener:
-                                    depth += 1
-                                elif ch == closer:
-                                    depth -= 1
-                                    if depth == 0:
-                                        return s[start : j + 1]
-                        return None
-
-                    candidate = _extract_balanced_json(cleaned_text)
-                    if candidate is not None:
-                        try:
-                            data = json.loads(candidate)
-                        except Exception:
-                            # attempt a trivial repair
-                            repaired = self._repair_truncated_json(cleaned_text)
-                            data = json.loads(repaired) if repaired else {"result": None, "raw": response_text}
+                    # Build ndarray for local OCR path
+                    if cv2 is not None:
+                        arr = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)
+                        if pm.n == 4:
+                            arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+                        rgb = arr
                     else:
-                        repaired = self._repair_truncated_json(cleaned_text)
-                        data = json.loads(repaired) if repaired else {"result": None, "raw": response_text}
+                        _pil = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
+                        rgb = np.array(_pil)
 
-            # Optional response_model validation/shaping
-            if response_model:
-                try:
-                    if isinstance(data, dict) and isinstance(data.get("questions"), list):
-                        def _sanitize(text: str) -> str:
-                            if not isinstance(text, str):
-                                return text
-                            sents = re.split(r"(?<=[.!?])\s+", text.strip())
-                            sents = [
-                                s for s in sents
-                                if not re.search(
-                                    r"\b(let\s+me|let's|assume|apologies|re-?calculate|recheck)\b",
-                                    s, flags=re.IGNORECASE
-                                )
-                            ]
-                            out = " ".join(sents).strip()
-                            return re.sub(r"\s+", " ", out)
-                        for q in data["questions"]:
-                            if isinstance(q, dict):
-                                steps = q.get("solution_steps")
-                                if isinstance(steps, list) and len(steps) > 5:
-                                    q["solution_steps"] = steps[:5]
-                                if "explanation" in q:
-                                    q["explanation"] = _sanitize(q["explanation"])
-                                if "question" in q:
-                                    q["question"] = _sanitize(q["question"])
-                except Exception:
-                    pass
-                return response_model.model_validate(data)
-            return {"result": data}
-
-        except genai_errors.ClientError as e:
-            # 4xx (including 429)
-            if getattr(e, "code", 0) == 429:
-                model_name = self._get_model_name(model)
-                try:
-                    self.api_key_manager.rotate_key(model_name)
-                    self._configure_genai(model_name)
-                except Exception:
-                    pass
-                # retry once
-                return self._generate(parts, model, generation_config, response_model)
-            raise
-        except genai_errors.ServerError:
-            model_name = self._get_model_name(model)
-            try:
-                self.api_key_manager.rotate_key(model_name)
-                self._configure_genai(model_name)
-            except Exception:
-                pass
-            # retry once
-            return self._generate(parts, model, generation_config, response_model)
-
-    @staticmethod
-    def _repair_truncated_json(s: str) -> Optional[str]:
-        start = None
-        for i, ch in enumerate(s):
-            if ch in "[{":
-                start = i
-                break
-        if start is None:
-            return None
-        in_string = False
-        escaped = False
-        stack: list[str] = []
-        for ch in s[start:]:
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif ch == "\\":
-                    escaped = True
-                elif ch == '"':
-                    in_string = False
-                continue
-            else:
-                if ch == '"':
-                    in_string = True
-                    continue
-                if ch in "[{":
-                    stack.append(ch)
-                elif ch in "]}":
-                    if stack:
-                        opener = stack[-1]
-                        if (opener == "[" and ch == "]") or (opener == "{" and ch == "}"):
-                            stack.pop()
-        repaired = s[start:]
-        if in_string:
-            repaired += '"'
-        for opener in reversed(stack):
-            repaired += "]" if opener == "[" else "}"
-        return repaired
-
-    # -------------------- High-level generate --------------------
-
-    def generate(
-        self,
-        prompt: str,
-        *,
-        model: Optional[str] = None,
-        generation_config: Optional[GeminiConfig | Dict[str, Any]] = None,
-        response_model: Optional[Type[T]] = None,
-    ) -> T | Dict[str, Any]:
-        """Generate text from a prompt using the specified model."""
-        gen_conf = generation_config
-        # If a response model is provided, enable structured output automatically
-        if response_model is not None:
-            if gen_conf is None:
-                gen_conf = self.default_config.model_copy(deep=True)
-            elif isinstance(gen_conf, dict):
-                gen_conf = GeminiConfig(**gen_conf)
-            elif not isinstance(gen_conf, GeminiConfig):
-                gen_conf = self.default_config.model_copy(deep=True)
-
-            if getattr(gen_conf, "response_schema", None) is None:
-                gen_conf.response_schema = response_model
-
-        return self._generate(
-            parts=[prompt], model=(model or self.model), generation_config=gen_conf, response_model=response_model
-        )
-
-    # -------------------- OCR helper (fixed for google-genai v1.x) --------------------
-
-    def ocr(
-        self,
-        images: List[Dict[str, Any]],
-        prompt: str = OCR_PROMPT,
-        response_model: Optional[Type[T]] = None,
-        generation_config: Optional[GeminiConfig | Dict[str, Any]] = None,
-        model: Optional[str] = None,
-    ) -> T | Dict[str, Any]:
-        """
-        OCR helper that builds proper multimodal Parts for the new google-genai SDK.
-
-        Args:
-            images: [{"mime_type": "image/png", "data": <bytes>}, ...]
-            prompt: OCR instruction appended after images
-            response_model: optional Pydantic model for structured output
-
-        Returns:
-            Plain text dict {"result": "..."} by default, or response_model instance if provided.
-        """
-        if not images:
-            raise ValueError("No images provided for OCR")
-
-        # Build typed Parts (required by google-genai v1.x)
-        parts: List[Any] = []
-        for img in images:
-            mt = img.get("mime_type")
-            data = img.get("data")
-            if not mt or data is None:
-                raise ValueError("Each image must include 'mime_type' and 'data' (bytes)")
-            parts.append(gtypes.Part.from_bytes(mime_type=mt, data=data))
-
-        # Append textual instruction last
-        parts.append(prompt)
-
-        # Select model/config
-        use_model = model or self.model
-        use_conf = generation_config if generation_config is not None else self.default_config
-
-        return self._generate(
-            parts=parts, model=use_model, generation_config=use_conf, response_model=response_model
-        )
-
-    # -------------------- Embeddings with batching & key rotation --------------------
-
-    def _estimate_tokens(self, text: str) -> int:
-        """Estimate tokens with a simple 4-chars-per-token heuristic."""
-        return max(1, len(text) // 4)
-
-    def _batch_texts(self, texts: List[str], max_tokens: int = 2000) -> List[List[str]]:
-        """Split texts so each batch stays within ~max_tokens heuristic limit."""
-        batches: List[List[str]] = []
-        current: List[str] = []
-        current_tokens = 0
-        for t in texts:
-            t_tok = self._estimate_tokens(t)
-            if t_tok > max_tokens:
-                if current:
-                    batches.append(current)
-                    current, current_tokens = [], 0
-                batches.append([t])
-                continue
-            if current_tokens + t_tok > max_tokens and current:
-                batches.append(current)
-                current, current_tokens = [t], t_tok
-            else:
-                current.append(t)
-                current_tokens += t_tok
-        if current:
-            batches.append(current)
-        return batches
-
-    def embed(
-        self,
-        texts: List[str],
-        model: Optional[str] = None,
-        target_dim: Optional[int] = 768
-    ) -> List[List[float]]:
-        """Generate embeddings while respecting ~2k tokens/request and RPM limits."""
-        if not texts:
-            return []
-
-        embedding_model = model or EMBEDDING_MODEL
-        batches = self._batch_texts(texts, max_tokens=2000)
-
-        rotation_cycles = 0
-        max_cycles_before_delay = 5
-
-        all_embeddings: List[List[float]] = []
-        for batch_idx, batch in enumerate(batches, 1):
-            should_delay = self._wait_for_rpm_if_needed("embedding", rotation_cycles, max_cycles_before_delay)
-            if should_delay:
-                rotation_cycles += 1
-
-            try:
-                approx_tokens = sum(self._estimate_tokens(t) for t in batch)
-                print(
-                    f"🔮 Embedding batch {batch_idx}/{len(batches)} "
-                    f"({len(batch)} texts, ≈{approx_tokens} tokens) using {embedding_model}"
-                )
-
-                # Configure per embedding family
-                self._configure_genai("embedding")
-
-                resp = self.client.models.embed_content(
-                    model=embedding_model,
-                    contents=batch if len(batch) > 1 else batch[0],
-                    config={"task_type": "retrieval_document"},
-                )
-
-                embs = getattr(resp, 'embeddings', None) or []
-                embeddings = [e.values for e in embs] if embs else []
-
-                if target_dim and embeddings and len(embeddings[0]) > target_dim:
-                    embeddings = [emb[:target_dim] for emb in embeddings]
-
-                all_embeddings.extend(embeddings)
-
-                key = self.api_key_manager.get_key("embedding")
-                model_name = self._get_model_name(embedding_model)
-                if key:
-                    self.api_key_manager.update_usage(
-                        key, model_name, sum(len(t.split()) for t in batch)
+                    fb = ocr_image(
+                        rgb, lang=lang, handwriting=fb_hand,
+                        engine=fb_engine, dpi_hint=dpi, return_debug=return_debug
                     )
+                    pages_text.append(fb.text)
+                    metrics.append(PageMetrics(
+                        page=i + 1, engine=f"gemini→{fb.by_page[0].engine}",
+                        lines=len(fb.text.splitlines()) if fb.text else 0,
+                        avg_conf=fb.by_page[0].avg_conf,
+                        min_conf=fb.by_page[0].min_conf,
+                        max_conf=fb.by_page[0].max_conf,
+                        dpi=dpi,
+                    ))
+                    continue  # next page
+                else:
+                    raise RuntimeError("Gemini OCR returned empty text (page).")
 
-            except genai_errors.ClientError as e:
-                print(f"⚠️ API key failed during embedding (client {getattr(e, 'code', '')}): {e}")
-                try:
-                    self.api_key_manager.rotate_key("embedding")
-                    self._configure_genai("embedding")
-                    rotation_cycles += 1
-                except ValueError as rotate_error:
-                    if "All API keys are over their limits" in str(rotate_error):
-                        if rotation_cycles >= max_cycles_before_delay:
-                            delay_time = 70
-                            print(
-                                f"⏰ All API keys exhausted after {rotation_cycles} rotations. "
-                                f"Waiting {delay_time}s for rate limits to reset..."
-                            )
-                            import time as _t
-                            _t.sleep(delay_time)
-                            rotation_cycles = 0
-                            self.api_key_manager.current_key_index = 0
-                            self._configure_genai("embedding")
-                        else:
-                            raise rotate_error
-                    else:
-                        raise rotate_error
+            # Normal Gemini success
+            pages_text.append(page_text)
+            metrics.append(PageMetrics(
+                page=i + 1, engine="gemini",
+                lines=len(page_text.splitlines()),
+                avg_conf=0.0, min_conf=0.0, max_conf=0.0, dpi=dpi
+            ))
+            continue
 
-                retry_embeddings = self.embed(batch, model, target_dim)
-                all_embeddings.extend(retry_embeddings)
+        # --- Non-Gemini: route via ocr_image() for consistency ---
+        if cv2 is not None:
+            arr = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)
+            if pm.n == 4:
+                arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+            rgb = arr
+        else:
+            img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
+            rgb = np.array(img)
 
+        single = ocr_image(
+            rgb, lang=lang, handwriting=handwriting,
+            engine=engine, dpi_hint=dpi, return_debug=return_debug
+        )
+        pages_text.append(single.text)
+        m = single.by_page[0]
+        m.page = i + 1
+        metrics.append(m)
+        if return_debug and single.debug_images:
+            debug_imgs.extend(single.debug_images)
+
+    full = "\n".join(pages_text)
+    meta = {"engine": engine, "handwriting": handwriting, "dpi": dpi, "pages": len(doc)}
+    return OCRResult(text=full, by_page=metrics, meta=meta, debug_images=(debug_imgs if return_debug else None))
+
+# ----------------- CLI -----------------
+if __name__ == "__main__":
+    import argparse
+
+    p = argparse.ArgumentParser(description="Standalone OCR for images/PDFs (Gemini/EasyOCR/Paddle)")
+    p.add_argument("inputs", nargs="+", help="File(s) or folder(s) to OCR")
+    p.add_argument("-o", "--outdir", default="ocr_out", help="Output directory")
+    p.add_argument("--hand", action="store_true", help="Handwriting mode (preprocessing for Easy/Paddle)")
+    p.add_argument("--lang", default=os.getenv("PADDLE_LANG", "en"), help="Language (e.g., en, fr)")
+    p.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
+                   choices=["easyocr", "paddleocr", "hybrid", "gemini"],
+                   help="OCR engine to use")
+    p.add_argument("--dpi", type=int, default=300, help="PDF render DPI (also affects Gemini page raster)")
+    p.add_argument("--save-debug", action="store_true", help="Save preprocessed images (non-Gemini)")
+    args = p.parse_args()
+
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    dbgdir = outdir / "debug"
+    if args.save_debug:
+        dbgdir.mkdir(exist_ok=True)
+
+    exts_img = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
+    targets: List[Path] = []
+    for raw in args.inputs:
+        pth = Path(raw)
+        if pth.is_dir():
+            targets += sorted(pth.rglob("*.pdf"))
+            for ext in exts_img:
+                targets += sorted(pth.rglob(f"*{ext}"))
+        else:
+            targets.append(pth)
+
+    if not targets:
+        raise SystemExit("No inputs found.")
+
+    for src in targets:
+        stem = src.stem
+        if src.suffix.lower() == ".pdf":
+            try:
+                res = ocr_pdf(
+                    src, lang=args.lang, handwriting=args.hand,
+                    dpi=args.dpi, engine=args.engine, return_debug=args.save_debug
+                )
+                (outdir / f"{stem}.txt").write_text(res.text, encoding="utf-8")
+                (outdir / f"{stem}.metrics.json").write_text(
+                    json.dumps([m.__dict__ for m in res.by_page], ensure_ascii=False, indent=2),
+                    encoding="utf-8"
+                )
+                if args.save_debug and res.debug_images and cv2 is not None:
+                    for idx, img in enumerate(res.debug_images, start=1):
+                        cv2.imwrite(str(dbgdir / f"{stem}_p{idx}.png"),
+                                    cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+                log.info(f"PDF OK: {src.name}  chars={len(res.text):,}  preview='{_snapshot(res.text)}'")
             except Exception as e:
-                print(f"❌ Error generating embeddings for batch {batch_idx}: {e}")
-                raise
+                log.error(f"PDF FAIL: {src} -> {e}")
+        else:
+            try:
+                if Image is None:
+                    raise RuntimeError("Pillow is required to open images")
+                im = Image.open(src)
+                res = ocr_image(
+                    im, lang=args.lang, handwriting=args.hand,
+                    engine=args.engine, dpi_hint=None, return_debug=args.save_debug
+                )
+                (outdir / f"{stem}.txt").write_text(res.text, encoding="utf-8")
+                (outdir / f"{stem}.metrics.json").write_text(
+                    json.dumps([m.__dict__ for m in res.by_page], ensure_ascii=False, indent=2),
+                    encoding="utf-8"
+                )
+                if args.save_debug and res.debug_images and cv2 is not None and res.debug_images:
+                    cv2.imwrite(str(dbgdir / f"{stem}.png"),
+                                cv2.cvtColor(res.debug_images[0], cv2.COLOR_RGB2BGR))
+                log.info(f"IMG OK: {src.name}  chars={len(res.text):,}  preview='{_snapshot(res.text)}'")
+            except Exception as e:
+                log.error(f"IMG FAIL: {src} -> {e}")
 
-        print(f"✨ Successfully generated {len(all_embeddings)} embeddings across {len(batches)} request(s)")
-        return all_embeddings
-
-    def _wait_for_rpm_if_needed(self, model: str = "flash", rotation_cycles: int = 0, max_cycles: int = 5) -> bool:
-        """Wait if the current key is approaching its RPM limit. Returns True if delay occurred."""
-        from ..Gemini.rate_limit_data import RATE_LIMITS
-
-        rate_limit = RATE_LIMITS.get(model, RATE_LIMITS["flash"])
-        current_timestamps = self.api_key_manager.rpm_timestamps[self.api_key_manager.current_key_index][model]
-
-        now = time.time()
-        current_timestamps[:] = [t for t in current_timestamps if now - t < 60]
-
-        if len(current_timestamps) >= rate_limit.per_minute:
-            oldest_request = min(current_timestamps)
-            wait_time = 60 - (now - oldest_request) + 1
-            if wait_time > 0:
-                if rotation_cycles >= max_cycles:
-                    extended_wait = wait_time + 60
-                    print(
-                        f"⏳ RPM limit reached after {rotation_cycles} rotations "
-                        f"({len(current_timestamps)}/{rate_limit.per_minute}). "
-                        f"Extended wait: {extended_wait:.1f}s..."
-                    )
-                    time.sleep(extended_wait)  # type: ignore[name-defined]
-                else:
-                    print(
-                        f"⏳ RPM limit reached "
-                        f"({len(current_timestamps)}/{rate_limit.per_minute}). "
-                        f"Waiting {wait_time:.1f}s..."
-                    )
-                    time.sleep(wait_time)  # type: ignore[name-defined]
-                return True
-        return False
+    print(f"Saved outputs to: {outdir}")
