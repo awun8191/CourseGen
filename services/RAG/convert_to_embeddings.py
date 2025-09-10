@@ -245,6 +245,22 @@ def get_paddle_ocr(lang: str = "en") -> Optional['PaddleOCR']:
             _PADDLE = None
     return _PADDLE
 
+def cleanup_paddle_ocr() -> None:
+    """Clean up PaddleOCR resources to free memory."""
+    global _PADDLE
+    if _PADDLE is not None:
+        try:
+            # PaddleOCR doesn't have an explicit cleanup method, but we can set it to None
+            # to allow garbage collection and force reinitialization if needed
+            log(f"[INFO] Cleaning up PaddleOCR resources")
+            _PADDLE = None
+            # Force garbage collection to free memory
+            import gc
+            gc.collect()
+        except Exception as e:
+            log(f"[WARN] Error during PaddleOCR cleanup: {e}")
+            _PADDLE = None
+
 def _pixmap_to_numpy(pix: fitz.Pixmap) -> 'np.ndarray':
     if not OPENCV_AVAILABLE:
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -256,7 +272,8 @@ def _pixmap_to_numpy(pix: fitz.Pixmap) -> 'np.ndarray':
 
 def ocr_page_with_paddle_or_tesseract(page: fitz.Page, dpi: int = 300, lang: str = "en") -> str:
     ocr = get_paddle_ocr(lang=lang) if PADDLE_AVAILABLE else None
-
+    result_text = ""
+    
     last_img = None
     ladder = [dpi, 240, 200, 150, 100, 72] if dpi >= 240 else [dpi, 150, 100, 72]
     MAX_OCR_BYTES = int(os.getenv("OCR_MAX_IMAGE_BYTES", str(64 * 1024 * 1024)))
@@ -269,16 +286,26 @@ def ocr_page_with_paddle_or_tesseract(page: fitz.Page, dpi: int = 300, lang: str
             img = _pixmap_to_numpy(pix)
             last_img = img
 
+            # Clean up pixmap immediately to free memory
+            del pix
+            
             nbytes = getattr(img, "nbytes", img.size)
             if nbytes > MAX_OCR_BYTES:
                 if attempt_dpi == ladder[-1]:
                     log(f"[WARN] Page image {nbytes}B too large at {attempt_dpi} DPI, skipping OCR")
                     break
                 log(f"[WARN] Page image {nbytes}B > {MAX_OCR_BYTES}B at {attempt_dpi} DPI; trying lower DPI")
+                # Clean up image before trying next DPI
+                if 'img' in locals():
+                    del img
                 continue
 
             if ocr is not None:
                 res = ocr.ocr(img)
+                # Clean up image immediately after OCR
+                if 'img' in locals():
+                    del img
+                    
                 flat = []
                 for blk in res:
                     if blk:
@@ -298,13 +325,26 @@ def ocr_page_with_paddle_or_tesseract(page: fitz.Page, dpi: int = 300, lang: str
                 if texts:
                     if attempt_dpi != dpi:
                         log(f"[OCR] Paddle used {attempt_dpi} DPI instead of {dpi}")
-                    return "\n".join(texts)
+                    result_text = "\n".join(texts)
+                    break
+                    
         except Exception as e:
+            # Clean up image if there's an exception
+            if 'img' in locals():
+                del img
             if any(s in str(e).lower() for s in ("memory", "alloc")) and attempt_dpi != ladder[-1]:
                 log(f"[WARN] Paddle OOM at {attempt_dpi} DPI; trying lower DPI")
                 continue
             log(f"[WARN] Paddle error at {attempt_dpi} DPI: {e}")
             break
+
+    # Clean up last_img if it exists
+    if 'last_img' in locals() and last_img is not None:
+        del last_img
+
+    # If we got text from Paddle, return it
+    if result_text:
+        return result_text
 
     # Last resort: Tesseract
     tess_cmd = os.getenv("TESSERACT_CMD")
@@ -322,17 +362,29 @@ def ocr_page_with_paddle_or_tesseract(page: fitz.Page, dpi: int = 300, lang: str
                 if not lang_path.exists():
                     log(f"[WARN] Tesseract missing {tess_lang}.traineddata under {lang_path.parent}; skipping Tesseract")
                     return ""
+            
+            # Get image at lower DPI for Tesseract if not already available
             if last_img is None:
                 pix = page.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
                 last_img = _pixmap_to_numpy(pix)
+                del pix  # Clean up pixmap immediately
 
             img_pil = Image.fromarray(last_img)
             tesseract_text = pytesseract.image_to_string(img_pil, lang=tess_lang)
+            
+            # Clean up Tesseract resources
+            del img_pil
+            if 'last_img' in locals():
+                del last_img
+                
             if tesseract_text.strip():
                 log("[OCR] Tesseract fallback used")
                 return tesseract_text.strip()
         except Exception as te:
             log(f"[WARN] Tesseract fallback failed: {te}")
+            # Clean up any remaining resources
+            if 'last_img' in locals():
+                del last_img
     return ""
 
 # Text extract wrapper
@@ -403,37 +455,50 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
     meta_path = parse_path_meta(path)
     log(f"[META] Parsing metadata for {path.name}")
 
-    log(f"[TEXT] Extracting text from {path.name}")
-    text = extract_text(path, Path(cache_dir), force_ocr, ocr_engine, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang)
-    if not text.strip():
-        return {"file": rel, "skip": True, "reason": "empty_text"}
-    log(f"[EXTRACT] {path.name} chars={len(text)} snapshot='{snapshot(text)}'")
-
-    log(f"[CHUNK] Chunking text for {path.name}")
-    chunks_all = chunk(text)
-    uniq, dup_map = dedupe(chunks_all)
-    if not uniq:
-        return {"file": rel, "skip": True, "reason": "no_chunks"}
-    log(f"[CHUNK] {path.name} uniq_chunks={len(uniq)} first_chunk='{snapshot(uniq[0]) if uniq else ''}'")
-
-    # Cloudflare embeddings
-    log(f"[EMBED] Creating Cloudflare BGE-M3 embeddings for {path.name} ({len(uniq)} chunks)")
     try:
-        cf = CFEmbeddings(cf_acct, cf_token, int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
-        log(f"[EMBED] Cloudflare client initialized with account: {cf_acct[:8]}...")
-        vecs, total_tokens = [], 0
-        batch_count = 0
-        for emb_batch, tok_batch in cf.embed_iter(uniq, batch_size=embed_batch):
-            vecs.extend(emb_batch)
-            total_tokens += tok_batch
-            batch_count += 1
-            log(f"[EMBED] Processed batch {batch_count}: {len(emb_batch)} vectors, {tok_batch} tokens")
-        if len(vecs) != len(uniq):
-            return {"file": rel, "error": f"embedding_mismatch: got {len(vecs)} vectors, expected {len(uniq)}"}
-        log(f"[EMBED] Successfully created {len(vecs)} Cloudflare embeddings, total tokens: {total_tokens}")
+        log(f"[TEXT] Extracting text from {path.name}")
+        text = extract_text(path, Path(cache_dir), force_ocr, ocr_engine, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang)
+        if not text.strip():
+            return {"file": rel, "skip": True, "reason": "empty_text"}
+        log(f"[EXTRACT] {path.name} chars={len(text)} snapshot='{snapshot(text)}'")
+
+        log(f"[CHUNK] Chunking text for {path.name}")
+        chunks_all = chunk(text)
+        uniq, dup_map = dedupe(chunks_all)
+        if not uniq:
+            return {"file": rel, "skip": True, "reason": "no_chunks"}
+        log(f"[CHUNK] {path.name} uniq_chunks={len(uniq)} first_chunk='{snapshot(uniq[0]) if uniq else ''}'")
+
+        # Cloudflare embeddings
+        log(f"[EMBED] Creating Cloudflare BGE-M3 embeddings for {path.name} ({len(uniq)} chunks)")
+        cf = None
+        try:
+            cf = CFEmbeddings(cf_acct, cf_token, int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
+            log(f"[EMBED] Cloudflare client initialized with account: {cf_acct[:8]}...")
+            vecs, total_tokens = [], 0
+            batch_count = 0
+            for emb_batch, tok_batch in cf.embed_iter(uniq, batch_size=embed_batch):
+                vecs.extend(emb_batch)
+                total_tokens += tok_batch
+                batch_count += 1
+                log(f"[EMBED] Processed batch {batch_count}: {len(emb_batch)} vectors, {tok_batch} tokens")
+            if len(vecs) != len(uniq):
+                return {"file": rel, "error": f"embedding_mismatch: got {len(vecs)} vectors, expected {len(uniq)}"}
+            log(f"[EMBED] Successfully created {len(vecs)} Cloudflare embeddings, total tokens: {total_tokens}")
+        except Exception as e:
+            log(f"[ERROR] Cloudflare embedding failed: {e}")
+            return {"file": rel, "error": f"cloudflare_embedding_error: {e}"}
+        finally:
+            # Clean up Cloudflare client
+            if cf is not None:
+                cf.close()
+
     except Exception as e:
-        log(f"[ERROR] Cloudflare embedding failed: {e}")
-        return {"file": rel, "error": f"cloudflare_embedding_error: {e}"}
+        log(f"[ERROR] Processing failed for {path.name}: {e}")
+        return {"file": rel, "error": f"processing_error: {e}"}
+    finally:
+        # Clean up PaddleOCR resources after processing each file
+        cleanup_paddle_ocr()
 
     # Write per-file JSONL
     tmp_dir = Path(export_tmp); tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -523,6 +588,8 @@ def main():
     ap.add_argument("--ocr-lang", default=os.getenv("PADDLE_LANG", "en"))
     ap.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
                     choices=["gemini", "hybrid", "easyocr", "paddleocr"], help="OCR engine")
+    ap.add_argument("--memory-limit", type=int, default=0, help="Memory limit in MB (0 = no limit)")
+    ap.add_argument("--retry-limit", type=int, default=3, help="Maximum retry attempts per file")
     args = ap.parse_args()
 
     try:
@@ -692,86 +759,92 @@ def main():
 
     processed = 0
     if args.workers == 1:
-        for fp in tasks:
-            files_state[str(fp)]["status"] = "in_progress"
-            files_state[str(fp)]["started_at"] = now_iso()
-            save_progress(progress_path, prog)
-            log(f"[START] Processing {fp.name} (single-threaded mode)")
-
-            try:
-                log(f"[PROCESS] Starting {fp.name} with {args.timeout}s timeout")
-                start_time = time.time()
-                from concurrent.futures import ProcessPoolExecutor as _PPE
-                ex1 = _PPE(max_workers=1)
-                fut = ex1.submit(
-                    process_one,
-                    str(fp), str(root), str(export_tmp), str(cache_dir),
-                    acct, tok, str(billing_file), args.embed_batch,
-                    args.force_ocr, args.engine, args.ocr_dpi, args.ocr_lang,
-                )
-                try:
-                    res = fut.result(timeout=max(1, int(args.timeout)))
-                except TimeoutError:
-                    ex1.shutdown(wait=False, cancel_futures=True)
-                    elapsed = time.time() - start_time
-                    log(f"[ERROR] Timeout after {elapsed:.1f}s on {fp.name}")
-                    res = {"error": "timeout", "file": str(fp)}
-                else:
-                    ex1.shutdown(wait=True, cancel_futures=False)
-                    elapsed = time.time() - start_time
-                    log(f"[PROCESS] Completed {fp.name} in {elapsed:.1f}s")
-            except KeyboardInterrupt:
-                log(f"[INTERRUPT] Processing interrupted for {fp.name}")
-                sys.exit(0)
-            except Exception as e:
-                elapsed = time.time() - start_time if 'start_time' in locals() else 0
-                log(f"[ERROR] Exception in {fp.name} after {elapsed:.1f}s: {e}")
-                res = {"error": f"exception: {e}", "file": str(fp)}
-
-            processed += 1
-
-            if res.get("error"):
-                files_state[str(fp)]["status"] = "failed"
-                files_state[str(fp)]["error"] = res["error"]
-                files_state[str(fp)]["finished_at"] = now_iso()
+        # Use a single process pool for all files in single-threaded mode
+        # This avoids the overhead of creating/destroying pools for each file
+        with ProcessPoolExecutor(max_workers=1,
+                                initializer=_worker_init_for_ocr,
+                                initargs=(args.ocr_lang,)) as ex:
+            for fp in tasks:
+                files_state[str(fp)]["status"] = "in_progress"
+                files_state[str(fp)]["started_at"] = now_iso()
                 save_progress(progress_path, prog)
-                log(f"[FAIL] {fp.name}: {res['error']}")
-                continue
+                log(f"[START] Processing {fp.name} (single-threaded mode)")
 
-            if res.get("skip"):
-                files_state[str(fp)].update({"status": "skipped", "reason": res.get("reason", "unknown"),
-                                             "finished_at": now_iso()})
-                save_progress(progress_path, prog)
-                log(f"[SKIP] {fp.name}: {res.get('reason')}")
-                continue
-
-            if "total_tokens" in res:
-                ftoks, fcost = billing.add(res["file"], res["total_tokens"])
-                log(f"[Billing] {Path(res['file']).name}: total tokens={ftoks:,} cost=${fcost:.6f}")
-
-            jsonl_tmp = Path(res["jsonl_tmp"])
-            jsonl_final = archive_tmp(jsonl_tmp)
-
-            chroma_done = False
-            if args.with_chroma and collection:
                 try:
-                    added = chroma_upsert_jsonl(jsonl_final, collection, client, batch=64)
-                    chroma_done = added > 0
-                    log(f"[Chroma] {fp.name}: +{added} vectors")
+                    log(f"[PROCESS] Starting {fp.name} with {args.timeout}s timeout")
+                    start_time = time.time()
+                    fut = ex.submit(
+                        process_one,
+                        str(fp), str(root), str(export_tmp), str(cache_dir),
+                        acct, tok, str(billing_file), args.embed_batch,
+                        args.force_ocr, args.engine, args.ocr_dpi, args.ocr_lang,
+                    )
+                    try:
+                        res = fut.result(timeout=max(1, int(args.timeout)))
+                    except TimeoutError:
+                        # Cancel the future and shutdown gracefully
+                        fut.cancel()
+                        elapsed = time.time() - start_time
+                        log(f"[ERROR] Timeout after {elapsed:.1f}s on {fp.name}")
+                        res = {"error": "timeout", "file": str(fp)}
+                    else:
+                        elapsed = time.time() - start_time
+                        log(f"[PROCESS] Completed {fp.name} in {elapsed:.1f}s")
+                except KeyboardInterrupt:
+                    log(f"[INTERRUPT] Processing interrupted for {fp.name}")
+                    # Cancel all pending futures
+                    for pending_fut in ex._futures:  # type: ignore
+                        pending_fut.cancel()
+                    sys.exit(0)
                 except Exception as e:
-                    log(f"[ERROR] ChromaDB failed for {fp.name}: {e}")
-                    chroma_done = False
+                    elapsed = time.time() - start_time if 'start_time' in locals() else 0
+                    log(f"[ERROR] Exception in {fp.name} after {elapsed:.1f}s: {e}")
+                    res = {"error": f"exception: {e}", "file": str(fp)}
 
-            files_state[str(fp)].update({
-                "status": "completed",
-                "jsonl_name": jsonl_final.name,
-                "jsonl_archived": True,
-                "chroma_upserted": chroma_done,
-                "chunks": res.get("chunks", 0),
-                "duplicates": res.get("dups", 0),
-                "finished_at": now_iso(),
-            })
-            save_progress(progress_path, prog)
+                processed += 1
+
+                if res.get("error"):
+                    files_state[str(fp)]["status"] = "failed"
+                    files_state[str(fp)]["error"] = res["error"]
+                    files_state[str(fp)]["finished_at"] = now_iso()
+                    save_progress(progress_path, prog)
+                    log(f"[FAIL] {fp.name}: {res['error']}")
+                    continue
+
+                if res.get("skip"):
+                    files_state[str(fp)].update({"status": "skipped", "reason": res.get("reason", "unknown"),
+                                                 "finished_at": now_iso()})
+                    save_progress(progress_path, prog)
+                    log(f"[SKIP] {fp.name}: {res.get('reason')}")
+                    continue
+
+                if "total_tokens" in res:
+                    ftoks, fcost = billing.add(res["file"], res["total_tokens"])
+                    log(f"[Billing] {Path(res['file']).name}: total tokens={ftoks:,} cost=${fcost:.6f}")
+
+                jsonl_tmp = Path(res["jsonl_tmp"])
+                jsonl_final = archive_tmp(jsonl_tmp)
+
+                chroma_done = False
+                if args.with_chroma and collection:
+                    try:
+                        added = chroma_upsert_jsonl(jsonl_final, collection, client, batch=64)
+                        chroma_done = added > 0
+                        log(f"[Chroma] {fp.name}: +{added} vectors")
+                    except Exception as e:
+                        log(f"[ERROR] ChromaDB failed for {fp.name}: {e}")
+                        chroma_done = False
+
+                files_state[str(fp)].update({
+                    "status": "completed",
+                    "jsonl_name": jsonl_final.name,
+                    "jsonl_archived": True,
+                    "chroma_upserted": chroma_done,
+                    "chunks": res.get("chunks", 0),
+                    "duplicates": res.get("dups", 0),
+                    "finished_at": now_iso(),
+                })
+                save_progress(progress_path, prog)
     else:
         with ProcessPoolExecutor(max_workers=args.workers,
                                  initializer=_worker_init_for_ocr,
@@ -783,58 +856,87 @@ def main():
                     args.force_ocr, args.engine, args.ocr_dpi, args.ocr_lang,
                 ): fp for fp in tasks
             }
+            
+            # Track processing progress and handle failures gracefully
+            completed_count = 0
+            failed_count = 0
+            skipped_count = 0
+            
             for fut in as_completed(fut_map):
                 fp = fut_map[fut]
+                processed += 1
+                completed_count += 1
+                
                 try:
                     res = fut.result()
+                    if res.get("error"):
+                        failed_count += 1
+                        files_state[str(fp)] = {
+                            **files_state.get(str(fp), {}),
+                            "status": "failed",
+                            "error": res["error"],
+                            "finished_at": now_iso(),
+                        }
+                        save_progress(progress_path, prog)
+                        log(f"[FAIL] {fp.name}: {res['error']}")
+                        continue
+                    if res.get("skip"):
+                        skipped_count += 1
+                        files_state[str(fp)] = {
+                            **files_state.get(str(fp), {}),
+                            "status": "skipped",
+                            "reason": res.get("reason", "unknown"),
+                            "finished_at": now_iso(),
+                        }
+                        save_progress(progress_path, prog)
+                        log(f"[SKIP] {fp.name}: {res.get('reason')}")
+                        continue
+
+                    if "total_tokens" in res:
+                        ftoks, fcost = billing.add(res["file"], res["total_tokens"])
+                        log(f"[Billing] {Path(res['file']).name}: total tokens={ftoks:,} cost=${fcost:.6f}")
+
+                    jsonl_final = archive_tmp(Path(res["jsonl_tmp"]))
+                    chroma_done = False
+                    if args.with_chroma and collection:
+                        try:
+                            added = chroma_upsert_jsonl(jsonl_final, collection, client, batch=64)
+                            chroma_done = added > 0
+                            log(f"[Chroma] {fp.name}: +{added} vectors")
+                        except Exception as e:
+                            log(f"[ERROR] ChromaDB failed for {fp.name}: {e}")
+                            chroma_done = False
+
+                    base = files_state.get(str(fp), {})
+                    base.update({
+                        "status": "completed", "jsonl_name": jsonl_final.name,
+                        "jsonl_archived": True, "chroma_upserted": chroma_done,
+                        "chunks": res.get("chunks", 0), "duplicates": res.get("dups", 0),
+                        "finished_at": now_iso(),
+                    })
+                    files_state[str(fp)] = base
+                    save_progress(progress_path, prog)
+                    
+                except KeyboardInterrupt:
+                    log(f"[INTERRUPT] Processing interrupted, cancelling remaining tasks...")
+                    # Cancel all pending futures
+                    for pending_fut in fut_map:
+                        pending_fut.cancel()
+                    sys.exit(0)
                 except Exception as e:
-                    res = {"error": f"exception: {e}", "file": str(fp)}
-                processed += 1
-                if res.get("error"):
+                    failed_count += 1
+                    log(f"[ERROR] Unexpected error processing {fp.name}: {e}")
                     files_state[str(fp)] = {
                         **files_state.get(str(fp), {}),
                         "status": "failed",
-                        "error": res["error"],
+                        "error": f"unexpected_error: {e}",
                         "finished_at": now_iso(),
                     }
                     save_progress(progress_path, prog)
-                    log(f"[FAIL] {fp.name}: {res['error']}")
-                    continue
-                if res.get("skip"):
-                    files_state[str(fp)] = {
-                        **files_state.get(str(fp), {}),
-                        "status": "skipped",
-                        "reason": res.get("reason", "unknown"),
-                        "finished_at": now_iso(),
-                    }
-                    save_progress(progress_path, prog)
-                    log(f"[SKIP] {fp.name}: {res.get('reason')}")
-                    continue
-
-                if "total_tokens" in res:
-                    ftoks, fcost = billing.add(res["file"], res["total_tokens"])
-                    log(f"[Billing] {Path(res['file']).name}: total tokens={ftoks:,} cost=${fcost:.6f}")
-
-                jsonl_final = archive_tmp(Path(res["jsonl_tmp"]))
-                chroma_done = False
-                if args.with_chroma and collection:
-                    try:
-                        added = chroma_upsert_jsonl(jsonl_final, collection, client, batch=64)
-                        chroma_done = added > 0
-                        log(f"[Chroma] {fp.name}: +{added} vectors")
-                    except Exception as e:
-                        log(f"[ERROR] ChromaDB failed for {fp.name}: {e}")
-                        chroma_done = False
-
-                base = files_state.get(str(fp), {})
-                base.update({
-                    "status": "completed", "jsonl_name": jsonl_final.name,
-                    "jsonl_archived": True, "chroma_upserted": chroma_done,
-                    "chunks": res.get("chunks", 0), "duplicates": res.get("dups", 0),
-                    "finished_at": now_iso(),
-                })
-                files_state[str(fp)] = base
-                save_progress(progress_path, prog)
+                    
+                # Log progress periodically
+                if completed_count % 5 == 0:
+                    log(f"[PROGRESS] Completed {completed_count}/{len(tasks)} files - Success: {completed_count - failed_count - skipped_count}, Failed: {failed_count}, Skipped: {skipped_count}")
 
     log(f"Done. Processed this run: {processed}")
 
