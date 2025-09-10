@@ -408,10 +408,23 @@ def _import_gemini_service_via_file(path_str: str):
 def _get_gemini_service():
     """Initialize your load-balanced GeminiService from GEMINI_SERVICE_PATH, else None."""
     global _GEMINI_SVC_SINGLETON, _GEMINI_SVC_LOADED
+
+    # Check if we're in a multiprocessing context
+    import multiprocessing
+    if multiprocessing.current_process().name != 'MainProcess':
+        # In worker processes, create a new instance instead of using singleton
+        log.debug("Creating new GeminiService instance for worker process")
+        return _create_gemini_service_instance()
+
+    # Main process: use singleton pattern
     if _GEMINI_SVC_LOADED:
         return _GEMINI_SVC_SINGLETON
     _GEMINI_SVC_LOADED = True
+    _GEMINI_SVC_SINGLETON = _create_gemini_service_instance()
+    return _GEMINI_SVC_SINGLETON
 
+def _create_gemini_service_instance():
+    """Create a new GeminiService instance."""
     path_env = os.getenv("GEMINI_SERVICE_PATH", "").strip()
     candidate_paths = []
     if path_env:
@@ -447,17 +460,16 @@ def _get_gemini_service():
             "No GeminiService available; will use direct google-genai fallback "
             "(if GEMINI_API_KEY present)."
         )
-        _GEMINI_SVC_SINGLETON = None
         return None
 
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
     try:
-        _GEMINI_SVC_SINGLETON = svc_cls(model=model)
-        log.info(f"GeminiService ready (model={model}) from {path_env}")
+        instance = svc_cls(model=model)
+        log.info(f"GeminiService instance ready (model={model}) from {path_env}")
+        return instance
     except Exception as e:
         log.error(f"GeminiService init failed: {e}")
-        _GEMINI_SVC_SINGLETON = None
-    return _GEMINI_SVC_SINGLETON
+        return None
 
 def _gemini_via_service(img_pil: "Image.Image") -> str:
     svc = _get_gemini_service()

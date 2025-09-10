@@ -417,14 +417,23 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
     log(f"[CHUNK] {path.name} uniq_chunks={len(uniq)} first_chunk='{snapshot(uniq[0]) if uniq else ''}'")
 
     # Cloudflare embeddings
-    log(f"[EMBED] Creating embeddings for {path.name}")
-    cf = CFEmbeddings(cf_acct, cf_token, int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
-    vecs, total_tokens = [], 0
-    for emb_batch, tok_batch in cf.embed_iter(uniq, batch_size=embed_batch):
-        vecs.extend(emb_batch)
-        total_tokens += tok_batch
-    if len(vecs) != len(uniq):
-        return {"file": rel, "error": "embedding_mismatch"}
+    log(f"[EMBED] Creating Cloudflare BGE-M3 embeddings for {path.name} ({len(uniq)} chunks)")
+    try:
+        cf = CFEmbeddings(cf_acct, cf_token, int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
+        log(f"[EMBED] Cloudflare client initialized with account: {cf_acct[:8]}...")
+        vecs, total_tokens = [], 0
+        batch_count = 0
+        for emb_batch, tok_batch in cf.embed_iter(uniq, batch_size=embed_batch):
+            vecs.extend(emb_batch)
+            total_tokens += tok_batch
+            batch_count += 1
+            log(f"[EMBED] Processed batch {batch_count}: {len(emb_batch)} vectors, {tok_batch} tokens")
+        if len(vecs) != len(uniq):
+            return {"file": rel, "error": f"embedding_mismatch: got {len(vecs)} vectors, expected {len(uniq)}"}
+        log(f"[EMBED] Successfully created {len(vecs)} Cloudflare embeddings, total tokens: {total_tokens}")
+    except Exception as e:
+        log(f"[ERROR] Cloudflare embedding failed: {e}")
+        return {"file": rel, "error": f"cloudflare_embedding_error: {e}"}
 
     # Write per-file JSONL
     tmp_dir = Path(export_tmp); tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -493,13 +502,14 @@ def main():
     if hasattr(signal, 'SIGTERM'):
         signal.signal(signal.SIGTERM, signal_handler)
 
+    log("[INIT] Resume functionality is ALWAYS ENABLED - script will automatically resume from previous progress")
+
     ap = argparse.ArgumentParser("Streamlined BGE-M3 pipeline")
     ap.add_argument("-i", "--input-dir", required=True)
     ap.add_argument("--export-dir", default="OUTPUT_DATA2/progress_report")
     ap.add_argument("--cache-dir", default="OUTPUT_DATA2/cache")
     ap.add_argument("--workers", type=int, default=5)
     ap.add_argument("--omp-threads", type=int, default=3)
-    ap.add_argument("--resume", action="store_true")
     ap.add_argument("--timeout", type=int, default=1800, help="Timeout per file in seconds")
     ap.add_argument("--with-chroma", dest="with_chroma", action="store_true", default=True)
     ap.add_argument("--no-chroma", dest="with_chroma", action="store_false")
@@ -582,12 +592,18 @@ def main():
         log(f"Chroma collection: {args.collection}")
 
     # progress & seen
+    log("[RESUME] Loading previous progress...")
     prog = load_progress(progress_path)
     files_state = prog.setdefault("files", {})
+    existing_files = len(files_state)
+    log(f"[RESUME] Found {existing_files} files in progress state")
+
     try:
         seen = json.loads(seen_index_path.read_text(encoding="utf-8")) if seen_index_path.exists() else {}
-    except Exception:
+        log(f"[RESUME] Found {len(seen)} entries in seen files index")
+    except Exception as e:
         seen = {}
+        log(f"[RESUME] Error loading seen files index: {e}, starting fresh")
 
     tasks: List[Path] = []
 
@@ -595,6 +611,8 @@ def main():
         file_key = str(fp)
         st = fp.stat()
         fh = sha256_file(fp)[:16]
+
+        # Initialize file state if not exists
         if file_key not in files_state:
             files_state[file_key] = {
                 "status": "pending",
@@ -602,30 +620,52 @@ def main():
                 "file_mtime": int(st.st_mtime),
                 "discovered_at": now_iso(),
             }
-        else:
-            try:
-                if should_skip(files_state[file_key], st.st_size, int(st.st_mtime)):
-                    files_state[file_key]["status"] = "skipped"
-                    files_state[file_key]["reason"] = "already_processed"
-                    files_state[file_key]["finished_at"] = now_iso()
-                    continue
-            except Exception:
-                pass
+            # Save progress immediately when discovering new files
+            save_progress(progress_path, prog)
+            log(f"[DISCOVER] New file: {fp.name}")
+
+        # Check if file should be skipped
+        try:
+            if should_skip(files_state[file_key], st.st_size, int(st.st_mtime)):
+                # Update status and save progress
+                files_state[file_key]["status"] = "skipped"
+                files_state[file_key]["reason"] = "already_processed"
+                files_state[file_key]["finished_at"] = now_iso()
+                save_progress(progress_path, prog)
+                log(f"[RESUME] Skipping already processed: {fp.name}")
+                continue
+        except Exception as e:
+            log(f"[WARN] Error checking skip status for {fp.name}: {e}")
+
+        # Check for file duplicates
         if fh in seen and seen[fh] != file_key:
             files_state[file_key]["status"] = "skipped"
             files_state[file_key]["reason"] = "file_duplicate"
             files_state[file_key]["duplicate_of"] = seen[fh]
             files_state[file_key]["finished_at"] = now_iso()
+            save_progress(progress_path, prog)
+            log(f"[DUPLICATE] Skipping duplicate: {fp.name} (same as {Path(seen[fh]).name})")
             continue
+
+        # Add to processing queue
         seen[fh] = file_key
         try:
             seen_index_path.write_text(json.dumps(seen, indent=2), encoding="utf-8")
         except Exception as e:
             log(f"[WARN] Failed to update seen files index: {e}")
+
         tasks.append(fp)
+        log(f"[QUEUE] Added to processing queue: {fp.name}")
 
     save_progress(progress_path, prog)
-    log(f"Queued {len(tasks)} files")
+
+    # Resume summary
+    total_files = len(pdfs)
+    queued_files = len(tasks)
+    skipped_files = total_files - queued_files
+    log(f"[RESUME] Summary: {total_files} total files, {queued_files} queued for processing, {skipped_files} skipped (already processed)")
+    if tasks:
+        log(f"[RESUME] Files to process: {[fp.name for fp in tasks[:5]]}" + ("..." if len(tasks) > 5 else ""))
 
     # Pre-warm OCR
     if PADDLE_AVAILABLE:
@@ -656,6 +696,7 @@ def main():
             files_state[str(fp)]["status"] = "in_progress"
             files_state[str(fp)]["started_at"] = now_iso()
             save_progress(progress_path, prog)
+            log(f"[START] Processing {fp.name} (single-threaded mode)")
 
             try:
                 log(f"[PROCESS] Starting {fp.name} with {args.timeout}s timeout")

@@ -53,13 +53,38 @@ def save_progress(p: Path, st: Dict[str, Any]) -> None:
 
 def should_skip(rec: Dict[str, Any], cur_size: int, cur_mtime: int) -> bool:
     # Fast path: check status first (most common case)
-    if rec.get("status") != "completed":
+    status = rec.get("status")
+    if status == "completed":
+        # Check file hasn't changed (size and mtime)
+        if rec.get("file_size") != cur_size or rec.get("file_mtime") != cur_mtime:
+            log.info(f"[SKIP] File changed, reprocessing: size {rec.get('file_size')}->{cur_size}, mtime {rec.get('file_mtime')}->{cur_mtime}")
+            return False
+
+        # Check processing completed successfully - allow skipping if JSONL was archived
+        # even if Chroma upsert failed (user can re-run Chroma separately)
+        jsonl_ok = rec.get("jsonl_archived", False)
+        chroma_ok = rec.get("chroma_upserted", False)
+
+        if jsonl_ok:
+            if chroma_ok:
+                log.info(f"[SKIP] File fully processed: JSONL archived + Chroma upserted")
+            else:
+                log.info(f"[SKIP] File partially processed: JSONL archived, Chroma upsert pending")
+            return True
+        else:
+            log.info(f"[SKIP] File incomplete: JSONL not archived, needs reprocessing")
+            return False
+
+    elif status == "failed":
+        log.info(f"[SKIP] Previous failure detected, will retry: {rec.get('error', 'unknown error')}")
         return False
-    
-    # Check file hasnt changed (size and mtime)
-    if rec.get("file_size") != cur_size or rec.get("file_mtime") != cur_mtime:
-        return False
-    
-    # Check processing completed successfully
-    return rec.get("jsonl_archived") and rec.get("chroma_upserted")
+
+    elif status == "skipped":
+        reason = rec.get("reason", "unknown")
+        log.info(f"[SKIP] Already marked as skipped: {reason}")
+        return True
+
+    # For pending or in_progress status, don't skip
+    log.info(f"[SKIP] Status '{status}', will process")
+    return False
 
