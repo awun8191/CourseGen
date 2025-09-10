@@ -1,0 +1,20 @@
+Example 3
+Calculate the resistivity of an intrinsic semiconductor at room temperature and classify it as an
+insulator, semiconductor or conductor. The electron and hole mobilities are: 1350 cm²/V and 500
+cm²/V. The intrinsic carrier density and electric charge, are: 1010 cm-3 and 1.60 × 10-19 C.
+Solution
+The conductivity, o, is:
+o = q(un + up) = 1.6 × 10-1 (1010 × 1350 + 1010 × 500) = 2.96 × 10-6 (Ω. cm)-1
+Resistivity, p, is:
+1
+p = = 3.38 × 105 Ω. cm
+σ
+Example 4
+Find the type and electron, and hole concentrations in a silicon sample at room temperature, if it
+is doped with boron concentration of 1016 /cm³ and a phosphorus concentration of 2 × 1015 /cm³.
+Solution
+Boron is an acceptor impurity and phosphorous is a donor impurity. Hence,
+NA = 1016 cm-3 and ND = 2 × 1015 cm-3
+Since NA > ND, the material is p-type. The hole concentration, p, is:
+p ≈ NA - ND = 8 × 1015 cm-3
+At room temperature, the intrinsic concentration, ni = 1010 cm-3

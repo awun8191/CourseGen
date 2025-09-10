@@ -306,7 +306,7 @@ def process_one(pdf_path: str,
 
     # Load/initialize progress
     prog = load_progress(progress_path)
-    if should_skip(prog, rel, mtime0):
+    if should_skip(prog, st0.st_size, mtime0):
         log(f"[SKIP] Already processed and up-to-date: {path.name}")
         return {"file": rel, "status": "skipped"}
 
@@ -323,7 +323,16 @@ def process_one(pdf_path: str,
     )
     t1 = time.time()
     if not text or len(text.strip()) < 10:
-        save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "error", "error": "empty_ocr"})
+        save_progress(
+            progress_path,
+            {
+                "file": rel,
+                "file_size": st0.st_size,
+                "file_mtime": mtime0,
+                "status": "error",
+                "error": "empty_ocr",
+            },
+        )
         raise RuntimeError(f"OCR yielded too little text for {path.name}")
     ocr_secs = t1 - t0
     log(f"[TEXT] {path.name}: chars={len(text):,}  time={ocr_secs:.1f}s  preview='{snapshot(text, 160)}'")
@@ -333,7 +342,16 @@ def process_one(pdf_path: str,
     raw_chunks = chunk(text)
     deduped, _ = dedupe(raw_chunks)
     if not deduped:
-        save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "error", "error": "no_chunks"})
+        save_progress(
+            progress_path,
+            {
+                "file": rel,
+                "file_size": st0.st_size,
+                "file_mtime": mtime0,
+                "status": "error",
+                "error": "no_chunks",
+            },
+        )
         raise RuntimeError(f"No chunks after dedupe for {path.name}")
     log(f"[CHUNK] {path.name}: raw={len(raw_chunks)}  unique={len(deduped)}")
 
@@ -369,7 +387,16 @@ def process_one(pdf_path: str,
         acct = cf_acct or os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
         tok = cf_token or os.getenv("CLOUDFLARE_API_TOKEN", "")
         if not acct or not tok:
-            save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "error", "error": "missing_cloudflare_creds"})
+            save_progress(
+                progress_path,
+                {
+                    "file": rel,
+                    "file_size": st0.st_size,
+                    "file_mtime": mtime0,
+                    "status": "error",
+                    "error": "missing_cloudflare_creds",
+                },
+            )
             raise RuntimeError("Missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN")
 
         with CFEmbeddings(acct, tok, batch_max=embed_batch) as cf:
@@ -424,7 +451,14 @@ def process_one(pdf_path: str,
 
     save_progress(
         progress_path,
-        {"file": rel, "mtime": mtime0, "status": "done", "jsonl": str(jsonl_path), "tokens": total_tokens},
+        {
+            "file": rel,
+            "file_size": st0.st_size,
+            "file_mtime": mtime0,
+            "status": "done",
+            "jsonl": str(jsonl_path),
+            "tokens": total_tokens,
+        },
     )
 
     # Clear per-page OCR cache once fully processed
@@ -465,8 +499,9 @@ def main():
     parser = argparse.ArgumentParser(description="PDF → OCR → chunk → dedupe → BGE-M3 → JSONL → Chroma (resume + billing)")
     parser.add_argument("inputs", nargs="+", help="PDF files or folders")
     parser.add_argument("-c", "--collection", default="default", help="Chroma collection name")
-    parser.add_argument("-o", "--out", default="exports", help="Output dir for per-file JSONL and progress")
-    parser.add_argument("--cache", default=".cache/convert_to_embeddings", help="Cache dir (reserved)")
+    parser.add_argument("-o", "--out", default="OUTPUT_DATA2/progress_report", help="Output dir for per-file JSONL and progress")
+    parser.add_argument("--cache", default="OUTPUT_DATA2/cache", help="Cache dir for OCR (default: <out>/cache)")
+    parser.add_argument("--persist-dir", default="OUTPUT_DATA2/emdeddings", help="Chroma persist dir (default: <out>/chroma)")
     parser.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
                         choices=["gemini", "hybrid", "easyocr", "paddleocr"], help="OCR engine (delegated to ocr_engine)")
     parser.add_argument("--dpi", type=int, default=300, help="OCR DPI for rasterization")

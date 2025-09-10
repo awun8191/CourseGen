@@ -1,0 +1,29 @@
+Example 2
+
+Calculate the velocity of a hole in an electric field of 10 V/cm. What is the electron velocity in the
+electric field of 2000 V/cm? The voltage across a resistor is 1 V, and the length of the resistor is
+2 μm. What is the electric field in the resistor? Note: for silicon, the electron and hole mobilities
+are: 1350 and 500 cm2/V.
+
+Having known the drift velocity in the semiconductor, the next thing is to derive equations for
+the current density. The current density due to drift transport mechanism, is the product of the
+charge density and the drift velocity. That is:
+
+Jn = qn Vn = qn(-unE) = qnunE 3
+
+Jp = qp Vp = qp(upE) = qpupE 4
+
+Hence, the total current density due to drift, is:
+
+J = Jn + Jp = qnunE + qpupE = q(nun + pup)E 5
+
+where q is an electric charge; n and p, are electron and hole concentrations or densities.
+
+From Equation 5, the electrical conductivity of the semiconductor, is:
+
+σ = q(nun + pup) (Ω. cm)-1 6
+
+Resistivity is the reciprocal of conductivity. Therefore, the resistivity can be determined by using
+Equation 7.
+
+ρ = 1/σ = 1/(q(nun + pup)) (Ω. cm) 7

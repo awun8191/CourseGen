@@ -470,20 +470,32 @@ def _gemini_via_service(img_pil: "Image.Image") -> str:
     buf = io.BytesIO()
     img_pil.save(buf, format="PNG")
     img_bytes = buf.getvalue()
-    try:
-        out = svc.ocr(images=[{"mime_type": "image/png", "data": img_bytes}],
-                      prompt=OCR_PROMPT, response_model=None)
-        if isinstance(out, dict) and "result" in out:
-            return (out["result"] or "").strip()
-        if isinstance(out, str):
-            return out.strip()
+    tries = max(1, int(os.getenv("OCR_GEMINI_RETRIES", "3")))
+    delay = float(os.getenv("OCR_GEMINI_RETRY_DELAY", "1"))
+    for attempt in range(1, tries + 1):
         try:
-            return str(out).strip()
-        except Exception:
-            return ""
-    except Exception as e:
-        log.error(f"GeminiService.ocr failed: {e}")
-        return ""
+            out = svc.ocr(
+                images=[{"mime_type": "image/png", "data": img_bytes}],
+                prompt=OCR_PROMPT,
+                response_model=None,
+            )
+            if isinstance(out, dict) and "result" in out:
+                return (out["result"] or "").strip()
+            if isinstance(out, str):
+                return out.strip()
+            try:
+                return str(out).strip()
+            except Exception:
+                return ""
+        except Exception as e:
+            if attempt == tries:
+                log.error(f"GeminiService.ocr failed: {e}")
+                return ""
+            log.warning(
+                f"GeminiService.ocr attempt {attempt}/{tries} failed: {e}; retrying in {delay:.1f}s"
+            )
+            time.sleep(delay)
+            delay *= 2
 
 
 def _gemini_via_service_batch(imgs: List["Image.Image"]) -> List[str]:
@@ -503,21 +515,30 @@ def _gemini_via_service_batch(imgs: List["Image.Image"]) -> List[str]:
         OCR_PROMPT
         + "\nAfter each page transcription add a line with <<<PAGE_BREAK>>>."
     )
-    try:
-        out = svc.ocr(images=image_parts, prompt=prompt, response_model=None)
-        if isinstance(out, dict) and "result" in out:
-            text = out["result"] or ""
-        elif isinstance(out, str):
-            text = out
-        else:
-            text = str(out)
-        parts = [p.strip() for p in text.split("<<<PAGE_BREAK>>>")]
-        if len(parts) < len(imgs):
-            parts.extend([""] * (len(imgs) - len(parts)))
-        return parts[: len(imgs)]
-    except Exception as e:
-        log.error(f"GeminiService.ocr batch failed: {e}")
-        return ["" for _ in imgs]
+    tries = max(1, int(os.getenv("OCR_GEMINI_RETRIES", "3")))
+    delay = float(os.getenv("OCR_GEMINI_RETRY_DELAY", "1"))
+    for attempt in range(1, tries + 1):
+        try:
+            out = svc.ocr(images=image_parts, prompt=prompt, response_model=None)
+            if isinstance(out, dict) and "result" in out:
+                text = out["result"] or ""
+            elif isinstance(out, str):
+                text = out
+            else:
+                text = str(out)
+            parts = [p.strip() for p in text.split("<<<PAGE_BREAK>>>")]
+            if len(parts) < len(imgs):
+                parts.extend([""] * (len(imgs) - len(parts)))
+            return parts[: len(imgs)]
+        except Exception as e:
+            if attempt == tries:
+                log.error(f"GeminiService.ocr batch failed: {e}")
+                return ["" for _ in imgs]
+            log.warning(
+                f"GeminiService.ocr batch attempt {attempt}/{tries} failed: {e}; retrying in {delay:.1f}s"
+            )
+            time.sleep(delay)
+            delay *= 2
 
 def _gemini_via_fallback(img_pil: "Image.Image") -> str:
     """Direct google-genai fallback (requires GEMINI_API_KEY)."""

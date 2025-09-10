@@ -33,11 +33,14 @@ def load_progress(p: Path) -> Dict[str, Any]:
     if p.exists():
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-            log.info(f"[PROG] loaded {p} with {len(data.get('files', {}))} entries")
+            if isinstance(data.get("files"), dict):
+                log.info(f"[PROG] loaded {p} with {len(data.get('files', {}))} entries")
+            else:
+                log.info(f"[PROG] loaded {p}")
             return data
         except Exception as e:
             log.warning(f"[PROG] load failed {p}: {e}")
-    return {"version": "simple-1", "files": {}}
+    return {}
 
 
 def save_progress(p: Path, st: Dict[str, Any]) -> None:
@@ -45,20 +48,16 @@ def save_progress(p: Path, st: Dict[str, Any]) -> None:
         tmp = p.with_suffix(".tmp")
         tmp.write_text(json.dumps(st, indent=2), encoding="utf-8")
         safe_file_replace(tmp, p)
-        log.info(f"[PROG] saved to {p} entries={len(st.get('files', {}))}")
+        log.info(f"[PROG] saved to {p}")
     except Exception as e:
         log.warning(f"[PROG] save failed {p}: {e}")
 
 
 def should_skip(rec: Dict[str, Any], cur_size: int, cur_mtime: int) -> bool:
-    # Fast path: check status first (most common case)
-    if rec.get("status") != "completed":
+    """Return True if prior run finished and file is unchanged."""
+    if rec.get("status") not in {"done", "completed"}:
         return False
-    
-    # Check file hasnt changed (size and mtime)
     if rec.get("file_size") != cur_size or rec.get("file_mtime") != cur_mtime:
         return False
-    
-    # Check processing completed successfully
-    return rec.get("jsonl_archived") and rec.get("chroma_upserted")
+    return True
 
