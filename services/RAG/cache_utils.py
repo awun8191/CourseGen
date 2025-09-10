@@ -2,7 +2,7 @@ import os
 import hashlib
 from pathlib import Path
 from typing import Optional
-from COURSEGEN.services.RAG.log_utils import get_logger
+from services.RAG.log_utils import get_logger
 
 log = get_logger("cache")
 

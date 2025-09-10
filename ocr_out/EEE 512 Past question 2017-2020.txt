@@ -1,0 +1,533 @@
+AFE BABALOLA UNIVERSITY
+ABUAD
+LUCE SERVITUM ET INTEGRITAS
+AFE
+BABALOLA
+UNIVERSITY
+ADO-EKITI (ABUAD)
+KM. 8.5, AFE BABALOLA WAY,
+ADO-EKITI, EKITI STATE, NIGERIA.
+P.M.B 5454 ADO-EKITI.
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL ELECTRONICS ENGINEERING
+2016/2017 SECOND SEMESTER EXAMINATION
+EEE 512 DIGITAL COMMUNICATION
+INSTRUCTIONS: Answer Four (4) Questions only TIME ALLOWED: 2 hours 30 minutes
+
+Question 1
+(a) Define the following terms
+i. Code word ii Block length iii Hamming weight iv. Hamming distance v. Source coding
+[4 marks]
+(b) Name the types of error control methods and Explain?
+[5 marks]
+(c) A discrete source transmit messages an alphabet of 8 letters x;, i = 1,...,8 with probabilities 0.25,
+0.20, 0.15, 0.12, 0.10, 0.08, 0.05 and 0.05. This was passed through a channel which has a bandwidth
+of 3.4 kHz and a signal- to- noise ratio of 30 Db. Hence,
+(i) Determine an optimum binary code for the source using the Huffman coding procedure.
+(ii) Calculate the information capacity of the across the Channel.
+(iii) Calculate the efficiency of the transmitted code.
+[6 marks]
+
+Question 2
+(a) Using a graphical illustration, explain the spread spectrum technique.
+[3 marks]
+(b) Name the two commonly used Spread techniques and briefly explain how they work. [6 marks]
+(c) Discuss the advantages of spectrum technique.
+[6 marks]
+
+Question 3
+(a) Discuss the types of noise responsible for transmission errors in a digital communication channel.
+[5 marks]
+(b) With the aid of a labelled diagram, explain in detail the principle of a digital communication
+[5 marks]
+(c) What are disadvantages of digital communication?
+[5 marks]
+
+Question 4
+(a) Show that:
+E(x) = [P(x) + D(x)]g(x) + S(x)
+[7 marks]
+(b) Given a (7, 4) linear block code whose generator matrix is given by:
+G =
+[1 0 0 0 1 0 1]
+[0 1 0 0 1 1 1]
+[0 0 1 0 1 1 0]
+[0 0 0 1 0 1 1]
+
+(i) Find all the code word (ii) Find the Parity check matrix (iii) if the received code word is 1101000,
+find the syndrome.
+[8 marks]
+
+Question 5
+
+(a) Discuss the practical applications of Huffman coding.
+[4 marks]
+(b) A discrete source emits two of 25 symbols once every 5 milliseconds, the probabilities of the
+character are as follows:
+P{a}=P{e}=P{o}=P{t}=0.10
+P{h}=P{i}=P{n}=P{r}=P{s}=0.07
+P{c}=P{d}=P{f}=P{l}=P{p}=P{u}=P{y}=0.02
+P{b}=P{g}=P{j}=P{k}=P{g}=P{v}=P{w}=P{x}=P{z} =0.01
+
+Calculate the:
+(i) entropy of the source (ii) information content each set of symbols as well as it overall total (iii)
+information rate
+[7 marks]
+
+(c) What are the advantages of Cyclic codes?
+[3 marks]
+
+Question 6
+
+(a) State and explain the optimality conditions for Huffman code
+[5 marks]
+(b) For a (6, 3) code, the generator matrix G is given by:
+G =
+[1 0 0 1 0]
+[0 1 0 1 1]
+[0 0 1 1 0]
+
+(i) Design an encoder for this code
+(ii) Verify that this code is single error correcting code
+(iii) If the received code word is 100011, find the syndrome
+[Assume, dmin =3]
+[10 marks]
+
+GOODLUCK
+AFE BABALOLA UNIVERSITY
+ABUAD
+AFE
+BABALOLA
+UNIVERSITY
+ADO-EKITI (ABUAD)
+KM. 8.5, AFE BABALOLA WAY,
+ADO-EKITI, EKITI STATE, NIGERIA.
+P.M.B 5454 ADO-EKITI.
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL, ELECTRONICS & COMPUTER ENGINEERING
+2017/2018 SECOND SEMESTER EXAMINATION
+EEE 512 DIGITAL COMMUNICATION
+INSTRUCTIONS: Answer Four (4) Questions only
+TIME ALLOWED: 2 hours 30 minutes
+
+Question 1
+(a) An alphabet consists of the letters A, B, C, and D, each letter is coded into sequence of two binary
+(on-off) pulses. The A is represented by 00, B by 01, the C by 10, and D by 11. Each individual is 5ms
+likely to occur
+i. Calculate the average rate of transmission of information, if the different letters are equally
+ii. The probability of occurrence each letter is respectively, P = 1/5, P = 1/4, P =
+4
+A
+B
+C
+1/4, P = 3/10. Find the average rate of transmission of information in bits/s
+D
+[6 marks]
+(b) Compute the required channel capacity for the transmission of digitized TV picture, assuming a
+signal-to-noise ratio of 50db and a transmission bandwidth of 50 MHz
+[5 marks]
+(c) Distinguish between source and channel coding
+[4 marks]
+
+Question 2
+(a) A Communication system is used to transmit one of 16 possible signals. Suppose that the
+transmission is accomplished by encoding the signals into binary digits
+i. What will be the pulse sequence for the 13th and 7th symbol?
+ii. If each binary digit requires 1 us for transmission, how much information in bits does the
+system transmit in 8 us? Assume that the signals are equally likely to occur
+iii. If the symbols are sent directly without encoding, it is found that each symbol requires 3 us
+for transmission. What is the information rate in bits/s in this case?
+[6 marks]
+(b) At the input of an ideal receiver the transmitted is 100 KHz while the bandwidth at the output is
+12.5KHz. If the input has S/N ratio of 15db, what is the S/N ratio at the demodulator output.
+[6 marks]
+(c) Give two main significance of digital communication.
+[3 marks]
+Question 3
+(a) Using a graphical illustration, explain the spread spectrum technique.
+(b) Differentiate between Fast and slow frequency hopping system.
+(c) Discuss the advantages of spectrum technique.
+[3 marks]
+[5 marks]
+[7 marks]
+Question 4
+(a) Define the term "Discrete Memoryless Channel"
+[ 2 marks]
+(b) A DMC with Input x1, x2, x3 and x4 and output y1, y2, y3 and y4
+i. Use a suitable diagram to represent a DMC
+ii. Generate its Channel matrix
+[5 marks]
+(c) Fig 1 shows a discrete memory less channel
+Transmitter
+Receiver
+Decision
+Po=0.8
+0
+0.9
+0
+P1=0.2
+1
+0.1
+0.7
+1
+1
+0.3
+Fig 1:
+Discrete memoryless channel
+i.
+Find the probability of error Pe
+ii.
+Find the probability of receiving 0 (P) and 1 (P)
+iii.
+Find Pe if the decisions are reversed i.e. received 1's are called 0's and vice versa
+[8 marks]
+Question 5
+(a) Discuss the practical applications of Huffman coding.
+[5 marks]
+(b) A binary symmetric channel is shown below. Find the rate of information transmission over this
+channel when p=04; assume that the symbol rate is 5000/sec
+[9 marks]
+0
+p
+0
+1-p
+1
+p
+1-p
+1
+Fig 2: Binary symmetric channel
+
+(c) State one reason why the above figure is called a binary symmetric channel [1 mark]
+
+Question 6
+
+(a) List (5) lossless compression techniques and indicate one area of applications of each.
+[5 marks]
+
+(b) A discrete memoryless channel is used to transmit eight symbols A, B, C, D, E, F, G and H, with
+corresponding probabilities: 0.35, 0.23, 0.15, 0.10, 0.08, 0.05, 0.03 and 0.01 respectively.
+i. Determine the code of the distribution using Huffman and Shannon technique
+ii. Which of the code is optimal?
+iii. Justify your answer
+[10 marks]
+
+GOODLUCK
+AFE BABALOLA UNIVERSITY
+ABUAD
+KM. 8.5, AFE BABALOLA WAY,
+ADO-EKITI, EKITI STATE, NIGERIA.
+P.M.B 5454 ADO-EKITI.
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL, ELECTRONICS & COMPUTER
+ENGINEERING
+2018/2019 SECOND SEMESTER EXAMINATION
+EEE 512 DIGITAL COMMUNICATION
+INSTRUCTIONS: Answer Five (5) Questions only
+Unit: 3
+TIME ALLOWED: 3 hours
+Question 1
+In order to meet a specific requirement in the deployment of telecommunication infrastructure
+three binary channel were cascaded as shown in Figure 1
+A1
+A2
+0.3
+0.1
+0.9
+B1
+0.9
+B2
+0.3
+C1
+0.2
+0.2
+C2
+0.1
+D1 = 0
+D2 = 1
+0.3
+Figure 1: Three Cascaded Binary
+(a) (i) Find the Overall Channel matrix of the resultant channel
+(ii) Draw the resultant channel diagram
+[5 marks]
+(b) Compute the following:
+(i) P(D1) and P(D2) when P(A1) =0.7 P(A2)= 0.3
+(ii) Find the joint probabilities P(A1, D1) and P(A2, D2)
+[6 marks]
+(c) Based on the resultant channel diagram in b(ii), find the:
+(i) probability of error Pe
+(ii) probability of receiving 0 (P) and 1 (P)
+(iii) Find Pe if the output results are reversed i.e. received 1's are called 0's and vice versa
+[9 marks]
+Question 2
+(a) An alphabet consists of the letters A, B, C, and D, each letter is coded into sequence of two binary
+(on-off) pulses. The A is represented by 000, B by 001, the C by 100, and D by 101. Each individual
+is transmitted at a frequency of 200 Hz
+i. Calculate the average rate of transmission of information, if the different letters are
+equally likely to occur
+ii. If the probability of occurrence each letter is respectively, P_A = 1/5, P_B = 1/4, P_C =
+1/4, P_D = 3/10, find the average rate of transmission of information in bits/s [6 marks]
+(b) A channel has a bandwidth of 8 kHz, what is the channel capacity if the signal to noise ratio is 31
+for the same channel capacity, if the signal to noise ratio is increased to 61, what will be the new
+channel bandwidth?
+[6 marks]
+(c) Given a (7, 4) linear block code whose generator matrix is given by:
+G =
+[1 0 0 0 1 0 1]
+[0 1 0 0 1 1 1]
+[0 0 1 0 1 1 0]
+[0 0 0 1 0 1 1]
+(i) Find all the first 5 sequence of transmitted code word (ii) Find the Parity check matrix (iii) if
+the received code word is 1101000, find the syndrome.
+[10 marks]
+[9 marks]
+Question 3
+(a) A Communication system is used to transmit one of 16 possible signals. Suppose that the
+transmission is accomplished by encoding the signals into binary digits
+i. What will be the pulse sequence for the 13th and 7th symbol?
+ii. If each binary digit requires 1 us for transmission, how much information in bits does the
+system transmit in 8 us? Assume that the signals are likely to occur equally.
+iii. If the symbols are sent directly without encoding, it is found that each symbol requires 3 us
+for transmission. What is the information rate in bits/s in this case?
+[9 marks]
+(b) At the input of an ideal receiver the transmitted is 100 KHz while the bandwidth at the output is
+12.5 KHz. If the input has S/N ratio of 15dB, what is the S/N ratio at the demodulator output
+[6 marks]
+(c) List five advantages of digital communication over analogue communication
+[5marks]
+Question 4
+(a) A high resolution black and white TV picture consists of about 2 X106 picture elements and 16
+different brightness levels. Pictures are repeated at the rate of 32 per second. All picture elements
+are assumed to be independent and all levels have equal likelihood of occurrence. Calculate the
+Entropy and average rate information conveyed by this TV picture source
+[5 marks]
+qwg pue 5 0Ft0
+(ssueW 9)
+sQeW 6
+(Sxew 6)
+Qu0eub uoneunwwon e u
+apo. ewndo (^)
+)Q pue t0'0
+8
+Que uen
+pas
+ pul-mond umous s!
+C8
+Dwg e iuasaidal ol weiaeip ageiins e as?
+Iaier odwAs au1 1eu1 awnsse 6'0-d uau
+ Susn uonnqud!
+e pa
+0
+Esto
+Junwwo) aumoo] au uo anou uous anM
+Q p
+Ssaisso pue Assor uaamrd ysn&unsio
+Qa$n s!
+gewndo sI apo au Jo q!yM
+0
+rmsue no Ansn
+3
+9 uonsano
+c uonsano
+XIeuq y q)
+0
+Question 7
+(a) A discrete source transmit messages X1, X2, and X3 with probabilities 0.3, 0.4 and 0.3. The source
+is connected to the Channel given in Figure 2.
+X1
+X2
+X3
+0.8
+0.2
+0.1
+0.3
+0.7
+Y1
+Y2
+Y3
+(i) Formulate the transition probability for the channel
+(ii) Find P(y1), P(y2) and P(y3)
+(iii) Calculate H(X) and H(Y)
+[9 marks]
+(b) Explain the effects of fundamental parameters in Shannon's equation expressed below on the
+rate and quality of information transmitted over a channel
+[6 marks]
+C = Blog2(1 + SNR) bit/s
+(c) With the aid of a well labelled diagram, explain the process of transmitting a compressed data
+over a channel and its reception at the destination
+[5 marks]
+GOODLUCK
+AFE BABALOLA UNIVERSITY
+ADO-EKITI (ABUAD)
+KM. 8.5, AFE BABALOLA WAY,
+ADO-EKITI, EKITI STATE, NIGERIA.
+P.M.B 5454 ADO-EKITI.
+
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL, ELECTRONICS & COMPUTER
+ENGINEERING
+2019/2020 SECOND SEMESTER ONLINE EXAMINATION
+EEE 512 DIGITAL COMMUNICATION
+Unit: 3
+INSTRUCTIONS: Answer Four (4) Questions only
+TIME ALLOWED: 2 hours
+Email: ejidokunto@abuad.edu.ng
+Whatsapp contact: 08062399758
+
+QUESTION 1
+
+(a) (i) Shannon Claude postulated in one of his articles titled "mathematical theory of communication" which
+stated that "the fundamental problem of communication is that of producing at one point either
+exactly or approximately a message selection in another part". Explain and identify the causes of the
+problem and existing solution that has been proffered.
+(ii) With the aid of a suitable diagram, briefly illustrate the process of converting analog signal to
+Digital.
+(iii) Outline the significance of data compression to transmission of information from a sender to the
+receiver.
+[12marks]
+
+(b) (i) Explain the effects of fundamental parameters in Shannon's equation expressed below on the rate and
+quality of information transmitted over a channel
+C = Blog2(1 + SNR) bit/s
+(ii) With the aid of a well labelled diagram, explain the process of transmitting a compressed data
+over a channel and its reception at the destination
+(iii) What is the significance of a transducer to a Digital communication system?
+[6 marks]
+
+(c) (i) Outline the implications of using a fixed code when coding discrete signal sources
+(ii) An equation is given by K = ΣM i=1 2-ni ≤ 1, What is the name of the equation and state the function
+of the equation?
+(iii) Identify the major limitation associated with the use of the equation in (c) ii
+[6 marks]
+
+QUESTION 2
+
+(a) (i) With the aid of suitable diagram explain the working principle of a digital radio system
+[8 marks]
+(ii) With the aid of a suitable equation relate and write short notes on the following:
+Amplitude shift keying modulation (ASK), Frequency shift keying modulation (FSK), Phase shift keying
+and Quadrature amplitude modulation
+[5 marks]
+
+(b) An FSK signal with a mark frequency of 49 KHz, a space frequency of 51 KHZ and an input bit rate of
+2kbps. Determine (I) the peak frequency deviation (II) minimum bandwidth (III) baud for the signal
+[6 marks]
+(c) For a BPSK modulator with a carrier frequency of 70 MHz and an input bit rate of 10Mbps. (i) Determine
+the maximum and minimum upper and lower side frequencies (ii) draw the output spectrum (iii) compute
+the minimum Nyquist bandwidth [6 marks]
+
+QUESTION 3
+
+(a) Given a binary symmetric channel (BSC) in figure 1 (i) show that the mutual information I(X: Y) given
+by: I(X: Y) = H(Y) + plog2p + (1 – p)log2(1 – p) (ii) Calculate I(X: Y) for a = 0.5 and p=0.1
+(iii) Repeat a(ii) for a=0.5 and p= 0.5 comment on the result [9 marks]
+
+p(x1 = a1)
+p(x2) = (1 – a1)
+1-p
+p
+p
+Y1
+Y2
+1-p
+
+Figure 1: Binary symmetric channel
+
+(b) Show that the mutual information I(X: Y) of a channel with the input probabilities p(xi) i =
+1, 2 ... ... m and the output probabilities p(yj), j = 1,2 ...... n can be expressed as:
+
+I(X:Y) = Σ Σ P(xi, yj)log2 P(xi/yj)
+i=1 j=1 P(xi)
+
+(c) A discrete source transmit messages X1, X2, and X3 with probabilities 0.3, 0.4 and 0.3. The
+source is connected to the Channel given in Figure 2.
+X1
+0.8
+Y1
+X2
+0.1
+0.2
+Y2
+X3
+0.3
+0.7
+Y3
+
+Figure 2: A typical channel model
+
+(i) Formulate the transition probability for the channel
+(ii) Find P(y1), P(y2) and P(y3)
+(iii) Calculate H(X) and H(Y) [9 marks]
+QUESTION 4
+(a) Verify the following probability functions used in digital signal analysis
+(i) H(X,Y) = H(X|Y) + H(Y)
+(ii) I(X,Y) = H(Y) + H(Y|X)
+[9 marks]
+(b) An analog signal having a 4 kHz bandwidth is sampled at 1.25 times the Nyquist rate, and each
+sample is quantized into one of equality likely levels. Assume that the successive samples are
+statistically independent.
+(i) what is the information rate of this source?
+(ii) can the output of this source be transmitted without error over an AWGN channel with a
+bandwidth of 10 kHz and an S/N ratio of 20 dB?
+(iii) find the S/N ratio required for error free transmission in b (i)
+(iv) find the bandwidth required for an AWGN channel for error-free transmission of the output
+of this source if the S/N ratio is 20 dB.
+(c) (i) A voice grade channel of the telephone network has a bandwidth of 3.4kHz. Calculate the
+information capacity of the telephone channel for a signal-to-noise ratio of 30dB.
+(ii) Given an AWGN channel with 4 kHz bandwidth and the noise spectral density
+n/2 = 10-12W Hz. The signal power required at the receiver is 0.1 Mw. Calculate the
+capacity of the channel.
+[6 marks]
+QUESTION 5
+In order to meet a specific requirement in the deployment of telecommunication infrastructure
+three binary channel were cascaded as shown in Figure 3
+A1
+0.3
+B1
+0.9
+C1
+0.9
+D1=0
+0.1
+0.1
+0.2
+0.2
+0.1
+A2
+0.9
+B2
+0.3
+C2
+0.3
+D2=1
+Figure 3: Three cascaded binary channel
+(a) (i) Find the Overall Channel matrix of the resultant channel
+(ii) Draw the resultant channel diagram
+[8 marks]
+(a) Compute the following:
+(i) P(D₁) and P(D₂) when P(A₁) =0.7 P(A₂) = 0.3
+(ii) Find the joint probabilities P(A₁, D₁) and P(A₂, D₂) [8 marks]
+(b) Based on the resultant channel diagram in b(ii), find the:
+(i) probability of error Pe
+(ii) probability of receiving 0 (P) and 1 (P)
+(iii) Find Pe if the output results are reversed i.e. received 1's are called 0's and vice versa [9 marks]
+QUESTION 6
+(a) With the aid of suitable diagram, appropriate illustration and equations list and explain the 3 types
+special types of channels.
+[8 marks]
+(b) A binary message consists of words which are 5 bits long. The message words are to be encoded
+using a single-error-correcting code. The first 5 bits of each code word must be the message bits
+d₁, d₂, d₃, d₄ and d₅ while the remaining bits are check bits.
+i. What is the minimum number of check bit?
+ii. Formulate the Parity check matrix (P) and Generator matrix (G)
+iii. Construct the appropriate H matrix for the code
+iv. Find the syndrome at the receiver if there is an error in d5 [8 marks]
+(c) Given a (7, 4) linear block code whose generator matrix is given by:
+G =
+[1 0 0 0 1 0 1]
+[0 1 0 0 1 1 1]
+[0 0 1 0 1 1 0]
+[0 0 0 1 0 1 1]
+(i) Find all the first 5 sequence of transmitted code word (ii) Find the Parity check matrix (iii) if the
+received code word is 1101000, find the syndrome.
+[9 marks]
+GOODLUCK

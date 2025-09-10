@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
 """
-Streamlined: PDF -> (OCR via ocr_engine) -> chunk -> dedupe -> BGE-M3 (Cloudflare)
+Streamlined: PDF -> (auto OCR w/ PaddleOCR) -> chunk -> dedupe -> BGE-M3 (Cloudflare)
 -> per-file JSONL -> immediate Chroma upsert -> real-time billing -> resume.
 
-Major fixes / features:
-- Uses your central OCR engine (`src.services.RAG.ocr_engine.ocr_pdf`) so you can pick
-  Gemini / EasyOCR / Paddle / Hybrid via --engine or OCR_ENGINE env.
-- Fixed PaddleOCR configuration conflict (use_angle_cls vs use_textline_orientation) by
-  letting the ocr_engine own these details.
+Major fixes:
+- Fixed PaddleOCR configuration conflict (use_angle_cls vs use_textline_orientation)
+- Fixed Windows file permission issues with progress saving
 - No hardcoded Cloudflare credentials; strictly require env vars.
-- Proper EasyOCR fallback is handled inside the shared OCR engine.
+- Proper EasyOCR fallback wired into OCR flow.
 - Retry/backoff for Cloudflare API (429/5xx/network).
-- Saner OCR image-size control lives in the OCR engine; DPI ladder via --dpi.
-- Correct cache keying using file sha256 + mtime; avoids caching near-empty text.
-- Resume: progress files per-PDF; safe temp writes with atomic replace.
+- Saner OCR image-size check using nbytes; DPI ladder and env-tunable cap.
+- Correct cache keying and no caching of near-empty OCR/text.
+- Fixed multiprocessing status merge order so "pending" isn't resurrected.
 - Safer Chroma upsert and metadata sanitization.
-- Multiprocessing for multiple PDFs with worker warmup.
 
 Env:
   CLOUDFLARE_ACCOUNT_ID          (required)
@@ -26,7 +23,7 @@ Env:
   BILLING_ENABLED=1
   PADDLE_LANG=en                  # optional; e.g., en, fr, de, ar, hi
   EASYOCR_GPU=0                   # optional; set 1 to enable GPU for EasyOCR
-  OCR_ENGINE=gemini|hybrid|easyocr|paddleocr  # default overridden by CLI --engine
+  OCR_MAX_IMAGE_BYTES=67108864    # 64MB default; adjust as needed
 """
 
 from __future__ import annotations
@@ -34,46 +31,38 @@ from __future__ import annotations
 import os, re, sys, json, time, argparse, signal
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
-from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
-try:
-    from concurrent.futures.process import BrokenProcessPool  # type: ignore
-except Exception:
-    class BrokenProcessPool(Exception):
-        pass
-import multiprocessing as mp
 
-# ---- Make repository root importable so "from src...." works when run directly ----
+# Make repository root importable when this script is executed directly
 try:
-    repo_root = Path(__file__).resolve().parents[3]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-    src_dir = repo_root / "src"
-    if src_dir.exists() and str(src_dir) not in sys.path:
-        sys.path.insert(0, str(src_dir))
+    repo_root = Path(__file__).resolve().parents[2]
+    repo_root_str = str(repo_root)
+    if repo_root_str not in sys.path:
+        sys.path.insert(0, repo_root_str)
 except Exception:
     pass
 
-# ---- External deps used here ----
+from typing import List, Dict, Any, Tuple, Optional
+from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
+
+import fitz  # PyMuPDF
+from PIL import Image
 import requests
 
-# ---- Project modules ----
-from COURSEGEN.services.RAG.log_utils import setup_logging, snapshot
-from COURSEGEN.services.RAG.billing import Billing
-from COURSEGEN.services.RAG.ocr_engine import ocr_pdf
-from COURSEGEN.services.RAG.chroma_store import chroma_client, chroma_upsert_jsonl
-from COURSEGEN.services.RAG.progress_store import (
+# New modular imports
+from services.RAG.log_utils import setup_logging, snapshot
+from services.RAG.billing import Billing
+from services.RAG.chroma_store import chroma_client, chroma_upsert_jsonl
+from services.RAG.progress_store import (
     load_progress,
     save_progress,
     safe_file_replace,
     should_skip,
 )
-from COURSEGEN.services.RAG.path_meta import parse_path_meta
-from COURSEGEN.services.RAG.cache_utils import sha256_file
-from COURSEGEN.services.RAG.chunking import chunk, dedupe, sha1_text
+from services.RAG.path_meta import parse_path_meta
+from services.RAG.cache_utils import sha256_file
+from services.RAG.chunking import chunk, dedupe, sha1_text
 
-# ------------------------------------------------------------------------------------
-# Optional OpenCV (not required here, OCR engine handles its own needs)
+# Optional OpenCV for image handling (Paddle likes numpy arrays)
 try:
     import cv2
     import numpy as np
@@ -81,8 +70,14 @@ try:
 except Exception:
     OPENCV_AVAILABLE = False
 
-# ------------------------------------------------------------------------------------
-# Small pretty logging helpers (terminal color)
+# PaddleOCR (optional)
+try:
+    from paddleocr import PaddleOCR
+    PADDLE_AVAILABLE = True
+except Exception:
+    PADDLE_AVAILABLE = False
+
+# ANSI colors for logging
 ANSI = {
     "reset": "\033[0m",
     "bold": "\033[1m",
@@ -103,11 +98,9 @@ _COLOR_PREFIX = {
     "[PROCESS]": (ANSI["cyan"], False),
     "[META]": (ANSI["blue"], False),
     "[TEXT]": (ANSI["blue"], False),
-    "[TEXT-SOURCE]": (ANSI["blue"] + ANSI["bold"], True),
     "[EXTRACT]": (ANSI["blue"], False),
     "[CHUNK]": (ANSI["magenta"], False),
     "[EMBED]": (ANSI["magenta"] + ANSI["bold"], True),
-    "[EMBED-SAMPLE]": (ANSI["magenta"], False),
     "[Chroma]": (ANSI["cyan"], False),
     "[Billing]": (ANSI["cyan"], False),
     "[SKIP]": (ANSI["yellow"], True),
@@ -136,8 +129,7 @@ def now_iso() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
 
-# ------------------------------------------------------------------------------------
-# Token counting (tiktoken if available; fallback ≈ chars/4)
+# Token counting (tiktoken; fallback ≈chars/4)
 class TokenCounter:
     def __init__(self) -> None:
         self._enc = None
@@ -152,8 +144,7 @@ class TokenCounter:
             return sum(len(self._enc.encode(t)) for t in texts)
         return sum(max(1, len(t) // 4) for t in texts)
 
-# ------------------------------------------------------------------------------------
-# Cloudflare Embeddings (BGE-M3) with retry/backoff
+# Cloudflare BGE-M3 client with retry/backoff
 @dataclass
 class RetryCfg:
     tries: int = 5
@@ -190,7 +181,7 @@ class CFEmbeddings:
                     raise requests.HTTPError(f"{r.status_code} {r.text[:200]}")
                 r.raise_for_status()
                 return r.json()
-            except Exception as e:
+            except Exception:
                 if attempt == self.retry.tries:
                     raise
                 time.sleep(min(self.retry.max_sleep, sleep))
@@ -210,337 +201,601 @@ class CFEmbeddings:
             tokens = self.counter.count_batch(sub)
             yield data, tokens
 
-# ------------------------------------------------------------------------------------
-# OCR wrapper (delegates to shared ocr_engine)
-def extract_text(path: str, ocr_dpi: int, ocr_lang: str, engine: str) -> Tuple[str, Dict[str, Any]]:
-    res = ocr_pdf(pdf_path=path, lang=ocr_lang, dpi=ocr_dpi, engine=engine)
-    return res.text, res.meta
+# OCR decision
+def need_ocr(doc: fitz.Document, sample_pages: int = 8, min_chars_per_page: int = 200) -> bool:
+    n = min(sample_pages, len(doc))
+    if n == 0:
+        return True
+    low = 0
+    for i in range(n):
+        txt = doc[i].get_text("text")
+        if len(txt) < min_chars_per_page:
+            low += 1
+    return (low / max(1, n)) >= 0.6
 
-# ------------------------------------------------------------------------------------
-# Worker warmup (optional): let ocr_engine initialize Paddle/Easy on worker side
-def _worker_init_for_ocr(lang: str, use_gpu: bool = False) -> None:
-    try:
-        # keep OpenCV threads tame
+# PaddleOCR (per-process singleton)
+_PADDLE: Optional['PaddleOCR'] = None
+
+def get_paddle_ocr(lang: str = "en") -> Optional['PaddleOCR']:
+    global _PADDLE
+    if not PADDLE_AVAILABLE:
+        return None
+    if _PADDLE is None:
         try:
-            import cv2  # type: ignore
-            cv2.setNumThreads(int(os.getenv("CV2_NUM_THREADS", "1")))
-        except Exception:
-            pass
-        # Warmup inside ocr_engine if it exposes helpers (optional)
-        try:
-            from COURSEGEN.services.RAG.ocr_engine import get_paddle_ocr as _warm  # type: ignore
-            _ = _warm(lang, use_gpu)  # returns a reader or None
-            if _ is None:
-                log(f"[WARMUP] PaddleOCR unavailable in worker (lang={lang}); EasyOCR/Gemini will be used")
+            log(f"[INFO] Initializing PaddleOCR with language: {lang}")
+            local_model_dir = './paddle_models'
+            if os.path.exists(local_model_dir):
+                log(f"[INFO] Using local models from {local_model_dir}")
+                _PADDLE = PaddleOCR(
+                    use_textline_orientation=True,
+                    lang=lang,
+                    det_model_dir=f'{local_model_dir}/det',
+                    rec_model_dir=f'{local_model_dir}/rec',
+                    cls_model_dir=f'{local_model_dir}/cls'
+                )
             else:
-                log(f"[WARMUP] Worker preloaded PaddleOCR (lang={lang}, gpu={use_gpu})")
-        except Exception:
-            pass
+                log(f"[INFO] Using default PaddleOCR models")
+                _PADDLE = PaddleOCR(
+                    use_textline_orientation=True,
+                    lang=lang,
+                )
+            log(f"[INFO] PaddleOCR initialized successfully")
+        except Exception as e:
+            log(f"[WARN] Failed to initialize PaddleOCR: {e}")
+            _PADDLE = None
+    return _PADDLE
+
+def _pixmap_to_numpy(pix: fitz.Pixmap) -> 'np.ndarray':
+    if not OPENCV_AVAILABLE:
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        return np.array(img) if 'np' in globals() else __import__('numpy').array(img)
+    arr = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+    if pix.n == 4:
+        arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+    return arr
+
+def ocr_page_with_paddle_or_tesseract(page: fitz.Page, dpi: int = 300, lang: str = "en") -> str:
+    ocr = get_paddle_ocr(lang=lang) if PADDLE_AVAILABLE else None
+
+    last_img = None
+    ladder = [dpi, 240, 200, 150, 100, 72] if dpi >= 240 else [dpi, 150, 100, 72]
+    MAX_OCR_BYTES = int(os.getenv("OCR_MAX_IMAGE_BYTES", str(64 * 1024 * 1024)))
+
+    for attempt_dpi in ladder:
+        try:
+            zoom = attempt_dpi / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            img = _pixmap_to_numpy(pix)
+            last_img = img
+
+            nbytes = getattr(img, "nbytes", img.size)
+            if nbytes > MAX_OCR_BYTES:
+                if attempt_dpi == ladder[-1]:
+                    log(f"[WARN] Page image {nbytes}B too large at {attempt_dpi} DPI, skipping OCR")
+                    break
+                log(f"[WARN] Page image {nbytes}B > {MAX_OCR_BYTES}B at {attempt_dpi} DPI; trying lower DPI")
+                continue
+
+            if ocr is not None:
+                res = ocr.ocr(img)
+                flat = []
+                for blk in res:
+                    if blk:
+                        flat.extend(blk if isinstance(blk, list) else [blk])
+                lines = []
+                for line in flat:
+                    try:
+                        if line and len(line) >= 2:
+                            box, (text, conf) = line
+                            xs = [p[0] for p in box]; ys = [p[1] for p in box]
+                            cx = sum(xs)/4.0; cy = sum(ys)/4.0
+                            lines.append((text, float(conf), (cx, cy)))
+                    except Exception:
+                        continue
+                lines.sort(key=lambda t: (round(t[2][1]/16.0), round(t[2][0]/16.0)))
+                texts = [t for (t, conf, _) in lines if t and conf >= 0.35]
+                if texts:
+                    if attempt_dpi != dpi:
+                        log(f"[OCR] Paddle used {attempt_dpi} DPI instead of {dpi}")
+                    return "\n".join(texts)
+        except Exception as e:
+            if any(s in str(e).lower() for s in ("memory", "alloc")) and attempt_dpi != ladder[-1]:
+                log(f"[WARN] Paddle OOM at {attempt_dpi} DPI; trying lower DPI")
+                continue
+            log(f"[WARN] Paddle error at {attempt_dpi} DPI: {e}")
+            break
+
+    # Last resort: Tesseract
+    tess_cmd = os.getenv("TESSERACT_CMD")
+    if tess_cmd and os.path.exists(tess_cmd):
+        try:
+            import pytesseract
+            pytesseract.pytesseract.tesseract_cmd = tess_cmd
+
+            tess_lang_map = {"en":"eng","fr":"fra","de":"deu","es":"spa","it":"ita","pt":"por","nl":"nld"}
+            tess_lang = tess_lang_map.get(lang, lang)
+
+            tess_prefix = os.getenv("TESSDATA_PREFIX")
+            if tess_prefix:
+                lang_path = Path(tess_prefix) / "tessdata" / f"{tess_lang}.traineddata"
+                if not lang_path.exists():
+                    log(f"[WARN] Tesseract missing {tess_lang}.traineddata under {lang_path.parent}; skipping Tesseract")
+                    return ""
+            if last_img is None:
+                pix = page.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
+                last_img = _pixmap_to_numpy(pix)
+
+            img_pil = Image.fromarray(last_img)
+            tesseract_text = pytesseract.image_to_string(img_pil, lang=tess_lang)
+            if tesseract_text.strip():
+                log("[OCR] Tesseract fallback used")
+                return tesseract_text.strip()
+        except Exception as te:
+            log(f"[WARN] Tesseract fallback failed: {te}")
+    return ""
+
+# Text extract wrapper
+def extract_text(pdf_path, cache_dir, force_ocr, ocr_engine, ocr_dpi, ocr_lang):
+    from services.RAG.ocr_engine import ocr_pdf
+
+    # If force_ocr is enabled, skip text extraction check
+    if force_ocr:
+        engine = 'paddleocr'
+        result = ocr_pdf(pdf_path, lang=ocr_lang, dpi=ocr_dpi, engine=engine)
+        return result.text
+
+    # First, try to extract text directly from PDF
+    try:
+        doc = fitz.open(str(pdf_path))
+        extracted_text = ""
+
+        # Check first 10 pages (or all pages if less than 10)
+        pages_to_check = min(10, len(doc))
+        total_chars = 0
+        text_pages = 0
+
+        for i in range(pages_to_check):
+            page_text = doc[i].get_text("text").strip()
+            if page_text:
+                extracted_text += page_text + "\n\n"
+                total_chars += len(page_text)
+                text_pages += 1
+
+        doc.close()
+
+        # If we have sufficient text (at least 5 pages with text and reasonable character count)
+        if text_pages >= 5 and total_chars > 1000:
+            log(f"[TEXT] Using direct text extraction: {text_pages}/{pages_to_check} pages with text, {total_chars} chars")
+            return extracted_text
+
+        log(f"[TEXT] Insufficient text found ({text_pages}/{pages_to_check} pages, {total_chars} chars), will use OCR")
+
     except Exception as e:
-        log(f"[WARN] Worker OCR warmup failed: {e}")
+        log(f"[WARN] Failed to extract text directly: {e}, will use OCR")
 
-# ------------------------------------------------------------------------------------
+    # Fall back to OCR
+    engine = ocr_engine if ocr_engine in ['gemini', 'hybrid', 'easyocr', 'paddleocr'] else 'hybrid'
+    result = ocr_pdf(pdf_path, lang=ocr_lang, dpi=ocr_dpi, engine=engine)
+    return result.text
+
+# Worker init for OCR
+def _worker_init_for_ocr(lang: str) -> None:
+    if PADDLE_AVAILABLE:
+        try:
+            from services.RAG.ocr_engine import get_paddle_ocr as _warm
+            _ = _warm(lang)
+            log(f"[WARMUP] Worker preloaded PaddleOCR (lang={lang})")
+        except Exception as e:
+            log(f"[WARN] Worker OCR warmup failed: {e}")
+
 # Per-file processing
-
-def sanitize_metadata(meta: Dict[str, Any]) -> Dict[str, Any]:
-    """Ensure metadata is JSON-serializable and small."""
-    def _clean(v):
-        if isinstance(v, (str, int, float, bool)) or v is None:
-            return v
-        if isinstance(v, (list, tuple)):
-            return [_clean(x) for x in v][:64]
-        if isinstance(v, dict):
-            return {str(k): _clean(vv) for k, vv in v.items()}
-        return str(v)
-    return _clean(meta) if isinstance(meta, dict) else {}
-
-def _file_id_for_chunk(file_sha: str, idx: int, text: str) -> str:
-    # stable, content-aware id (sha1 over text to avoid dup collisions)
-    return f"{file_sha}:{idx}:{sha1_text(text)}"
-
-def _write_jsonl_atomic(lines: List[Dict[str, Any]], out_path: Path) -> None:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out_path.with_suffix(out_path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        for rec in lines:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    safe_file_replace(tmp, out_path)
-
-def process_one(pdf_path: str,
-                collection: str,
-                export_dir: str,
-                cache_dir: str,
-                cf_acct: str,
-                cf_token: str,
-                billing_file: str,
-                embed_batch: int,
-                ocr_engine: str,
-                ocr_dpi: int,
-                ocr_lang: str,
-                skip_embed: bool = False) -> Dict[str, Any]:
+def process_one(pdf_path: str, root: str, export_tmp: str,
+                cache_dir: str, cf_acct: str, cf_token: str,
+                billing_file: str, embed_batch: int,
+                force_ocr: bool, ocr_engine: str,
+                ocr_dpi: int, ocr_lang: str) -> Dict[str, Any]:
 
     path = Path(pdf_path)
     rel = str(path.resolve())
-    try:
-        uri = path.as_uri()
-    except Exception:
-        uri = rel
+    log(f"[START] Processing {path.name}")
 
-    try:
-        st0 = path.stat()
-        size0 = f"{st0.st_size:,}B"
-        mtime0 = int(st0.st_mtime)
-    except Exception:
-        size0 = "?"
-        mtime0 = 0
-
-    log(f"[START] Processing {path.name}  |  size={size0}  mtime={mtime0}  link={uri}")
-
-    # Progress files
-    export_dir_p = Path(export_dir)
-    export_dir_p.mkdir(parents=True, exist_ok=True)
-    progress_path = export_dir_p / f"{path.stem}.progress.json"
-    jsonl_path = export_dir_p / f"{path.stem}.jsonl"
-
-    # Load/initialize progress
-    prog = load_progress(progress_path)
-    if should_skip(prog, rel, mtime0):
-        log(f"[SKIP] Already processed and up-to-date: {path.name}")
-        return {"file": rel, "status": "skipped"}
-
-    # File-level metadata
     meta_path = parse_path_meta(path)
-    log(f"[META] {path.name}: GROUP_KEY={meta_path.get('GROUP_KEY','')}")
-    file_sha = sha256_file(path)
+    log(f"[META] Parsing metadata for {path.name}")
 
-    # ---------- OCR ----------
-    log(f"[OCR] Engine={ocr_engine} DPI={ocr_dpi} Lang={ocr_lang}")
-    t0 = time.time()
-    text, ocr_meta = extract_text(rel, ocr_dpi, ocr_lang, ocr_engine)
-    t1 = time.time()
-    if not text or len(text.strip()) < 10:
-        save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "error", "error": "empty_ocr"})
-        raise RuntimeError(f"OCR yielded too little text for {path.name}")
-    ocr_secs = t1 - t0
-    log(f"[TEXT] {path.name}: chars={len(text):,}  time={ocr_secs:.1f}s  preview='{snapshot(text, 160)}'")
+    log(f"[TEXT] Extracting text from {path.name}")
+    text = extract_text(path, Path(cache_dir), force_ocr, ocr_engine, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang)
+    if not text.strip():
+        return {"file": rel, "skip": True, "reason": "empty_text"}
+    log(f"[EXTRACT] {path.name} chars={len(text)} snapshot='{snapshot(text)}'")
 
-    # ---------- Chunk & dedupe ----------
-    log("[CHUNK] Chunking + dedup")
-    raw_chunks = chunk(text)
-    deduped = dedupe(raw_chunks)
-    if not deduped:
-        save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "error", "error": "no_chunks"})
-        raise RuntimeError(f"No chunks after dedupe for {path.name}")
-    log(f"[CHUNK] {path.name}: raw={len(raw_chunks)}  unique={len(deduped)}")
+    log(f"[CHUNK] Chunking text for {path.name}")
+    chunks_all = chunk(text)
+    uniq, dup_map = dedupe(chunks_all)
+    if not uniq:
+        return {"file": rel, "skip": True, "reason": "no_chunks"}
+    log(f"[CHUNK] {path.name} uniq_chunks={len(uniq)} first_chunk='{snapshot(uniq[0]) if uniq else ''}'")
 
-    # ---------- Build JSONL records ----------
-    base_meta = {
-        "source_path": rel,
-        "source_uri": uri,
-        "file_sha256": file_sha,
-        "mtime": mtime0,
-        "collection": collection,
-        "ocr": sanitize_metadata(ocr_meta),
-        "path_meta": sanitize_metadata(meta_path),
-        "created_at": now_iso(),
-    }
-    jsonl_lines: List[Dict[str, Any]] = []
-    for idx, ch in enumerate(deduped):
-        cid = _file_id_for_chunk(file_sha, idx, ch)
-        rec = {
-            "id": cid,
-            "text": ch,
-            "metadata": {**base_meta, "chunk_index": idx, "text_sha1": sha1_text(ch), "length": len(ch)},
-        }
-        jsonl_lines.append(rec)
+    # Cloudflare embeddings
+    log(f"[EMBED] Creating embeddings for {path.name}")
+    cf = CFEmbeddings(cf_acct, cf_token, int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
+    vecs, total_tokens = [], 0
+    for emb_batch, tok_batch in cf.embed_iter(uniq, batch_size=embed_batch):
+        vecs.extend(emb_batch)
+        total_tokens += tok_batch
+    if len(vecs) != len(uniq):
+        return {"file": rel, "error": "embedding_mismatch"}
 
-    # Write per-file JSONL atomically
-    _write_jsonl_atomic(jsonl_lines, jsonl_path)
-    log(f"[EXTRACT] Wrote JSONL: {jsonl_path}  lines={len(jsonl_lines)}")
+    # Write per-file JSONL
+    tmp_dir = Path(export_tmp); tmp_dir.mkdir(parents=True, exist_ok=True)
+    group = meta_path["GROUP_KEY"]
+    jsonl_name = f"{re.sub(r'[^A-Za-z0-9._-]+','_',group)}__{sha1_text(rel)}.jsonl"
+    jsonl_tmp = tmp_dir / jsonl_name
 
-    # ---------- Embeddings (Cloudflare) ----------
-    total_tokens = 0
-    if not skip_embed:
-        log(f"[EMBED] Cloudflare BGE-M3  batch≤{embed_batch}")
-        acct = cf_acct or os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
-        tok = cf_token or os.getenv("CLOUDFLARE_API_TOKEN", "")
-        if not acct or not tok:
-            save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "error", "error": "missing_cloudflare_creds"})
-            raise RuntimeError("Missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN")
+    file_hash = sha256_file(path)[:16]
+    st = path.stat()
+    doc_hash = sha1_text(text)
+    with jsonl_tmp.open("w", encoding="utf-8") as out:
+        total = len(chunks_all)
+        k = 0
+        for idx, ch in enumerate(chunks_all):
+            if idx in dup_map:
+                continue
+            chash = sha1_text(ch)
+            rid = sha1_text(f"{doc_hash}:{idx}:{chash}")
+            md = {
+                "path": str(path),
+                "chunk_index": idx,
+                "total_chunks_in_doc": total,
+                "file_size": st.st_size,
+                "file_mtime": int(st.st_mtime),
+                "file_hash": file_hash,
+                "chunk_hash": chash,
+                **meta_path,
+            }
+            out.write(json.dumps({
+                "id": rid,
+                "text": ch,
+                "metadata": md,
+                "embedding": vecs[k],
+                "embedding_type": "cloudflare-bge-m3"
+            }) + "\n")
+            k += 1
+        # duplicates
+        for idx, (orig_idx, orig_h) in dup_map.items():
+            ch = chunks_all[idx]
+            rid = sha1_text(f"{doc_hash}:{idx}:{orig_h}:dup")
+            md = {
+                "path": str(path),
+                "chunk_index": idx,
+                "total_chunks_in_doc": total,
+                "file_hash": file_hash,
+                "chunk_hash": sha1_text(ch),
+                "is_duplicate": True,
+                "duplicate_of_index": orig_idx,
+                "duplicate_of_hash": orig_h,
+                "skip_index": True,
+                **meta_path
+            }
+            out.write(json.dumps({"id": rid, "text": ch, "metadata": md}) + "\n")
 
-        with CFEmbeddings(acct, tok, batch_max=embed_batch) as cf:
-            # stream-embed and upsert per-batch to reduce RAM
-            embs_collected: List[List[float]] = []
-            texts = [rec["text"] for rec in jsonl_lines]
-            ids = [rec["id"] for rec in jsonl_lines]
-            metas = [rec["metadata"] for rec in jsonl_lines]
+    return {"file": rel, "jsonl_tmp": str(jsonl_tmp),
+            "chunks": len(uniq), "dups": len(dup_map), "jsonl_name": jsonl_name,
+            "total_tokens": total_tokens}
 
-            # We'll accumulate vectors incrementally and upsert to Chroma in slices.
-            # To avoid mismatches, we upsert exactly in the same batch partitions.
-            upsert_count = 0
-            for (emb_batch, tok_batch), start in zip(cf.embed_iter(texts, batch_size=embed_batch),
-                                                     range(0, len(texts), embed_batch)):
-                end = min(start + embed_batch, len(texts))
-                batch_ids = ids[start:end]
-                batch_texts = texts[start:end]
-                batch_metas = metas[start:end]
-
-                # Upsert this batch into Chroma
-                chroma_upsert_jsonl(
-                    None,  # <- we can upsert directly with in-memory arrays (function supports path OR arrays)
-                    collection_name=collection,
-                    ids=batch_ids,
-                    embeddings=emb_batch,
-                    metadatas=batch_metas,
-                    documents=batch_texts,
-                )
-                upsert_count += len(batch_ids)
-                total_tokens += tok_batch
-                if upsert_count <= 3:
-                    # sample logs
-                    log(f"[EMBED-SAMPLE] ids[{batch_ids[0]}], dims={len(emb_batch[0]) if emb_batch else 'n/a'}  toks≈{tok_batch}")
-
-        # Update billing
-        try:
-            price_per_m = float(os.getenv("CF_PRICE_PER_M_TOKENS", "0.012"))
-            usd = (total_tokens / 1_000_000.0) * price_per_m
-            if int(os.getenv("BILLING_ENABLED", "1")):
-                Billing.add_cost("cloudflare_embeddings", usd, meta={"tokens": total_tokens, "price_per_m": price_per_m, "file": rel})
-            log(f"[Billing] Cloudflare embeddings: tokens≈{total_tokens:,}  cost≈${usd:.4f}")
-        except Exception as e:
-            log(f"[WARN] Billing update failed: {e}")
-    else:
-        log("[EMBED] Skipped by flag --skip-embed")
-        # Even if skipping embedding, ensure JSONL still gets upserted as documents with no vectors, if desired.
-        # Here we choose not to upsert without vectors to avoid empty collections.
-
-    # ---------- Final upsert from file (optional path-based re-upsert) ----------
-    # If you prefer a single-shot upsert from the JSONL file (instead of per-batch above),
-    # uncomment below and remove the streaming upserts in the loop.
-    # chroma_upsert_jsonl(jsonl_path, collection_name=collection)
-
-    save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "done", "jsonl": str(jsonl_path), "tokens": total_tokens})
-    log(f"[SUCCESS] {path.name}  chunks={len(jsonl_lines)}  tokens≈{total_tokens:,}")
-    return {"file": rel, "status": "done", "chunks": len(jsonl_lines), "tokens": total_tokens, "jsonl": str(jsonl_path)}
-
-# ------------------------------------------------------------------------------------
-# CLI + Orchestration
-
-def discover_pdfs(inputs: List[str]) -> List[str]:
-    found: List[str] = []
-    for raw in inputs:
-        p = Path(raw)
-        if p.is_dir():
-            found += [str(x) for x in sorted(p.rglob("*.pdf"))]
-        elif p.suffix.lower() == ".pdf":
-            found.append(str(p))
-    # de-dup while preserving order
-    seen = set()
-    uniq: List[str] = []
-    for f in found:
-        if f not in seen:
-            uniq.append(f)
-            seen.add(f)
-    return uniq
+# Main
+def signal_handler(signum, frame):
+    log(f"[INTERRUPT] Received signal {signum}, gracefully shutting down...")
+    sys.exit(0)
 
 def main():
-    parser = argparse.ArgumentParser(description="PDF → OCR → chunk → dedupe → BGE-M3 → JSONL → Chroma (resume + billing)")
-    parser.add_argument("inputs", nargs="+", help="PDF files or folders")
-    parser.add_argument("-c", "--collection", default="default", help="Chroma collection name")
-    parser.add_argument("-o", "--out", default="exports", help="Output dir for per-file JSONL and progress")
-    parser.add_argument("--cache", default=".cache/convert_to_embeddings", help="Cache dir (reserved)")
-    parser.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
-                        choices=["gemini", "hybrid", "easyocr", "paddleocr"], help="OCR engine (delegated to ocr_engine)")
-    parser.add_argument("--dpi", type=int, default=300, help="OCR DPI for rasterization")
-    parser.add_argument("--lang", default=os.getenv("PADDLE_LANG", "en"), help="OCR language hint (ocr_engine may ignore)")
-    parser.add_argument("--cf-batch", type=int, default=int(os.getenv("CF_EMBED_MAX_BATCH", "96")), help="Max batch size for CF embeddings")
-    parser.add_argument("--workers", type=int, default=max(1, mp.cpu_count() // 2), help="Parallel workers")
-    parser.add_argument("--skip-embed", action="store_true", help="Run OCR + JSONL only; skip embeddings/upsert")
-    parser.add_argument("--timeout", type=int, default=0, help="Per-file timeout in seconds (0=disable)")
-    args = parser.parse_args()
+    signal.signal(signal.SIGINT, signal_handler)
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, signal_handler)
 
-    setup_logging()
-    os.environ.setdefault("OMP_NUM_THREADS", "4")
+    ap = argparse.ArgumentParser("Streamlined BGE-M3 pipeline")
+    ap.add_argument("-i", "--input-dir", required=True)
+    ap.add_argument("--export-dir", default="OUTPUT_DATA2/progress_report")
+    ap.add_argument("--cache-dir", default="OUTPUT_DATA2/cache")
+    ap.add_argument("--workers", type=int, default=5)
+    ap.add_argument("--omp-threads", type=int, default=3)
+    ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--timeout", type=int, default=1800, help="Timeout per file in seconds")
+    ap.add_argument("--with-chroma", dest="with_chroma", action="store_true", default=True)
+    ap.add_argument("--no-chroma", dest="with_chroma", action="store_false")
+    ap.add_argument("-c", "--collection", default="course_embeddings")
+    ap.add_argument("--persist-dir", default="OUTPUT_DATA2/emdeddings")
+    ap.add_argument("--ocr-on-missing", choices=["fallback", "error", "skip"], default="fallback")
+    ap.add_argument("--force-ocr", action="store_true")
+    ap.add_argument("--max-pdfs", type=int, default=0)
+    ap.add_argument("--embed-batch", type=int, default=int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
+    ap.add_argument("--ocr-dpi", type=int, default=200)
+    ap.add_argument("--ocr-lang", default=os.getenv("PADDLE_LANG", "en"))
+    ap.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
+                    choices=["gemini", "hybrid", "easyocr", "paddleocr"], help="OCR engine")
+    args = ap.parse_args()
 
-    # Credentials
-    cf_acct = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
-    cf_token = os.getenv("CLOUDFLARE_API_TOKEN", "")
-    if not args.skip_embed and (not cf_acct or not cf_token):
-        log("[ERROR] CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required (or use --skip-embed)")
+    try:
+        setup_logging(level=os.getenv("LOG_LEVEL", "DEBUG"))
+    except Exception:
+        pass
+
+    if getattr(args, "omp_threads", 0) and args.omp_threads > 0:
+        os.environ["OMP_NUM_THREADS"] = str(args.omp_threads)
+    else:
+        for _omp_var in ("OMP_THREAD_LIMIT", "KMP_DEVICE_THREAD_LIMIT", "KMP_TEAMS_THREAD_LIMIT"):
+            if _omp_var in os.environ:
+                os.environ.pop(_omp_var, None)
+
+    acct = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    tok = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+    if not acct or not tok:
+        log("ERROR: Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN")
         sys.exit(2)
 
-    pdfs = discover_pdfs(args.inputs)
-    if not pdfs:
-        log("[ERROR] No PDFs found in inputs.")
-        sys.exit(1)
+    root = Path(args.input_dir).resolve()
+    export_dir = Path(args.export_dir).resolve(); export_dir.mkdir(parents=True, exist_ok=True)
+    export_tmp = export_dir / "_tmp"; export_tmp.mkdir(parents=True, exist_ok=True)
+    cache_dir = Path(args.cache_dir).resolve(); cache_dir.mkdir(parents=True, exist_ok=True)
+    persist_dir = Path(args.persist_dir).resolve(); persist_dir.mkdir(parents=True, exist_ok=True)
+    billing_file = persist_dir / "billing_state.json"
+    seen_index_path = persist_dir / "seen_files.json"
+    progress_path = export_dir / "progress_state.json"
+    billing = Billing(Path(billing_file))
 
-    # Make output dirs
-    out_dir = Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir = Path(args.cache)
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    # discover PDFs
+    pdfs: List[Path] = []
+    ignores = {".git", "node_modules", "__pycache__", ".venv", ".idea", ".vscode", "build", "dist"}
+    log(f"Scanning directory: {root}")
+    for d, dirnames, files in os.walk(root):
+        current_dir = Path(d)
+        log(f"Scanning directory: {current_dir.name} (contains {len(files)} files, {len(dirnames)} subdirs)")
 
-    # Graceful Ctrl+C across pool
-    interrupted = {"flag": False}
-    def _sigint(_a, _b):
-        interrupted["flag"] = True
-        log("[INTERRUPT] Ctrl+C received; finishing current tasks...")
-    signal.signal(signal.SIGINT, _sigint)
+        # Filter directories but be more permissive
+        original_dirnames = dirnames[:]
+        dirnames[:] = [x for x in dirnames if x not in ignores and not x.startswith(".")]
+        if len(original_dirnames) != len(dirnames):
+            filtered = set(original_dirnames) - set(dirnames)
+            log(f"Filtered directories: {filtered}")
 
-    # Serial path if workers==1 (easier to debug)
+        # Process files
+        for f in files:
+            if f.startswith('.') or f.startswith('._'):
+                continue
+            if f.lower().endswith(".pdf"):
+                pdf_path = current_dir / f
+                pdfs.append(pdf_path)
+                log(f"Found PDF: {pdf_path.name}")
+
+    pdfs.sort()
+    log(f"Total PDFs discovered: {len(pdfs)}")
+    if args.max_pdfs > 0:
+        pdfs = pdfs[:args.max_pdfs]
+        log(f"Limited to first {args.max_pdfs} PDFs")
+    log(f"Final PDF count: {len(pdfs)}")
+
+    # Chroma
+    collection = None; client = None
+    if args.with_chroma:
+        client = chroma_client(str(persist_dir))
+        collection = client.get_or_create_collection(name=args.collection, metadata={"hnsw:space": "cosine"})
+        log(f"Chroma collection: {args.collection}")
+
+    # progress & seen
+    prog = load_progress(progress_path)
+    files_state = prog.setdefault("files", {})
+    try:
+        seen = json.loads(seen_index_path.read_text(encoding="utf-8")) if seen_index_path.exists() else {}
+    except Exception:
+        seen = {}
+
+    tasks: List[Path] = []
+
+    for fp in pdfs:
+        file_key = str(fp)
+        st = fp.stat()
+        fh = sha256_file(fp)[:16]
+        if file_key not in files_state:
+            files_state[file_key] = {
+                "status": "pending",
+                "file_size": st.st_size,
+                "file_mtime": int(st.st_mtime),
+                "discovered_at": now_iso(),
+            }
+        else:
+            try:
+                if should_skip(files_state[file_key], st.st_size, int(st.st_mtime)):
+                    files_state[file_key]["status"] = "skipped"
+                    files_state[file_key]["reason"] = "already_processed"
+                    files_state[file_key]["finished_at"] = now_iso()
+                    continue
+            except Exception:
+                pass
+        if fh in seen and seen[fh] != file_key:
+            files_state[file_key]["status"] = "skipped"
+            files_state[file_key]["reason"] = "file_duplicate"
+            files_state[file_key]["duplicate_of"] = seen[fh]
+            files_state[file_key]["finished_at"] = now_iso()
+            continue
+        seen[fh] = file_key
+        try:
+            seen_index_path.write_text(json.dumps(seen, indent=2), encoding="utf-8")
+        except Exception as e:
+            log(f"[WARN] Failed to update seen files index: {e}")
+        tasks.append(fp)
+
+    save_progress(progress_path, prog)
+    log(f"Queued {len(tasks)} files")
+
+    # Pre-warm OCR
+    if PADDLE_AVAILABLE:
+        try:
+            log(f"[WARMUP] Preloading PaddleOCR models (lang={args.ocr_lang})")
+            _ = get_paddle_ocr(args.ocr_lang)
+        except Exception as e:
+            log(f"[WARN] OCR warmup failed: {e}")
+
+    def archive_tmp(tmp: Path) -> Path:
+        final = export_dir / tmp.name
+        if final.exists():
+            final.unlink()
+        try:
+            safe_file_replace(tmp, final)
+        except Exception as e:
+            log(f"[WARN] Failed to archive {tmp.name}, using fallback copy: {e}")
+            final.write_bytes(tmp.read_bytes())
+            try:
+                tmp.unlink()
+            except Exception:
+                pass
+        return final
+
+    processed = 0
     if args.workers == 1:
-        results = []
-        for pdf in pdfs:
-            if interrupted["flag"]:
-                break
-            try:
-                r = process_one(pdf, args.collection, str(out_dir), str(cache_dir),
-                                cf_acct, cf_token, str(out_dir / "billing.jsonl"),
-                                args.cf_batch, args.engine, args.dpi, args.lang,
-                                skip_embed=args.skip_embed)
-                results.append(r)
-            except Exception as e:
-                log(f"[FAIL] {pdf}: {e}")
-        log(f"[DONE] files={len(results)}")
-        return
+        for fp in tasks:
+            files_state[str(fp)]["status"] = "in_progress"
+            files_state[str(fp)]["started_at"] = now_iso()
+            save_progress(progress_path, prog)
 
-    # Parallel execution
-    results = []
-    with ProcessPoolExecutor(max_workers=args.workers,
-                             initializer=_worker_init_for_ocr,
-                             initargs=(args.lang, bool(int(os.getenv("PADDLE_GPU", "0"))))) as ex:
-        futs = {}
-        for pdf in pdfs:
-            fut = ex.submit(
-                process_one, pdf, args.collection, str(out_dir), str(cache_dir),
-                cf_acct, cf_token, str(out_dir / "billing.jsonl"),
-                args.cf_batch, args.engine, args.dpi, args.lang, args.skip_embed
-            )
-            futs[fut] = pdf
-
-        for fut in as_completed(futs):
-            pdf = futs[fut]
-            if interrupted["flag"]:
-                break
             try:
-                if args.timeout and hasattr(fut, "result"):
-                    r = fut.result(timeout=args.timeout)
+                log(f"[PROCESS] Starting {fp.name} with {args.timeout}s timeout")
+                start_time = time.time()
+                from concurrent.futures import ProcessPoolExecutor as _PPE
+                ex1 = _PPE(max_workers=1)
+                fut = ex1.submit(
+                    process_one,
+                    str(fp), str(root), str(export_tmp), str(cache_dir),
+                    acct, tok, str(billing_file), args.embed_batch,
+                    args.force_ocr, args.engine, args.ocr_dpi, args.ocr_lang,
+                )
+                try:
+                    res = fut.result(timeout=max(1, int(args.timeout)))
+                except TimeoutError:
+                    ex1.shutdown(wait=False, cancel_futures=True)
+                    elapsed = time.time() - start_time
+                    log(f"[ERROR] Timeout after {elapsed:.1f}s on {fp.name}")
+                    res = {"error": "timeout", "file": str(fp)}
                 else:
-                    r = fut.result()
-                results.append(r)
-            except TimeoutError:
-                log(f"[FAIL] Timeout: {pdf}")
-            except BrokenProcessPool:
-                log("[ERROR] Worker pool broke; aborting.")
-                break
+                    ex1.shutdown(wait=True, cancel_futures=False)
+                    elapsed = time.time() - start_time
+                    log(f"[PROCESS] Completed {fp.name} in {elapsed:.1f}s")
             except KeyboardInterrupt:
-                log("[INTERRUPT] KeyboardInterrupt during futures. Stopping…")
-                break
+                log(f"[INTERRUPT] Processing interrupted for {fp.name}")
+                sys.exit(0)
             except Exception as e:
-                log(f"[FAIL] {pdf}: {e}")
+                elapsed = time.time() - start_time if 'start_time' in locals() else 0
+                log(f"[ERROR] Exception in {fp.name} after {elapsed:.1f}s: {e}")
+                res = {"error": f"exception: {e}", "file": str(fp)}
 
-    log(f"[DONE] files={len(results)} processed")
-    # Optionally, summarize tokens/costs here.
+            processed += 1
+
+            if res.get("error"):
+                files_state[str(fp)]["status"] = "failed"
+                files_state[str(fp)]["error"] = res["error"]
+                files_state[str(fp)]["finished_at"] = now_iso()
+                save_progress(progress_path, prog)
+                log(f"[FAIL] {fp.name}: {res['error']}")
+                continue
+
+            if res.get("skip"):
+                files_state[str(fp)].update({"status": "skipped", "reason": res.get("reason", "unknown"),
+                                             "finished_at": now_iso()})
+                save_progress(progress_path, prog)
+                log(f"[SKIP] {fp.name}: {res.get('reason')}")
+                continue
+
+            if "total_tokens" in res:
+                ftoks, fcost = billing.add(res["file"], res["total_tokens"])
+                log(f"[Billing] {Path(res['file']).name}: total tokens={ftoks:,} cost=${fcost:.6f}")
+
+            jsonl_tmp = Path(res["jsonl_tmp"])
+            jsonl_final = archive_tmp(jsonl_tmp)
+
+            chroma_done = False
+            if args.with_chroma and collection:
+                try:
+                    added = chroma_upsert_jsonl(jsonl_final, collection, client, batch=64)
+                    chroma_done = added > 0
+                    log(f"[Chroma] {fp.name}: +{added} vectors")
+                except Exception as e:
+                    log(f"[ERROR] ChromaDB failed for {fp.name}: {e}")
+                    chroma_done = False
+
+            files_state[str(fp)].update({
+                "status": "completed",
+                "jsonl_name": jsonl_final.name,
+                "jsonl_archived": True,
+                "chroma_upserted": chroma_done,
+                "chunks": res.get("chunks", 0),
+                "duplicates": res.get("dups", 0),
+                "finished_at": now_iso(),
+            })
+            save_progress(progress_path, prog)
+    else:
+        with ProcessPoolExecutor(max_workers=args.workers,
+                                 initializer=_worker_init_for_ocr,
+                                 initargs=(args.ocr_lang,)) as ex:
+            fut_map = {
+                ex.submit(
+                    process_one, str(fp), str(root), str(export_tmp), str(cache_dir),
+                    acct, tok, str(billing_file), args.embed_batch,
+                    args.force_ocr, args.engine, args.ocr_dpi, args.ocr_lang,
+                ): fp for fp in tasks
+            }
+            for fut in as_completed(fut_map):
+                fp = fut_map[fut]
+                try:
+                    res = fut.result()
+                except Exception as e:
+                    res = {"error": f"exception: {e}", "file": str(fp)}
+                processed += 1
+                if res.get("error"):
+                    files_state[str(fp)] = {
+                        **files_state.get(str(fp), {}),
+                        "status": "failed",
+                        "error": res["error"],
+                        "finished_at": now_iso(),
+                    }
+                    save_progress(progress_path, prog)
+                    log(f"[FAIL] {fp.name}: {res['error']}")
+                    continue
+                if res.get("skip"):
+                    files_state[str(fp)] = {
+                        **files_state.get(str(fp), {}),
+                        "status": "skipped",
+                        "reason": res.get("reason", "unknown"),
+                        "finished_at": now_iso(),
+                    }
+                    save_progress(progress_path, prog)
+                    log(f"[SKIP] {fp.name}: {res.get('reason')}")
+                    continue
+
+                if "total_tokens" in res:
+                    ftoks, fcost = billing.add(res["file"], res["total_tokens"])
+                    log(f"[Billing] {Path(res['file']).name}: total tokens={ftoks:,} cost=${fcost:.6f}")
+
+                jsonl_final = archive_tmp(Path(res["jsonl_tmp"]))
+                chroma_done = False
+                if args.with_chroma and collection:
+                    try:
+                        added = chroma_upsert_jsonl(jsonl_final, collection, client, batch=64)
+                        chroma_done = added > 0
+                        log(f"[Chroma] {fp.name}: +{added} vectors")
+                    except Exception as e:
+                        log(f"[ERROR] ChromaDB failed for {fp.name}: {e}")
+                        chroma_done = False
+
+                base = files_state.get(str(fp), {})
+                base.update({
+                    "status": "completed", "jsonl_name": jsonl_final.name,
+                    "jsonl_archived": True, "chroma_upserted": chroma_done,
+                    "chunks": res.get("chunks", 0), "duplicates": res.get("dups", 0),
+                    "finished_at": now_iso(),
+                })
+                files_state[str(fp)] = base
+                save_progress(progress_path, prog)
+
+    log(f"Done. Processed this run: {processed}")
 
 if __name__ == "__main__":
     main()
