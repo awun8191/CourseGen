@@ -3,7 +3,7 @@ import time
 from typing import List
 from pathlib import Path
 
-from COURSEGEN.utils.Caching.cache import Cache
+from utils.Caching.cache import Cache
 from .rate_limit_data import RATE_LIMITS
 from .gemini_api_keys import GeminiApiKeys
 

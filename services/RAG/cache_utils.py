@@ -1,11 +1,10 @@
-import os
 import hashlib
 from pathlib import Path
 from typing import Optional
-from COURSEGEN.services.RAG.log_utils import get_logger
+
+from services.RAG.log_utils import get_logger
 
 log = get_logger("cache")
-
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -14,14 +13,14 @@ def sha256_file(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
-
 def _key_text(file_hash: str, lang: str) -> str:
     return f"{file_hash}.text.{lang}.txt.cache"
-
 
 def _key_ocr(file_hash: str, lang: str, dpi: int, policy: str) -> str:
     return f"{file_hash}.ocr.{lang}.dpi{dpi}.{policy}.cache"
 
+def _key_ocr_page(file_hash: str, lang: str, dpi: int, policy: str, page: int) -> str:
+    return f"{file_hash}.p{page:04d}.ocr.{lang}.dpi{dpi}.{policy}.cache"
 
 def try_read(cache_dir: Path, key: str) -> Optional[str]:
     cpath = cache_dir / key
@@ -36,7 +35,6 @@ def try_read(cache_dir: Path, key: str) -> Optional[str]:
         log.debug(f"[CACHE] miss key={key}")
     return None
 
-
 def write(cache_dir: Path, key: str, text: str) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     cpath = cache_dir / key
@@ -46,12 +44,11 @@ def write(cache_dir: Path, key: str, text: str) -> None:
     except Exception as e:
         log.warning(f"[CACHE] write-failed key={key} err={e}")
 
-
 __all__ = [
     "sha256_file",
     "_key_text",
     "_key_ocr",
+    "_key_ocr_page",
     "try_read",
     "write",
 ]
-

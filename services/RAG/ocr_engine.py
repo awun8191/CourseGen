@@ -51,16 +51,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
+from .cache_utils import sha256_file, _key_ocr_page, try_read, write
+
 # ----------------- Optional deps -----------------
 try:
     import numpy as np
 except Exception:
     np = None  # type: ignore
 
-try:
-    import cv2
-except Exception:
-    cv2 = None  # type: ignore
+# OpenCV is heavy; load lazily to avoid unnecessary memory use for Gemini OCR
+cv2 = None  # type: ignore
+def _ensure_cv2() -> bool:
+    """Import OpenCV on first use. Returns True if available."""
+    global cv2
+    if cv2 is None:
+        try:
+            import cv2 as _cv2  # type: ignore
+            cv2 = _cv2
+        except Exception:
+            cv2 = None  # type: ignore
+    return cv2 is not None
 
 try:
     from PIL import Image
@@ -78,6 +88,14 @@ try:
 except Exception:
     easyocr = None  # type: ignore
     _HAS_EASYOCR = False
+
+# Gemini key load-balancing utilities
+try:
+    from ..Gemini.api_key_manager import ApiKeyManager
+    from ..Gemini.gemini_api_keys import GeminiApiKeys
+except Exception:  # pragma: no cover - optional dependency
+    ApiKeyManager = None  # type: ignore
+    GeminiApiKeys = None  # type: ignore
 
 try:
     from paddleocr import PaddleOCR
@@ -113,7 +131,7 @@ class OCRResult:
     debug_images: Optional[List["np.ndarray"]] = None
 
 # ----------------- Common helpers -----------------
-_OCR_PROMPT = (
+OCR_PROMPT = (
     "Transcribe the exact visible text from this page image into plain text.\n"
     "Preserve the original line breaks and spacing where obvious.\n"
     "Do not include any explanations, headings, labels, JSON, or code fences.\n"
@@ -152,7 +170,7 @@ def _snapshot(s: str, n: int = 160) -> str:
 
 # ----------------- Handwriting preprocessing (for Easy/Paddle) -----------------
 def _deskew(gray: "np.ndarray") -> "np.ndarray":
-    if cv2 is None:
+    if not _ensure_cv2():
         return gray
     try:
         _th, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
@@ -173,7 +191,7 @@ def _deskew(gray: "np.ndarray") -> "np.ndarray":
         return gray
 
 def _remove_shadow(gray: "np.ndarray") -> "np.ndarray":
-    if cv2 is None:
+    if not _ensure_cv2():
         return gray
     try:
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (31, 31))
@@ -185,7 +203,7 @@ def _remove_shadow(gray: "np.ndarray") -> "np.ndarray":
         return gray
 
 def _adaptive_binarize(gray: "np.ndarray") -> "np.ndarray":
-    if cv2 is None:
+    if not _ensure_cv2():
         return gray
     try:
         den = cv2.fastNlMeansDenoising(gray, h=10, templateWindowSize=7, searchWindowSize=21)
@@ -201,7 +219,7 @@ def _adaptive_binarize(gray: "np.ndarray") -> "np.ndarray":
         return gray
 
 def _maybe_upscale(img: "np.ndarray", factor: float) -> "np.ndarray":
-    if cv2 is None or factor <= 1.01:
+    if factor <= 1.01 or not _ensure_cv2():
         return img
     try:
         h, w = img.shape[:2]
@@ -214,6 +232,7 @@ def _maybe_upscale(img: "np.ndarray", factor: float) -> "np.ndarray":
 
 def preprocess_for_handwriting(img_rgb: Union["np.ndarray", "Image.Image"], *, upscale: float = 1.6) -> "np.ndarray":
     img = _ensure_np(img_rgb)
+    _ensure_cv2()
     if len(img.shape) == 3:
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if cv2 is not None else img.mean(axis=2).astype("uint8")
     else:
@@ -303,24 +322,12 @@ _GEMINI_SVC_SINGLETON = None
 _GEMINI_SVC_LOADED = False
 
 def _import_gemini_service_via_dotted(path_str: str):
-    """
-    Try normal dotted import (src.services.Gemini.gemini_service) after adding repo root
-    to sys.path. Preserves relative imports inside gemini_service.py.
-    """
+    """Attempt a dotted import after adding the repo root to ``sys.path``."""
     p = Path(path_str).resolve()
-    repo_root = None
-    src_dir = None
-    for anc in p.parents:
-        if anc.name == "src":
-            src_dir = anc
-            repo_root = anc.parent
-            break
-    if repo_root is None or src_dir is None:
-        return None, f"No 'src' directory found in ancestors of {p}"
-    repo_root_str = str(repo_root)
-    if repo_root_str not in sys.path:
-        sys.path.insert(0, repo_root_str)
-    dotted = ".".join(p.relative_to(repo_root).with_suffix("").parts)  # src.services.Gemini.gemini_service
+    repo_root = p.parents[2]  # .../repo/services/Gemini/gemini_service.py -> repo
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    dotted = ".".join(p.relative_to(repo_root).with_suffix("").parts)
     try:
         mod = importlib.import_module(dotted)
     except Exception as e:
@@ -333,20 +340,9 @@ def _import_gemini_service_via_dotted(path_str: str):
     return svc, None
 
 def _import_gemini_service_via_pkgstub(path_str: str):
-    """
-    Robust loader: create package stubs so relative imports in the service work
-    even when loading the file directly.
-    """
+    """Create package stubs so relative imports work when loading the file directly."""
     p = Path(path_str).resolve()
-    repo_root = None
-    src_dir = None
-    for anc in p.parents:
-        if anc.name == "src":
-            src_dir = anc
-            repo_root = anc.parent
-            break
-    if repo_root is None or src_dir is None:
-        return None, f"No 'src' directory found in ancestors of {p}"
+    repo_root = p.parents[2]
 
     def _ensure_pkg(name: str, path_list: List[str]):
         pkg = sys.modules.get(name)
@@ -359,16 +355,21 @@ def _import_gemini_service_via_pkgstub(path_str: str):
                 pkg.__path__ = path_list  # type: ignore[attr-defined]
         return pkg
 
-    _ensure_pkg("src", [str(src_dir)])
-    _ensure_pkg("src.services", [str(src_dir / "services")])
-    _ensure_pkg("src.services.Gemini", [str(src_dir / "services" / "Gemini")])
+    parts = p.relative_to(repo_root).with_suffix("").parts
+    for i in range(len(parts) - 1):
+        pkg_name = ".".join(parts[: i + 1])
+        pkg_path = [str(repo_root / Path(*parts[: i + 1]))]
+        _ensure_pkg(pkg_name, pkg_path)
 
-    mod_name = "src.services.Gemini.gemini_service"
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+    mod_name = ".".join(parts)
     spec = importlib.util.spec_from_file_location(mod_name, str(p))
     if not spec or not spec.loader:
         return None, f"Cannot create spec for {p}"
     module = importlib.util.module_from_spec(spec)
-    module.__package__ = "src.services.Gemini"
+    module.__package__ = ".".join(parts[:-1])
     sys.modules[mod_name] = module
     try:
         spec.loader.exec_module(module)  # type: ignore[attr-defined]
@@ -442,7 +443,17 @@ def _get_gemini_service():
 
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
     try:
-        _GEMINI_SVC_SINGLETON = svc_cls(model=model)
+        keys: List[str] = []
+        if GeminiApiKeys is not None:
+            try:
+                keys = GeminiApiKeys().get_keys()
+            except Exception:
+                keys = []
+        manager = ApiKeyManager(keys) if ApiKeyManager is not None else None
+        if manager is not None:
+            _GEMINI_SVC_SINGLETON = svc_cls(model=model, api_key_manager=manager)
+        else:
+            _GEMINI_SVC_SINGLETON = svc_cls(model=model)
         log.info(f"GeminiService ready (model={model}) from {path_env}")
     except Exception as e:
         log.error(f"GeminiService init failed: {e}")
@@ -461,7 +472,7 @@ def _gemini_via_service(img_pil: "Image.Image") -> str:
     img_bytes = buf.getvalue()
     try:
         out = svc.ocr(images=[{"mime_type": "image/png", "data": img_bytes}],
-                      prompt=_OCR_PROMPT, response_model=None)
+                      prompt=OCR_PROMPT, response_model=None)
         if isinstance(out, dict) and "result" in out:
             return (out["result"] or "").strip()
         if isinstance(out, str):
@@ -473,6 +484,40 @@ def _gemini_via_service(img_pil: "Image.Image") -> str:
     except Exception as e:
         log.error(f"GeminiService.ocr failed: {e}")
         return ""
+
+
+def _gemini_via_service_batch(imgs: List["Image.Image"]) -> List[str]:
+    """Call GeminiService.ocr with multiple page images at once."""
+    svc = _get_gemini_service()
+    if svc is None:
+        return ["" for _ in imgs]
+    max_edge = int(os.getenv("OCR_GEMINI_MAX_EDGE", "2000"))
+    image_parts: List[Dict[str, bytes]] = []
+    for im in imgs:
+        if max_edge > 0:
+            im = _limit_long_edge(im, max_edge)
+        buf = io.BytesIO()
+        im.save(buf, format="PNG")
+        image_parts.append({"mime_type": "image/png", "data": buf.getvalue()})
+    prompt = (
+        OCR_PROMPT
+        + "\nAfter each page transcription add a line with <<<PAGE_BREAK>>>."
+    )
+    try:
+        out = svc.ocr(images=image_parts, prompt=prompt, response_model=None)
+        if isinstance(out, dict) and "result" in out:
+            text = out["result"] or ""
+        elif isinstance(out, str):
+            text = out
+        else:
+            text = str(out)
+        parts = [p.strip() for p in text.split("<<<PAGE_BREAK>>>")]
+        if len(parts) < len(imgs):
+            parts.extend([""] * (len(imgs) - len(parts)))
+        return parts[: len(imgs)]
+    except Exception as e:
+        log.error(f"GeminiService.ocr batch failed: {e}")
+        return ["" for _ in imgs]
 
 def _gemini_via_fallback(img_pil: "Image.Image") -> str:
     """Direct google-genai fallback (requires GEMINI_API_KEY)."""
@@ -499,7 +544,7 @@ def _gemini_via_fallback(img_pil: "Image.Image") -> str:
         image_part = gtypes.Part.from_bytes(mime_type="image/png", data=img_bytes)
         resp = client.models.generate_content(
             model=model,
-            contents=[image_part, _OCR_PROMPT],
+            contents=[image_part, OCR_PROMPT],
             config={"temperature": 0.0, "max_output_tokens": max_tokens},
         )
         text = (getattr(resp, "text", None) or getattr(resp, "output_text", "") or "").strip()
@@ -652,71 +697,95 @@ def ocr_pdf(
     handwriting: bool = False,
     dpi: int = 300,
     engine: str = "hybrid",  # include "gemini"
+    cache_dir: Optional[str] = None,
+    file_hash: Optional[str] = None,
     return_debug: bool = False,
 ) -> OCRResult:
     doc = _open_pdf(Path(pdf_path))
+    cdir = Path(cache_dir) if cache_dir else None
+    if file_hash is None and cdir is not None:
+        try:
+            file_hash = sha256_file(Path(pdf_path))
+        except Exception:
+            file_hash = None
 
     pages_text: List[str] = []
     metrics: List[PageMetrics] = []
     debug_imgs: List["np.ndarray"] = []
+
+    if engine == "gemini":
+        if Image is None:
+            raise RuntimeError("Pillow required for Gemini OCR")
+        batch_size = max(1, int(os.getenv("OCR_GEMINI_PAGE_BATCH", "3")))
+        imgs: List[Image.Image] = []
+        idxs: List[Tuple[int, Optional[str]]] = []
+        for i in range(len(doc)):
+            page_no = i + 1
+            key = _key_ocr_page(file_hash, lang, dpi, engine, page_no) if cdir and file_hash else None
+            if key and cdir:
+                cached = try_read(cdir, key)
+                if cached is not None:
+                    pages_text.append(cached)
+                    metrics.append(PageMetrics(
+                        page=page_no, engine="gemini",
+                        lines=len(cached.splitlines()),
+                        avg_conf=0.0, min_conf=0.0, max_conf=0.0, dpi=dpi,
+                    ))
+                    continue
+            pg = doc.load_page(i)
+            zoom = max(1.0, dpi / 72.0)
+            pm = pg.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+            img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
+            imgs.append(img)
+            idxs.append((page_no, key))
+            if len(imgs) == batch_size or i == len(doc) - 1:
+                texts = _gemini_via_service_batch(imgs)
+                for (page_no, key), text, img in zip(idxs, texts, imgs):
+                    if not text.strip():
+                        if bool(int(os.getenv("OCR_GEMINI_AUTOFALLBACK", "1"))):
+                            fb_engine = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "hybrid").lower()
+                            fb_hand = bool(int(os.getenv("OCR_GEMINI_FALLBACK_HAND", "1")))
+                            if fb_engine not in ("easyocr", "paddleocr", "hybrid"):
+                                fb_engine = "hybrid"
+                            log.warning(
+                                f"[p{page_no}] Gemini empty; falling back to {fb_engine} (hand={int(fb_hand)})"
+                            )
+                            fb = ocr_image(
+                                img, lang=lang, handwriting=fb_hand,
+                                engine=fb_engine, dpi_hint=dpi, return_debug=return_debug,
+                            )
+                            text = fb.text
+                            metrics.append(PageMetrics(
+                                page=page_no, engine=f"gemini→{fb.by_page[0].engine}",
+                                lines=len(fb.text.splitlines()) if fb.text else 0,
+                                avg_conf=fb.by_page[0].avg_conf,
+                                min_conf=fb.by_page[0].min_conf,
+                                max_conf=fb.by_page[0].max_conf,
+                                dpi=dpi,
+                            ))
+                            if return_debug and fb.debug_images:
+                                debug_imgs.extend(fb.debug_images)
+                        else:
+                            raise RuntimeError("Gemini OCR returned empty text (page).")
+                    else:
+                        metrics.append(PageMetrics(
+                            page=page_no, engine="gemini",
+                            lines=len(text.splitlines()),
+                            avg_conf=0.0, min_conf=0.0, max_conf=0.0, dpi=dpi,
+                        ))
+                    pages_text.append(text)
+                    if key and cdir:
+                        write(cdir, key, text)
+                imgs, idxs = [], []
+        full = "\n".join(pages_text)
+        meta = {"engine": "gemini", "handwriting": handwriting, "dpi": dpi, "pages": len(doc)}
+        return OCRResult(text=full, by_page=metrics, meta=meta, debug_images=(debug_imgs if return_debug else None))
 
     for i in range(len(doc)):
         pg = doc.load_page(i)
         zoom = max(1.0, dpi / 72.0)
         pm = pg.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
 
-        # --- Gemini path for PDF ---
-        if engine == "gemini":
-            if Image is None:
-                raise RuntimeError("Pillow required for Gemini OCR")
-            img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
-            page_text = _gemini_via_service(img) or _gemini_via_fallback(img)
-
-            if not page_text.strip():
-                if bool(int(os.getenv("OCR_GEMINI_AUTOFALLBACK", "1"))):
-                    fb_engine = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "hybrid").lower()
-                    fb_hand = bool(int(os.getenv("OCR_GEMINI_FALLBACK_HAND", "1")))
-                    if fb_engine not in ("easyocr", "paddleocr", "hybrid"):
-                        fb_engine = "hybrid"
-                    log.warning(f"[p{i+1}] Gemini empty; falling back to {fb_engine} (hand={int(fb_hand)})")
-
-                    # Build ndarray for local OCR path
-                    if cv2 is not None:
-                        arr = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)
-                        if pm.n == 4:
-                            arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
-                        rgb = arr
-                    else:
-                        _pil = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
-                        rgb = np.array(_pil)
-
-                    fb = ocr_image(
-                        rgb, lang=lang, handwriting=fb_hand,
-                        engine=fb_engine, dpi_hint=dpi, return_debug=return_debug
-                    )
-                    pages_text.append(fb.text)
-                    metrics.append(PageMetrics(
-                        page=i + 1, engine=f"gemini→{fb.by_page[0].engine}",
-                        lines=len(fb.text.splitlines()) if fb.text else 0,
-                        avg_conf=fb.by_page[0].avg_conf,
-                        min_conf=fb.by_page[0].min_conf,
-                        max_conf=fb.by_page[0].max_conf,
-                        dpi=dpi,
-                    ))
-                    continue  # next page
-                else:
-                    raise RuntimeError("Gemini OCR returned empty text (page).")
-
-            # Normal Gemini success
-            pages_text.append(page_text)
-            metrics.append(PageMetrics(
-                page=i + 1, engine="gemini",
-                lines=len(page_text.splitlines()),
-                avg_conf=0.0, min_conf=0.0, max_conf=0.0, dpi=dpi
-            ))
-            continue
-
-        # --- Non-Gemini: route via ocr_image() for consistency ---
         if cv2 is not None:
             arr = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)
             if pm.n == 4:
@@ -728,7 +797,7 @@ def ocr_pdf(
 
         single = ocr_image(
             rgb, lang=lang, handwriting=handwriting,
-            engine=engine, dpi_hint=dpi, return_debug=return_debug
+            engine=engine, dpi_hint=dpi, return_debug=return_debug,
         )
         pages_text.append(single.text)
         m = single.by_page[0]
