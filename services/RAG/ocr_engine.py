@@ -113,11 +113,19 @@ class OCRResult:
     debug_images: Optional[List["np.ndarray"]] = None
 
 # ----------------- Common helpers -----------------
-_OCR_PROMPT = (
+_OCR_PROMPT_SINGLE = (
     "Transcribe the exact visible text from this page image into plain text.\n"
     "Preserve the original line breaks and spacing where obvious.\n"
     "Do not include any explanations, headings, labels, JSON, or code fences.\n"
     "Return ONLY the text content as a single plain string."
+)
+
+_OCR_PROMPT_BATCH = (
+    "Transcribe the exact visible text from these page images into plain text.\n"
+    "Provide the text for each page separately, labeled as Page 1:, Page 2:, etc.\n"
+    "Preserve the original line breaks and spacing where obvious.\n"
+    "Do not include any explanations, headings, labels, JSON, or code fences.\n"
+    "Return ONLY the labeled text content."
 )
 
 def _ensure_np(img: Union["np.ndarray", "Image.Image"]) -> "np.ndarray":
@@ -483,7 +491,7 @@ def _gemini_via_service(img_pil: "Image.Image") -> str:
     img_bytes = buf.getvalue()
     try:
         out = svc.ocr(images=[{"mime_type": "image/png", "data": img_bytes}],
-                      prompt=_OCR_PROMPT, response_model=None)
+                      prompt=_OCR_PROMPT_BATCH, response_model=None)
         if isinstance(out, dict) and "result" in out:
             return (out["result"] or "").strip()
         if isinstance(out, str):
