@@ -1,19 +1,13 @@
 from __future__ import annotations
 import logging
-import os
 import re
-import sys
 from pathlib import Path
-
 
 import fitz
 
-# Add workspace root to sys.path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../'))
-
-from COURSEGEN.data_models.ocr_data_model import OCRData
-from COURSEGEN.services.Gemini.gemini_service import GeminiService
-from COURSEGEN.utils.Caching.cache import Cache
+from data_models.ocr_data_model import OCRData
+from services.Gemini.gemini_service import GeminiService
+from utils.Caching.cache import Cache
 
 ACCEPTABLE_TEXT_PERCENTAGE = 0.85
 CACHE_FILE = "pdf_cache.json"

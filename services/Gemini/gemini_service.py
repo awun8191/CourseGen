@@ -17,32 +17,21 @@ import sys
 import time
 import re
 
-from data_models.gemini_config import GeminiConfig
-
 # Add the project root to the Python path to allow for absolute imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Type,
-    TypeVar,
-    Union,
-)
-from typing import get_origin, get_args
 
-from google import genai
-from google.genai import types as gtypes
-from google.genai import errors as genai_errors
-from pydantic import BaseModel
+from typing import Any, Dict, Iterable, List, Optional, Type, TypeVar, get_args, get_origin  # noqa: E402
+
+from data_models.gemini_config import GeminiConfig  # noqa: E402
+from google import genai  # noqa: E402
+from google.genai import types as gtypes  # noqa: E402
+from google.genai import errors as genai_errors  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 # --- Project imports ---
-from ..Gemini.api_key_manager import ApiKeyManager  # relative import (same folder)
+from ..Gemini.api_key_manager import ApiKeyManager  # relative import (same folder)  # noqa: E402
 try:
     from ..Gemini.gemini_api_keys import GeminiApiKeys  # optional convenience provider
 except Exception:
@@ -61,7 +50,8 @@ except Exception:
 
 T = TypeVar("T", bound=BaseModel)
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+# Use the faster flash-lite variant by default for OCR-heavy workflows
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 EMBEDDING_MODEL = "gemini-embedding-001"
 
 # --- sample models (you can remove if unused) ---

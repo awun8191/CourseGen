@@ -31,21 +31,25 @@ Env:
 
 from __future__ import annotations
 
-import os, re, sys, json, time, argparse, signal
+import argparse
+import json
+import os
+import signal
+import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any, Dict, List, Tuple
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 try:
     from concurrent.futures.process import BrokenProcessPool  # type: ignore
 except Exception:
     class BrokenProcessPool(Exception):
         pass
-import multiprocessing as mp
 
 # ---- Make repository root importable so "from src...." works when run directly ----
 try:
-    repo_root = Path(__file__).resolve().parents[3]
+    repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
     src_dir = repo_root / "src"
@@ -58,29 +62,21 @@ except Exception:
 import requests
 
 # ---- Project modules ----
-from COURSEGEN.services.RAG.log_utils import setup_logging, snapshot
-from COURSEGEN.services.RAG.billing import Billing
-from COURSEGEN.services.RAG.ocr_engine import ocr_pdf
-from COURSEGEN.services.RAG.chroma_store import chroma_client, chroma_upsert_jsonl
-from COURSEGEN.services.RAG.progress_store import (
+from services.RAG.log_utils import setup_logging, snapshot
+from services.RAG.billing import Billing
+from services.RAG.ocr_engine import ocr_pdf
+from services.RAG.chroma_store import chroma_upsert_jsonl
+from services.RAG.progress_store import (
     load_progress,
     save_progress,
     safe_file_replace,
     should_skip,
 )
-from COURSEGEN.services.RAG.path_meta import parse_path_meta
-from COURSEGEN.services.RAG.cache_utils import sha256_file
-from COURSEGEN.services.RAG.chunking import chunk, dedupe, sha1_text
+from services.RAG.path_meta import parse_path_meta
+from services.RAG.cache_utils import sha256_file, _key_ocr_page
+from services.RAG.chunking import chunk, dedupe, sha1_text
 
 # ------------------------------------------------------------------------------------
-# Optional OpenCV (not required here, OCR engine handles its own needs)
-try:
-    import cv2
-    import numpy as np
-    OPENCV_AVAILABLE = True
-except Exception:
-    OPENCV_AVAILABLE = False
-
 # ------------------------------------------------------------------------------------
 # Small pretty logging helpers (terminal color)
 ANSI = {
@@ -190,7 +186,7 @@ class CFEmbeddings:
                     raise requests.HTTPError(f"{r.status_code} {r.text[:200]}")
                 r.raise_for_status()
                 return r.json()
-            except Exception as e:
+            except Exception:
                 if attempt == self.retry.tries:
                     raise
                 time.sleep(min(self.retry.max_sleep, sleep))
@@ -212,32 +208,38 @@ class CFEmbeddings:
 
 # ------------------------------------------------------------------------------------
 # OCR wrapper (delegates to shared ocr_engine)
-def extract_text(path: str, ocr_dpi: int, ocr_lang: str, engine: str) -> Tuple[str, Dict[str, Any]]:
-    res = ocr_pdf(pdf_path=path, lang=ocr_lang, dpi=ocr_dpi, engine=engine)
+def extract_text(
+    path: str,
+    ocr_dpi: int,
+    ocr_lang: str,
+    engine: str,
+    cache_dir: str | None = None,
+    file_sha: str | None = None,
+) -> Tuple[str, Dict[str, Any]]:
+    res = ocr_pdf(
+        pdf_path=path,
+        lang=ocr_lang,
+        dpi=ocr_dpi,
+        engine=engine,
+        cache_dir=cache_dir,
+        file_hash=file_sha,
+    )
     return res.text, res.meta
 
 # ------------------------------------------------------------------------------------
-# Worker warmup (optional): let ocr_engine initialize Paddle/Easy on worker side
-def _worker_init_for_ocr(lang: str, use_gpu: bool = False) -> None:
+# Worker warmup: limit OpenCV threads but avoid heavy OCR initialization to save memory
+def _worker_init_for_ocr(_lang: str, _use_gpu: bool = False) -> None:
+    """Lightweight worker setup: limit OpenCV threads only when needed."""
+    if os.getenv("OCR_ENGINE", "gemini") == "gemini":
+        return
     try:
-        # keep OpenCV threads tame
-        try:
-            import cv2  # type: ignore
-            cv2.setNumThreads(int(os.getenv("CV2_NUM_THREADS", "1")))
-        except Exception:
-            pass
-        # Warmup inside ocr_engine if it exposes helpers (optional)
-        try:
-            from COURSEGEN.services.RAG.ocr_engine import get_paddle_ocr as _warm  # type: ignore
-            _ = _warm(lang, use_gpu)  # returns a reader or None
-            if _ is None:
-                log(f"[WARMUP] PaddleOCR unavailable in worker (lang={lang}); EasyOCR/Gemini will be used")
-            else:
-                log(f"[WARMUP] Worker preloaded PaddleOCR (lang={lang}, gpu={use_gpu})")
-        except Exception:
-            pass
-    except Exception as e:
-        log(f"[WARN] Worker OCR warmup failed: {e}")
+        import cv2  # type: ignore
+        cv2.setNumThreads(int(os.getenv("CV2_NUM_THREADS", "1")))
+        # Wire cv2 into ocr_engine lazily
+        from services.RAG import ocr_engine as _ocr_engine
+        _ocr_engine.cv2 = cv2  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 # ------------------------------------------------------------------------------------
 # Per-file processing
@@ -316,7 +318,9 @@ def process_one(pdf_path: str,
     # ---------- OCR ----------
     log(f"[OCR] Engine={ocr_engine} DPI={ocr_dpi} Lang={ocr_lang}")
     t0 = time.time()
-    text, ocr_meta = extract_text(rel, ocr_dpi, ocr_lang, ocr_engine)
+    text, ocr_meta = extract_text(
+        rel, ocr_dpi, ocr_lang, ocr_engine, cache_dir, file_sha
+    )
     t1 = time.time()
     if not text or len(text.strip()) < 10:
         save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "error", "error": "empty_ocr"})
@@ -327,7 +331,7 @@ def process_one(pdf_path: str,
     # ---------- Chunk & dedupe ----------
     log("[CHUNK] Chunking + dedup")
     raw_chunks = chunk(text)
-    deduped = dedupe(raw_chunks)
+    deduped, _ = dedupe(raw_chunks)
     if not deduped:
         save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "error", "error": "no_chunks"})
         raise RuntimeError(f"No chunks after dedupe for {path.name}")
@@ -370,7 +374,6 @@ def process_one(pdf_path: str,
 
         with CFEmbeddings(acct, tok, batch_max=embed_batch) as cf:
             # stream-embed and upsert per-batch to reduce RAM
-            embs_collected: List[List[float]] = []
             texts = [rec["text"] for rec in jsonl_lines]
             ids = [rec["id"] for rec in jsonl_lines]
             metas = [rec["metadata"] for rec in jsonl_lines]
@@ -419,7 +422,22 @@ def process_one(pdf_path: str,
     # uncomment below and remove the streaming upserts in the loop.
     # chroma_upsert_jsonl(jsonl_path, collection_name=collection)
 
-    save_progress(progress_path, {"file": rel, "mtime": mtime0, "status": "done", "jsonl": str(jsonl_path), "tokens": total_tokens})
+    save_progress(
+        progress_path,
+        {"file": rel, "mtime": mtime0, "status": "done", "jsonl": str(jsonl_path), "tokens": total_tokens},
+    )
+
+    # Clear per-page OCR cache once fully processed
+    try:
+        cdir = Path(cache_dir)
+        pages = int(ocr_meta.get("pages", 0))
+        for page in range(1, pages + 1):
+            key = _key_ocr_page(file_sha, ocr_lang, ocr_dpi, ocr_engine, page)
+            f = cdir / key
+            if f.exists():
+                f.unlink()
+    except Exception as e:
+        log(f"[CACHE] cleanup failed for {path.name}: {e}")
     log(f"[SUCCESS] {path.name}  chunks={len(jsonl_lines)}  tokens≈{total_tokens:,}")
     return {"file": rel, "status": "done", "chunks": len(jsonl_lines), "tokens": total_tokens, "jsonl": str(jsonl_path)}
 
@@ -454,13 +472,25 @@ def main():
     parser.add_argument("--dpi", type=int, default=300, help="OCR DPI for rasterization")
     parser.add_argument("--lang", default=os.getenv("PADDLE_LANG", "en"), help="OCR language hint (ocr_engine may ignore)")
     parser.add_argument("--cf-batch", type=int, default=int(os.getenv("CF_EMBED_MAX_BATCH", "96")), help="Max batch size for CF embeddings")
-    parser.add_argument("--workers", type=int, default=max(1, mp.cpu_count() // 2), help="Parallel workers")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=min(3, os.cpu_count() or 1),
+        help="Parallel worker processes (default: 3 or CPU count, whichever is lower)",
+    )
     parser.add_argument("--skip-embed", action="store_true", help="Run OCR + JSONL only; skip embeddings/upsert")
     parser.add_argument("--timeout", type=int, default=0, help="Per-file timeout in seconds (0=disable)")
     args = parser.parse_args()
+    # allow caller to override worker count; default chosen above
 
     setup_logging()
     os.environ.setdefault("OMP_NUM_THREADS", "4")
+    os.environ.setdefault("OCR_ENGINE", args.engine)
+    # Ensure load-balanced Gemini OCR with flash-lite model and 3-page batching
+    gem_svc = Path(__file__).resolve().parents[1] / "Gemini" / "gemini_service.py"
+    os.environ.setdefault("GEMINI_SERVICE_PATH", str(gem_svc))
+    os.environ.setdefault("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    os.environ.setdefault("OCR_GEMINI_PAGE_BATCH", "3")
 
     # Credentials
     cf_acct = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
