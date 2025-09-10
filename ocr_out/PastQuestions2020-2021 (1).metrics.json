@@ -1,0 +1,209 @@
+[
+  {
+    "page": 1,
+    "engine": "gemini",
+    "lines": 50,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 2,
+    "engine": "gemini",
+    "lines": 62,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 3,
+    "engine": "gemini",
+    "lines": 44,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 4,
+    "engine": "gemini",
+    "lines": 46,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 5,
+    "engine": "gemini",
+    "lines": 14,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 6,
+    "engine": "gemini",
+    "lines": 34,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 7,
+    "engine": "gemini",
+    "lines": 54,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 8,
+    "engine": "gemini",
+    "lines": 50,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 9,
+    "engine": "gemini",
+    "lines": 10,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 10,
+    "engine": "gemini",
+    "lines": 55,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 11,
+    "engine": "gemini",
+    "lines": 31,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 12,
+    "engine": "gemini",
+    "lines": 40,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 13,
+    "engine": "gemini",
+    "lines": 18,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 14,
+    "engine": "gemini",
+    "lines": 46,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 15,
+    "engine": "gemini",
+    "lines": 60,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 16,
+    "engine": "gemini",
+    "lines": 6,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 17,
+    "engine": "gemini",
+    "lines": 46,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 18,
+    "engine": "gemini",
+    "lines": 58,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 19,
+    "engine": "gemini",
+    "lines": 12,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 20,
+    "engine": "gemini",
+    "lines": 40,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 21,
+    "engine": "gemini",
+    "lines": 38,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 22,
+    "engine": "gemini",
+    "lines": 37,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 23,
+    "engine": "gemini",
+    "lines": 33,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  }
+]

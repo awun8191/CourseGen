@@ -1,0 +1,119 @@
+[
+  {
+    "page": 1,
+    "engine": "gemini",
+    "lines": 49,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 2,
+    "engine": "gemini",
+    "lines": 47,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 3,
+    "engine": "gemini",
+    "lines": 49,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 4,
+    "engine": "gemini",
+    "lines": 44,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 5,
+    "engine": "gemini",
+    "lines": 25,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 6,
+    "engine": "gemini",
+    "lines": 52,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 7,
+    "engine": "gemini",
+    "lines": 36,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 8,
+    "engine": "gemini→paddleocr(angle_cls=False)",
+    "lines": 30,
+    "avg_conf": 0.6940281669298808,
+    "min_conf": 0.5320000052452087,
+    "max_conf": 0.8806121349334717,
+    "dpi": 300
+  },
+  {
+    "page": 9,
+    "engine": "gemini",
+    "lines": 26,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 10,
+    "engine": "gemini",
+    "lines": 55,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 11,
+    "engine": "gemini",
+    "lines": 46,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 12,
+    "engine": "gemini",
+    "lines": 46,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  },
+  {
+    "page": 13,
+    "engine": "gemini",
+    "lines": 28,
+    "avg_conf": 0.0,
+    "min_conf": 0.0,
+    "max_conf": 0.0,
+    "dpi": 300
+  }
+]

@@ -2,7 +2,7 @@ import os
 import json
 from pathlib import Path
 from typing import Any, Dict
-from COURSEGEN.services.RAG.log_utils import get_logger
+from services.RAG.log_utils import get_logger
 
 log = get_logger("progress")
 

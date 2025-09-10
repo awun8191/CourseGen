@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Tuple
-from COURSEGEN.services.RAG.log_utils import get_logger, snapshot
+from services.RAG.log_utils import get_logger, snapshot
 
 log = get_logger("chunk")
 

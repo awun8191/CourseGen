@@ -1,0 +1,884 @@
+AFE
+BARALOLA
+UNIVERSITY (ABUAD)
+RM 2, AFE BARALOLA WAY,
+ADO-EKITI, EKITI STATE, NIGERIA
+PMB 540 ADO-EKITI
+
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL/ELECTRONICS & COMPUTER ENGINEERING
+
+Session: 2020/2021 Semester: Second
+Course Code: EEE 512 Course Title: Digital Communications
+Units: 3 Time Allowed: 2 hours 30 mins. Total Marks: 100 Marks
+Instructions: Attempt three (3) questions in Section A and two (2) questions in section B [Five questions in all]
+
+SECTION A (60 Marks)
+
+QUESTION 1 (20 marks)
+
+(a) (i) What is data compression? (5 marks)
+(ii) Highlight three (3) basic motivation for data compression
+(b) (i) A 100 kilobyte file was compressed to 40Kb, calculate its compression factor (5 marks)
+(ii) In one sentence state the effect of entropy on data compression
+(c) (i) Briefly state the modalities of compression in GIF and PNG (5 marks)
+(ii) With the aid of a suitable diagram, briefly explain the generalized process of compression
+of data.
+(d) Use the suitable block diagram to show the compression process in JPEG algorithm (5 marks)
+
+QUESTION 2 (20 marks)
+
+(a) Explain the effects of fundamental parameters in Shannon's equation expressed below on
+the rate and quality of information transmitted over a channel (5 marks)
+C = Blog2(1 + SNR) bit/s
+(b) An analog signal having a 4 kHz bandwidth is sampled at 1.25 times the Nyquist rate, and
+each sample is quantized into one of equality likely levels. Assume that the successive
+samples are statistically independent.
+(i) What is the information rate of this source?
+(ii) can the output of this source be transmitted without error over an AWGN channel with
+a bandwidth of 10 kHz and an S/N ratio of 20 dB?
+(iii) Find the S/N ratio required for error free transmission in b (i) (8 marks)
+(iv) Find the bandwidth required for an AWGN channel for error-free transmission of the
+output of this source if the S/N ratio is 20 dB.
+(c) (i) A voice grade channel of the telephone network has a bandwidth of 3.4kHz. Calculate the
+information capacity of the telephone channel for a signal-to-noise ratio of 30dB.
+(ii) Given an AWGN channel with 4kHz bandwidth and the noise spectral density 7/2 =
+10-12W Hz. The signal power required at the receiver is 0.1 Mw. Calculate the capacity
+(7 marks)
+of the channel.
+
+Scanned with CamScanner
+QUESTION 3 (20 marks)
+In order to meet a specific requirement in the deployment of telecommunication infrastructure
+three binary channel were cascaded as shown in Figure 1
+
+A1
+0.3
+B1
+0.9
+C1
+0.9
+D1=0
+0.1
+0.2
+0.2
+0.2
+0.1
+A2
+0.9
+B2
+0.3
+C2
+0.3
+D2=1
+
+Figure 1: Three Cascaded Binary
+
+(a) (i) Find the Overall Channel matrix of the resultant channel
+(ii) Draw the resultant channel diagram
+
+(b) Compute the following:
+(i) P(D1) and P(D2) when P(A1) =0.7 P(A2)= 0.3
+(ii) Find the joint probabilities P(A1, D1) and P(A2, D2)
+(c) Based on the resultant channel diagram in b(ii), find the:
+(i) probability of error Pe
+(ii) probability of receiving 0 (P) and 1 (P)
+(iii) Find Pe if the output results are reversed i.e. received 1's are called 0's and vice versa
+(7 marks)
+
+(7 marks)
+
+(6 marks)
+
+QUESTION 4 (20 marks)
+
+(a) An alphabet consists of the letters A, B, C, and D, each letter is coded into sequence of two
+binary (on-off) pulses. The A is represented by 000, B by 001, the C by 100, and D by 101.
+Each individual is transmitted at a frequency of 200 Hz
+(i) Calculate the average rate of transmission of information, if the different letters are
+equally likely to occur
+(ii) If the probability of occurrence each letter is respectively, PA = 1/5, PB = 1/4, Pc =
+1/4, PD = 3/10, find the average rate of transmission of information in bits/s (8 marks)
+
+(b) A Communication system is used to transmit one of 16 possible signals. Suppose that
+the transmission is accomplished by encoding the signals into binary digits
+i. What will be the pulse sequence for the 13th and 7th symbol?
+ii. If each binary digit requires 1 us for transmission, how much information in bits does the
+system transmit in 8 us? Assume that the signals are likely to occur equally.
+iii. If the symbols are sent directly without encoding, it is found that each symbol requires 3
+us for transmission. What is the information rate in bits/s in this case?
+(7 marks)
+
+Scanned with CamScanner
+(c) A high resolution black and white TV picture consists of about 2 X106 picture elements and
+16 different brightness levels. Pictures are repeated at the rate of 32 per second. All picture
+elements are assumed to be independent and all levels have equal likelihood of occurrence.
+Calculate the Entropy and average rate information conveyed by this TV picture source
+(5 marks)
+
+SECTION B (40 Marks)
+
+QUESTION 5 (20 marks) (4 marks)
+(a) Discuss probability of error as applied to digital communication systems.
+(b) State the Shannon channel capacity theorem and discuss the importance of spectral efficiency (4 marks)
+in digital communication systems.
+(c) Using a block diagram, explain the operation of a Non-coherent FSK demodulator. (4 marks)
+(d) What is the benefit of adopting multi-level signaling in digital communication? How many (4 marks)
+bits of data are required to transmit a 128-state discrete signal?
+(e) For the truth table in table 1, sketch the Phasor and constellation diagrams for the 8-PSK (4 marks)
+system.
+
+Table 1: 8-PSK Modulator Truth Table
+
+Binary Input Output Phase
+Q I C
+0 0 0 -112.5
+0 0 1 -157.5
+0 1 0 -67.5
+0 1 1 -22.5
+1 0 0 +112.5
+1 0 1 +157.5
+1 1 0 +67.5
+1 1 1 +22.5
+
+QUESTION 6 (20 marks)
+(a) Discuss source coding and give an example of technique used for source coding in digital (4 marks)
+communication system.
+(b) Using block diagram and mathematical analysis, explain the operation of a Binary Phase-Shift (6 marks)
+Keying (BPSK) demodulator.
+(c) For a binary FSK signal with a mark frequency of 36 kHz, a space frequency of 42 kHz and an (6 marks)
+input bit rate of 2 kbps, determine the:
+(i) peak frequency deviation
+(ii) minimum bandwidth
+(iii) baud
+(iv) h factor
+
+Scanned with CamScanner
+AFE
+ABALOLA
+UNIVERSITY
+ADO-EKITI (ABUAD)
+KM. 8.8, AFE BABALOLA WAY,
+IDO-EKITI, EKITI STATE, NIGERIA
+P.M.B. 5454 ADO-EKITI
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL/ELECTRONICS & COMPUTER ENGINEERING
+Session: 2020/2021 Semester: Second
+Course Code: EEE 524 Course Title: Analog IC Design and Applications
+Units: 2 Time Allowed: 2 hours Total Marks: 60 Marks
+Instructions: In Section A Answer Question 1 and Any Other One. In Section B Answer Question 4 and
+Any Other One.
+SECTION A [30 marks]
+Question 1 [15 marks]
+a. The phase locked loop (PLL) to be used for frequency synthesis is shown in Figure 1. The output
+frequency of the PLL ranges from 300MHz to 400MHz with 10MHz channel spacing. Note that
+there is no charge pump and the output of the phase detector is a voltage which is filtered before
+being applied to the VCO.
+(2 Marks)
+(i) What is an appropriate choice for the reference frequency fre?
+(ii) What are the range of divide values N that will be used for this choice of reference frequency?
+(3 Marks)
+(iii) Derive the equation for the damping factor (5) and the natural frequency (wn) of the
+characteristic equation of the PLL.
+(5 Marks)
+(iv) Based on the constraints that there must be no peaking in the frequency response (521/2)
+and that wn must be minimized, calculate the value for the product RC given that Kpp = 1 V/rad
+and Kvco = 150,000 rad/Sv.
+(5 Marks)
+Φref
++
+KpD
+R
+C
+Kvco/s
+Φout
+1/N
+Figure 1. A phase locked loop (PLL).
+Question 2 [15 marks]
+a. Using the Gilbert cell multiplier circuit in Figure 2, calculate the current difference (ΔΙc).
+Given that Vx is 100V, Vy is 25kV and Vbe is 0.1kV.
+(10 Marks)
+1
+Scanned with CamScanner
+Figure 2. A simple Gilbert multiplier circuit.
+b. Why does the location of a pole define its stability? Briefly explain
+(5 Marks)
+Question 3 [15 marks]
+a. Describe the operation of a flowmeter and state five (5) other applications of such devices.
+(8 Marks)
+b. Derive the transfer function [Z(S)] of the passive filter shown in Figure 3.
+(7 Marks)
+Figure 3. Passive filter.
+SECTION B [30 marks]
+Question 4 [10 marks]
+a. Find the input current for the circuit given in Figure 4.
+(7 marks)
+Scanned with CamScanner
+COLLEGE OF ENGINEERING
+
+Figure 4. Op Amp with multiplier as feedback.
+
+b. Differentiate between an integrator and a differentiator. Draw the circuit diagrams and give
+the output voltage equation for each?
+(8 marks)
+
+Question 5 [15 marks]
+
+Derive the voltage op-amp gain factor (Av) for the lossy integrator in Figure 5 and calculate the op-
+amp gain given R is 120kΩ, R₁ is 50Ω and C is 10F, Frequency is 50 Hz.
+(15 Marks)
+
+R1
+R
+C
+Vin
+Vout
+
+Figure 5. Lossy integrator.
+
+Question 6 [15 marks]
+
+a. Using the Astable multivibrator in Figure 6.
+Calculate:
+(i) Time high (T1)
+(ii) Time low (T2)
+(iii) Time Period (T)
+(iv) Frequency (F) and
+(10 marks)
+3
+
+Scanned with CamScanner
+AFE BABALOLA
+UNIVERSITY
+ADO-EKITI (ABUAD)
+KM 8.5, AFE BABALOLA WAY,
+ADO-EKITI, EKITI STATE, NIGERIA.
+P.M.B 5454 ADO-EKITI.
+COLLEGE OF ENGINEERING
+
+DEPARTMENT OF ELECTRICAL/ELECTRONICS & COMPUTER ENGINEERING
+
+Session: 2020/2021 Semester: Second
+Course Code: EEE 566 Course Title: Introduction to Non-Linear Systems
+Units: 3 Time Allowed: 3 hours Total Marks: 60 Marks
+Instructions: Attempt All questions in Section A and any Three (3) questions in section B [Five
+questions in all]
+
+SECTION A [30 marks]
+
+Question 1 [15 marks]
+
+a. Briefly differentiate (with details) between linear systems and non-linear systems (4 marks)
+b. In four (4) different ways, differentiate between Method of Least Squares and Taylor's Series (4 marks)
+methods of time-domain linearization of non-linear systems
+c. Describe an analytic system, and highlight the conditions for time-domain linearization (2 marks)
+d. Describe the harmonic linearization method, and (2 marks)
+i. State its advantage over the time-domain linearization (1 marks)
+ii. State the assumptions involved in the harmonic linearization (2 marks)
+
+Question 2 [15 marks]
+
+a. Calculate the describing function N(X, jo) of an ideal relay with maximum output of K if the (5 marks)
+input to the non-linear element is a sinusoidal input given by x=Xmsinwt
+b. A non-linear system represented by the input-output relation
+y = g(u) = 3(u² + u³)
+About the operating point
+y = 3(U² + U³)
+Obtain a linearized model for the system using (3 marks)
+i. Direct substitution method (2 marks)
+ii. Tangential approximation (5 marks)
+iii. Method of Least Squares Approximation
+
+SECTION B [30 marks]
+
+Question 3 [10 marks]
+Consider the diagram in Fig Q3
+Output↑ C
+D
+O
+A
+Input
+Fig Q3
+1
+
+Scanned with CamScanner
+State the linearity status of Fig Q3
+Calculate the describing function N(X, jw) of Fig Q3 if input to the non-linear element is a
+sinusoidal input given by X(t) = Xsinwt
+(2 marks)
+(8 marks)
+Question 4 [10 marks]
+Consider the diagram in Fig Q4
+Output
+M
+Drop out
+point
+A
+Drop in
+point
+Dead Zone
+-M
+Input
+Fig Q4
+(2 marks)
+a. State the linearity status of Fig Q4
+b. Calculate the describing function N(X, jw) of Fig Q4 if the input to the non-linear element is a
+sinusoidal input given by X(t) = Xsinwt
+(8 marks)
+Question 5 [10 marks]
+The differential equation here represents the forward element of a control system with a non-odd
+function. Express the describing function of the non-linear element in the system, if P is a constant,
+A is the amplitude of the signal, and u is the input signal.
+u =
+x+Pu-u-ü
+Pü
+Question 6 [10 marks]
+Consider the diagram in Fig Q6
+Output
+Ks
+slope = K
+-S
+S
+Input
+Fig Q6
+(2 marks)
+a. State the linearity status of Fig Q6
+b. Calculate the describing function N(X, jw) of Fig Q6 if the input to the non-linear element is a
+sinusoidal input given by X(t) = Xsinwt
+(8 marks)
+Question 7 [10 marks]
+a. Mention the three major tasks in typical control systems
+b. Using Taylor's Series approximation for the system in Fig Q7, find the approximate linear
+relationship between a displacement change and the corresponding capacitance change of
+2
+Scanned with CamScanner
+the sensor, for minimal excursions about the operating point x = X. The displacement x
+causes the plate separation to increase to d + x, so that the capacitance becomes
+C = EOA
+d+x
+(7 marks)
+X
+d
+Variable Separation
+Figure Q7
+Scanned with CamScanner
+AFE
+BABALOLA
+ADO-EKITI (ABUAD)
+A.A. APE BABALOLA WAY,
+ADO-EKITI, EKITI STATE, NIGERIA
+PMB 5454 ADO-EKITI.
+
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL/ELECTRONICS & COMPUTER ENGINEERING
+
+Session: 2020/2021 Semester: Second
+Course Code: EEE 564 Course Title: Current Trends in Electrical Electronic Engineering
+Units: 2 Time Allowed: 2 hours Total Marks: 80 Marks
+Instructions: Attempt question ONE and any other THREE. [Four questions in all]
+
+QUESTION 1
+
+(a) Describe the features or learning techniques of each of the following softcomputing
+techniques:
+[2 marks]
+
+(i) Genetic Algorithm (GA)
+
+[2 marks]
+
+(ii) Fuzzy Inference Systems (FIS)
+
+[2 marks]
+
+(iii) Artificial Neural Networks (ANN)
+
+[2 marks]
+
+(iv) Bee Colony Optimization
+
+(b) In simulating an artificial neural network for a typical modelling problem with MATLAB, [4 marks]
+describe the steps involved from data acquisition to network performance evaluation.
+(c) Calculate the error of the neural network in Figure Q1 for the first iteration if the input pattern [8 marks]
+[x, y] corresponding to [0.4765, 0.9833] are supplied with corresponding target "1". Assume a
+sigmoid transfer function for all neurons if the initial weights in the network are as itemized in
+Table Q1.
+
+Table Q1
+
+Weights Initial value
+a 1.2655
+b 2.1288
+c 1.8745
+d 1.1117
+e 0.1056
+f 2.2090
+g 1.1683
+h 0.1245
+
+Scanned with CamScanner
+Figure Q1
+
+QUESTION 2
+
+(a) Define the term "MEMS" and mention any two branches of MEMS technology [3 marks]
+
+(b) Mention and discuss briefly any two possible areas where MEM devices can be used in
+(i) telecommunication systems [2 marks]
+(ii) power systems [2 marks]
+
+(c) Identify any three features that make MEMS attractive option for the applications above.
+[3 marks]
+
+(d) Using appropriate sketches/equations, differentiate between capacitive sensing and
+piezoelectric sensing. [4 marks]
+
+(e) A 10 mm long piezoresistive strip has a resistance of 12 2. Determine the change in resistance
+of this strip after it is stretched, if the percentage change in the length and resistivity are 0.080 and
+0.079, respectively. (Take Poisson's ratio = 0.258) [6 marks]
+
+QUESTION 3
+
+(a) Define the term "biosensors" as it applies to Biomedical Engineering. [2 marks]
+
+(b) Explain the operation principles of the terms
+(i) Electrical Impedance Tomography (EIT) [2 marks]
+(ii) Transdermal drug delivery [2 marks]
+
+(c) By explaining how each technology works, identify how EIT differs from
+
+Scanned with CamScanner
+(i) ultrasound scan
+(ii) MRI
+[2 marks]
+[2 marks]
+(d) Explain, using a relevant sketch, the functions of each of the following components of an
+Enzyme Field Effect Transistor.
+(i) Ion sensitive membrane
+(ii) Encapsulant
+(iii) Gate
+[2 marks]
+[2 marks]
+[2 marks]
+(e) Enumerate any four (4) factors that designers of biosensors must put into consideration.
+[4 marks]
+QUESTION 4
+(a) State Moore's law
+[2 marks]
+(b) Define the following terms and state any modern-day application of each
+(i) Spintronics
+(ii) Carrier-mediated ferromagnetism
+(iii) Dilute magnetic semiconductors
+[2 marks]
+[2 marks]
+[2 marks]
+(c) Define the term "cryogenics" and mention any three applications or systems wherein
+cryogenic principles are employed.
+[4 marks]
+(d) Enumerate any three reasons as to why spintronic and graphene-based devices are not yet
+ubiquitous.
+[3 marks]
+(e) Mention any three (3) advantages and (2) disadvantages offered by magnetoresistive random
+access memory.
+[5 marks]
+QUESTION 5
+(a) Define the following
+(i) Blockchain technology
+(ii) Transactive energy
+[2 marks]
+[2 marks]
+Scanned with CamScanner
+(b) Explain any three possible areas of a smart power system where blockchain technology can
+be of use. [6 marks]
+(c) Describe with the aid of a block diagram, the structure of a transactional block [4 marks]
+(d) Briefly describe the processes involved when two users make transactions within a blockchain
+network. [6 marks]
+QUESTION 6
+(a) Graphene is an interesting material for the design of ultra-sensitive electronic devices, describe
+(i) The structure of this material [2 marks]
+(ii) Its mechanical, electrical and optical properties [3 marks]
+(iii) The most significant problem identified with its use and the reason for such [3 marks]
+(iv) The two techniques for addressing this problem [2 marks]
+(v) The difficulties associated with each of the techniques above. [2 marks]
+(b) The loading ratio of a 500 um long 10 um thick and 150 um wide DC-contact RF-MEMS series
+switch is expressed in quadratic equation form as:
+λ,2 + 1.5436 = 6λ,
+Determine the applied stress that will produce an end deflection of 28 um. (Take the beam
+stiffness factor = 74.86N/m and Poisson's ratio = 0.258) [8 marks]
+Scanned with CamScanner
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL/ELECTRONICS & COMPUTER ENGINEERING
+Session: 2020/2021 Semester: Second
+Course Code: EEE 552 Course Title: Utilization of Electric Power System
+Units: 3 Time Allowed: 3 hours Total Marks: 60 Marks
+Instructions: Attempt question one and any other four (4) questions [Five questions in all]
+
+Question 1 [40 marks]
+a. Define the term brightness of light (2 marks)
+b. Highlight four advantages of electric train (4 marks)
+c. Explain how power factor correction affect the power system quality. (6 marks)
+d. You are recently employed as an engineer by GAUTRAIN MANAGEMENT AGENCY. The
+corporation is presently engaged with construction of railway track from Johannesburg to
+Durban. You have been asked to advise on the system of railway electrification to be chosen.
+Explain five reasons for your choice? (8 marks)
+e. Slog Foods has a 415 V, three phase, 50 Hz induction motor having an output power of 74.6 kW
+runs on full load at a power factor of 0.7 lagging, and with an efficiency of 85%. Determine the
+capacitance per phase of a mesh-connected capacitor necessary to raise the power factor to:
+(i) unity (ii) 0.9 lagging. (10 marks)
+f. ABUAD industrial park has a total lighting load of 30 kW, 200 metrics horse power of induction
+motors with 70.7% lagging power factor and 82% efficiency; and 100 metrics horse power of
+synchronous motor. The tariff is RM 100 per annum per kVA maximum demand plus 6 paise
+per kWh. Determine the annual saving cost if the synchronous motor operates at 80% leading
+power factor, 93% efficiency instead of 80% lagging power factor. (10 marks)
+
+Question 2 [20 marks]
+a. Using an appropriate diagram and equations, proof that every dielectric behaves as an imperfect
+capacitor. (4 marks)
+b. Explain four methods of temperature control of resistance furnaces. (6 marks)
+c. A 4-phase electric arc furnace drew 5000 A of current with arc voltage of 50 V. The resistance of
+the transformer referred to secondary is 0.002 ohm and resistance of transformer referred to
+secondary is 0.004 ohm. Determine:
+(i) the power factor and kW drawn from the supply, (4 marks)
+(ii) if the overall efficiency of the furnace is 65%, find the time required to melt 2 tonnes of
+steel if latent heat of steel is 8.89kcal/kg, specific heat of steel is 0.12, melting point of steel
+is 1370°C and initial temperature of steel is 20°C. (10 marks)
+
+Question 3 [20 marks]
+a. Define the following terms: (i) Load factor (ii) Demand factor (iii) Demand (4 marks)
+b. Using an appropriate diagram, show that
+Net kVA r after power factor correction = Lagging kVA before p.f. correction - (6 marks)
+leading kVAR of equipment.
+
+1
+
+Scanned with CamScanner
+c. A consumer has an annual consumption of 176,400 kWh. The charge is RM 120 per kW of
+maximum demand plus 4 paisa per kWh. Calculate
+(i) the annual bill and the overall cost per kWh if the load factor is 36%.
+(ii) What is the overall cost per kWh, if the consumption were reduced 25% with the same
+load factor?
+(iii) What is the overall cost per kWh, if the load factor is 27% with the same consumption as
+in (i).
+(10 marks)
+
+Question 4 [20 marks]
+a. Highlight five areas of application of dielectric heating
+b. Differentiate between surface heating and volume heating
+c. A 30 kW, three phase, 400 V resistance oven is to employ nickel-chrome strip 0.254 mm thick for
+the three star-connected heating elements. If the wire temperature is to be 1,100°C and that of the
+charge to be 700°C, estimate a suitable width for the strip. Assume emissivity is 0.9 and radiating
+efficiency to be 0.5 and resistivity of the strip material is 101.6x10-2-m. What would be the
+temperature of wire if the charge were cold?
+(5 marks)
+(5 marks)
+(10 marks)
+
+Question 5 [10 marks]
+a. Gauteng train corporation are replacing five damaged traction motors of electric trains. As a
+maintenance engineer in the corporation, which of the traction motor will you suggest between
+Induction and DC motors? State your reasons.
+b. Using an appropriate diagram, explain the five essential parts of speed/time curve for electric
+trains.
+c. Gautrein moves in between two stations 1.6 km apart at an average speed of 36 km/h. If the
+maximum speed is to be limited to 72 km/h, acceleration to 2.7 km/h/s, coasting retardation to
+0.18 km/h/s and braking retardation to 3.2 km/h/s. Compute the duration of acceleration,
+coasting and braking periods. Assume a simplified speed/time curve.
+(3 marks)
+(7 marks)
+(10 marks)
+
+Question 6 [10 marks]
+a. Differentiate between mass and weight of a train
+b. Proof that E = E, Cos 0, and states the law governing this equation.
+c. A 22-diameter globe of opal glassחס enclosures a lamp of uniform luminous intensity 120 C.P. Thirty
+per cent of light emitted by the lamp is absorbed by the globe. Determine
+(i) Luminance of globe
+(ii) C. P. of globe in any direction
+(4 marks)
+(6 marks)
+(10 marks)
+
+Question 7 [20 marks]
+a. The drawing studio in ABUAD Engineering building was recently renovated and you have been
+assigned to carried out the lighting scheme for the studio. The drawing studio is 15 m long, 9 m
+wide and 3 m up to trusses and to be illuminated to a level of 200 lux. It has a utilization factor
+of 0.9 and maintenance factor of 0.8. Make a scale drawing of the plan of the shop and set out the
+required lighting points, assuming the use of tungsten lamps and dispersive metallic reflectors.
+You may assume a lamp efficiency of 13 lumen/W, and spacing height ratio of unity.
+b. Estimate the energy required to melt 0.5 tonne of brass in a single-phase induction furnace. If the
+melt is to be carried out in 0.5 hour, what must be the average power input to the furnace?
+(10 marks)
+
+2
+
+Scanned with CamScanner
+Specific heat of brass = 0.094
+Latent heat of fusion of brass = 30 kilocal/kg
+Melting point of brass = 920°C
+Furnace efficiency = 60.2%
+(10 marks)
+Scanned with CamScanner
+BABALOLA UNIVERSITY
+COLLEGE OF ENGINEERING
+DEPARTMENT OF ELECTRICAL/ELECTRONICS & COMPUTER ENGINEERING
+Session: 2020/2021 Semester: Second
+Course Code: EEE 522 Course Title: Microprocessor Applications and Interfacing
+Units: 3 Time Allowed: 2 hours 30mins Total Marks: 70 Marks
+Instructions: Attempt QUESTION 1 plus any other Four (4) Questions [Five questions in all].
+Workings of questions that require a process before arriving at the answers must be
+fully shown; just dropping (writing down) the answers attracts zero marks.
+
+QUESTION 1 [22 marks]
+a) Classify the following as, 'would belong to the input-subsystem' or 'would belong to the
+output-subsystem' or 'could belong to either the input-subsystem or the output-
+subsystem' of a microprocessor-based system; i. the brake-pedal of a car, ii. the electric
+ceiling fan, iii. the seat-belt of a car, iv. the pressure sensor of a pressure-cooker, v. the
+electric motor for pumping water into an elevated water storage tank, vi. the weight
+bridge of a weight-tolling system, vii. a loud-speaker, viii. the door of a car, ix. the heating
+device of a home-heating system, x. the alarm system of a security and fire-alarm system,
+xi. the fire-detector of a security and fire-alarm system. (7 marks)
+b) A microprocessor-based system is to be designed to monitor the temperature and the
+pressure of the gas in a gas cylinder. When the temperature and/or the pressure are at
+given thresholds, an audible alarm and a visual display are to be triggered to come ON. A
+multiplexer, a de-multiplexer, an 8-bit ADC, an 8-bit DAC, and a microprocessor that has
+an 8-bit data bus, are to be used to accomplish this task. The input voltage of the ADC
+ranges from Ov to 5v dc, and the analog input of the ADC is indicated as AIN; while the
+output of the ADC is indicated as Do, D1, D2, D3, D4, D5, D6, D7. The output of the DAC
+ranges from Ov to 15v dc, while the DAC input has the same configuration as the ADC's
+output. The output of the DAC is indicated as AOUT.
+i. Produce a diagrammatic framework showing all the devices involved in (6 marks)
+this problem interfaced to one another.
+ii. State the ADC's minimum and maximum input values. (2 marks)
+iii. State the DAC's minimum and maximum input values. (2 marks)
+Note: Represent the input and output devices as circles.
+c) i. Is a processor the same thing as a digital computer? Comment on your answer. (1 mark)
+ii. Is a processor the same thing as a microprocessor? Comment on your answer. (1 mark)
+iii. Briefly explain the principal difference (or differences), if any, between a single-chip (1 mark)
+microcomputer and a microcontroller.
+d) Give reasons why shift registers may need to be utilized when interfacing a (2 marks)
+microprocessor to an I/O device.
+
+QUESTION 2 [12 marks]
+In the implementation of interrupt program-controlled I/O data transfer, the stack plays a very
+important role.
+a) Define the term 'stack'. (2 marks).
+
+Scanned with CamScanner
+briefly explain what you understand by, and the issues involved in, ‘interrupt program-
+controlled I/O data transfer’. (4 marks)
+b) Briefly but clearly, explain with respect to the INTEL 8085 microprocessor the role of a
+(2 marks)
+c)
+of microprocessor-based systems.
+Briefly but clearly, explain with respect to the INTEL 8085 microprocessor the role of a
+(2 marks)
+stack in an interrupt program-controlled I/O data transfer.
+d) List the principal instructions utilized when the role of the stack during interrupt
+(4 marks)
+program-controlled I/O data transfer comes into play. Explain the functions of the
+instructions.
+
+QUESTION 3 [12 marks]
+a) With the aid of a well-labelled diagram, explain the functions of the main functional units
+(8 marks)
+of microprocessor-based systems.
+b) Define the following terms: i. programming model of a processor; ii. instruction set of a
+(2 marks)
+processor.
+c) Illustrate the programming model of the INTEL 8085 microprocessor.
+(2 marks)
+
+QUESTION 4 [12 marks]
+a) Assume that registers A, B, C, and D, are each 8-bit registers; write out the contents of
+each register after the execution of each instruction in the following fragment of code.
+Assume the INTEL 8085 Instruction Set. Your answer must be in binary. (7 marks)
+MVI A, 30H
+MVI B, 2EH
+MOV B, A
+ADD A, B
+MOV C, A
+MOV D, B
+ADD D, B
+b) State the full meaning of the following acronyms. i. AC; ii. SP, iii. PC. State also, the
+function(s) of the units that are associated with these acronyms. (5 marks)
+
+QUESTION 5 [12 marks]
+a) The processor of a computer system has an address bus with 20 address lines, and a data
+bus of 12 data bits. Estimate the maximum capacity in Mega Bytes of the memory
+device(s) that can be interfaced to the processor. (4 marks)
+b) A microprocessor-based system is to be designed with two (2) memory devices: 2716
+EPROM (a 2 Kbytes×8 device) and 4118 RWM (a 1 Kbytes×8 device). The EPROM is
+mapped to start at address 3000H, then a 1-Kbyte address space is skipped; the RWM is
+now mapped to start at the address immediately following the skipped address space.
+Develop ONLY, the memory address map of the system. (8 marks)
+
+QUESTION 6 [12 marks]
+a) i. Briefly explain what is meant by: ‘Program-controlled I/O data transfer’. Demonstrate
+the basic instructions that can be used to carry out this type of I/O data transfer.
+(3 marks)
+ii. With the aid of a properly labeled diagram, explain the steps involved in DMA
+operation. (4 marks)
+b) By means of diagrammatic illustration and a few words only, differentiate between
+memory-mapped I/O and isolated I/O. (5 marks)
+
+Scanned with CamScanner
+QUESTION 7 [12 marks]
+a) i. Show the basic elements you would incorporate in a framework to interface a
+microprocessor system to a serial I/O device. (2 marks)
+ii. Briefly but concisely explain the functions of the interfacing elements shown in (i)
+(3 marks)
+b) State the full meaning of the following acronyms: i. UART; ii. USART. (1 mark)
+c) If a USART is memory-mapped at address: A0 = 1, A1 = 0, A2 = 1, A3 = 0, A4 = 0, A5 = 0, A6 =
+0, A7 = 1, A8 = 1, A9 = 1, A10 = 1, A11 = 0, A12 = 0, A13 = 1, A14 = 0, A15 = 1 of an INTEL 8085
+processor, derive the equivalent of this address in i) Hexadecimal, ii) Decimal (4 marks)
+d) Write an instruction to: i. Output data to the USART in (c); ii. Input data from the USART
+in (c). (2 marks)
+Scanned with CamScanner
+AFE BABALOLA UNIVERSITY, ADO-EKITI
+DEPARTMENT OF ELECTRICAL ELECTRONIC AND COMPUTER ENGINEERING
+SECOND SEMESTER 2018/2019 EXAMINATION, APRIL 2019.
+COURSE TITLE: WIRELESS COMMUNICATION (EEE 536)
+TIME ALLOWED: 3 HOURS
+INSTRUCTION: ANSWER QUESTION 1 AND ANY OTHER FOUR
+
+QUESTION 1
+
+(a) Describe the following terms, indicating their importance in wireless communication
+systems.
+
+(i) Handoff [2 marks]
+
+(ii) Mobile telephone switching office (MTSO) [2 marks]
+
+(iii) Public Switched telephone network (PSTN) [2 marks]
+
+(b) Mention any four empirical path loss models and specify their respective frequency range of
+applicability. [4 marks]
+
+(c) Consider the set of empirical measurements of Pr/Pt given in the Table 1 for an indoor system
+at 6 GHz.
+
+Table 1
+Distance from transmitter (m) Pr/Pt in (dB)
+10 -70
+20 -75
+30 -95
+80 -110
+150 -120
+
+(i) Find the path loss exponent y which minimizes the error between the simplified model and
+the empirical loss measurement. Assume do = 1 m and K is determined from the free space
+path loss formula K(dB) = -20log10 (4nd/2). [8 marks]
+
+(ii) Compute the received power at 150 m for the simplified path loss model with this path loss
+exponent and a transmit power of 1 mW. [2 marks]
+
+Scanned with CamScanner
+QUESTION 2
+(a) (i) Define the term "Multiuser MIMO System" and enumerate any three (3) merits offered by
+the system.
+[4 marks]
+(ii) In terms of basic wave properties, define the term "critical distance" and highlight the key
+importance of this term to radio planning.
+[3 marks]
+(b) (i) Discuss the frequency-distance tradeoff of wireless signal transmission.
+[2 marks]
+(ii) Mention any three options that can be explored in order to improve the transmission range
+in the presence of signal impairments.
+[3 marks]
+(c) (i) Given that at a ground reflection coefficient of 0.26, the path loss of the two-ray model
+shown in Figure Q2 is 40 dB, determine the gain of the horizontally polarized receive antenna in
+the LOS direction if that of the transmit antenna is 0.61.
+[6 marks]
+Tx
+ht = 10m
+30°
+65m
+Rx
+hr = 6m
+Figure Q2
+(ii) What is the dielectric constant under the above transmission condition?
+[2 mark]
+QUESTION 3
+(a) (i) Define and explain the essence of the term "diversity" in radio frequency communication.
+[6 marks]
+(ii) Describe any two techniques whereby diversity can be achieved.
+[4 marks]
+(b). With the aid of applicable sketches, describe any three diversity combining techniques for
+receivers.
+[6 marks]
+(c) The individual branch signal for a common combining technique is expressed as
+Xn = A.hn + En
+Explain the expression and explicate each variable.
+[4 marks]
+Scanned with CamScanner
+QUESTION 4
+
+(a) Explain the phenomenon that results in the term "multipath propagation" [4 marks]
+
+(b) Enumerate the difference between "path loss" and "shadowing" [4 marks]
+
+(c) Discuss the modifications that can be implemented in order to take advantage of multipath
+propagation in MIMO systems. [3 marks]
+
+(d) (i) Consider an indoor wireless LAN with fc = 900 MHz, cells of radius 100 m, and non-
+directional antennas. Under the free space path loss model, what transmit power is required at
+the access point such that all terminals within the cell receive a minimum power of 10 µW.
+[7 marks]
+
+(ii) How does this change if the system frequency is 5 GHz? [2 marks]
+
+QUESTION 5
+
+(a) Define the term "Digital Modulation" [4 marks]
+
+(b) Mention any four (4) likely channel impairments when signals are transmitted through free
+space. [4 marks]
+
+(c) Digital modulation can be classified using the memory criterion and linearity criterion,
+discuss the two groups of modulation under each criterion. [4 marks]
+
+(d) Show that the average energy Eavg for a signal Sm(t) = Amp(t) whose amplitude Am is
+described as
+
+Am = 2m - 1 - M, m = 1, 2, ... M
+
+Can be expressed as
+
+Eavg = (M2 - 1)Ep
+3 [4 marks]
+
+Scanned with CamScanner
+QUESTION 6
+[4 marks]
+(a) Using a suitable diagram, describe the dielectric canyon.
+(b) A communication system Engineer rightly decides to employ the dielectric canyon
+propagation model in a certain scenario, itemize four factors that must have influenced this
+decision.
+[4 marks]
+(c) For a ten-ray model, the received signal may be simplified to
+Pr = Pt [4πd]2 |√Gt + ΣRtvGt Gxt ejo
+i=1
+xt
+[4 marks]
+(i) Describe the above relation, identify the components and every entity thereof.
+(ii) Mention one valid assumption leading to the simplified dielectric canyon equation [4 marks]
+(iii) Using this model, by what factor would the received signal change if the frequency of
+transmission is doubled?
+[4 marks]
+QUESTION 7
+(a) Define the term "Fresnel zone"
+[2 marks]
+(b) Differentiate between large-scale and small-scale propagation effects.
+[4 marks]
+(c) Describe, using appropriate diagram, the different kinds of waves employed for long
+distance wireless communication.
+[4 marks]
+(d) (i) The curvature of the earth is a crucial factor to be considered when planning long
+distance line-of-sight communication, compute the minimum height of the receive antenna
+required for LOS transmission from a 25 m high transmit antenna over a distance of 35.5 km.
+[8 marks]
+(ii) Compute the LOS distance under the above scenario if the transmit antenna is situated on a
+80 m high hill.
+[2 marks]
+Scanned with CamScanner

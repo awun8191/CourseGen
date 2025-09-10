@@ -304,23 +304,24 @@ _GEMINI_SVC_LOADED = False
 
 def _import_gemini_service_via_dotted(path_str: str):
     """
-    Try normal dotted import (src.services.Gemini.gemini_service) after adding repo root
+    Try normal dotted import (services.Gemini.gemini_service) after adding repo root
     to sys.path. Preserves relative imports inside gemini_service.py.
     """
-    p = Path(path_str).resolve()
+    file_path = path_str.replace('.', '/') + '.py'
+    p = Path(file_path).resolve()
     repo_root = None
-    src_dir = None
+    base_dir = None
     for anc in p.parents:
-        if anc.name == "src":
-            src_dir = anc
+        if anc.name == "services":
+            base_dir = anc
             repo_root = anc.parent
             break
-    if repo_root is None or src_dir is None:
-        return None, f"No 'src' directory found in ancestors of {p}"
+    if repo_root is None or base_dir is None:
+        return None, f"No 'services' directory found in ancestors of {p}"
     repo_root_str = str(repo_root)
     if repo_root_str not in sys.path:
         sys.path.insert(0, repo_root_str)
-    dotted = ".".join(p.relative_to(repo_root).with_suffix("").parts)  # src.services.Gemini.gemini_service
+    dotted = ".".join(p.relative_to(repo_root).with_suffix("").parts)  # services.Gemini.gemini_service
     try:
         mod = importlib.import_module(dotted)
     except Exception as e:
@@ -337,16 +338,17 @@ def _import_gemini_service_via_pkgstub(path_str: str):
     Robust loader: create package stubs so relative imports in the service work
     even when loading the file directly.
     """
-    p = Path(path_str).resolve()
+    file_path = path_str.replace('.', '/') + '.py'
+    p = Path(file_path).resolve()
     repo_root = None
-    src_dir = None
+    base_dir = None
     for anc in p.parents:
-        if anc.name == "src":
-            src_dir = anc
+        if anc.name == "services":
+            base_dir = anc
             repo_root = anc.parent
             break
-    if repo_root is None or src_dir is None:
-        return None, f"No 'src' directory found in ancestors of {p}"
+    if repo_root is None or base_dir is None:
+        return None, f"No 'services' directory found in ancestors of {p}"
 
     def _ensure_pkg(name: str, path_list: List[str]):
         pkg = sys.modules.get(name)
@@ -359,16 +361,15 @@ def _import_gemini_service_via_pkgstub(path_str: str):
                 pkg.__path__ = path_list  # type: ignore[attr-defined]
         return pkg
 
-    _ensure_pkg("src", [str(src_dir)])
-    _ensure_pkg("src.services", [str(src_dir / "services")])
-    _ensure_pkg("src.services.Gemini", [str(src_dir / "services" / "Gemini")])
+    _ensure_pkg("services", [str(base_dir)])
+    _ensure_pkg("services.Gemini", [str(base_dir / "Gemini")])
 
-    mod_name = "src.services.Gemini.gemini_service"
+    mod_name = "services.Gemini.gemini_service"
     spec = importlib.util.spec_from_file_location(mod_name, str(p))
     if not spec or not spec.loader:
         return None, f"Cannot create spec for {p}"
     module = importlib.util.module_from_spec(spec)
-    module.__package__ = "src.services.Gemini"
+    module.__package__ = "services.Gemini"
     sys.modules[mod_name] = module
     try:
         spec.loader.exec_module(module)  # type: ignore[attr-defined]
@@ -385,12 +386,13 @@ def _import_gemini_service_via_pkgstub(path_str: str):
 
 def _import_gemini_service_via_file(path_str: str):
     """Last resort raw import (works only if the service uses absolute imports)."""
-    p = Path(path_str)
+    file_path = path_str.replace('.', '/') + '.py'
+    p = Path(file_path)
     if not p.is_file():
-        return None, f"Not a file: {path_str}"
+        return None, f"Not a file: {file_path}"
     spec = importlib.util.spec_from_file_location("gemini_service_ext", str(p))
     if not spec or not spec.loader:
-        return None, f"Cannot create import spec for: {path_str}"
+        return None, f"Cannot create import spec for: {file_path}"
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)  # type: ignore[attr-defined]
@@ -411,34 +413,42 @@ def _get_gemini_service():
     _GEMINI_SVC_LOADED = True
 
     path_env = os.getenv("GEMINI_SERVICE_PATH", "").strip()
-    if not path_env:
-        log.info(
-            "GEMINI_SERVICE_PATH not set; will use direct google-genai fallback (if GEMINI_API_KEY present)."
-        )
-        _GEMINI_SVC_SINGLETON = None
-        return None
+    candidate_paths = []
+    if path_env:
+        candidate_paths.append(path_env)
+    # Always fall back to the built-in GeminiService inside this repository.
+    candidate_paths.append("services.Gemini.gemini_service")
 
-    if not Path(path_env).is_file():
-        log.warning(
-            f"GEMINI_SERVICE_PATH '{path_env}' is not a file; skipping Gemini service."
-        )
-        _GEMINI_SVC_SINGLETON = None
-        return None
-
-    # 1) Try dotted import
-    svc_cls, err = _import_gemini_service_via_dotted(path_env)
-    if svc_cls is None:
+    svc_cls = None
+    for candidate in candidate_paths:
+        # 1) Try dotted import
+        svc_cls, err = _import_gemini_service_via_dotted(candidate)
+        if svc_cls is not None:
+            path_env = candidate
+            break
         log.error(f"GeminiService dotted import failed: {err}")
         # 2) Try package-stubbed import
-        svc_cls, err2 = _import_gemini_service_via_pkgstub(path_env)
-        if svc_cls is None:
-            log.error(f"GeminiService package-stub import failed: {err2}")
-            # 3) Raw file import
-            svc_cls, err3 = _import_gemini_service_via_file(path_env)
-            if svc_cls is None:
-                log.error(f"Failed to load GeminiService from {path_env}: {err3}")
-                _GEMINI_SVC_SINGLETON = None
-                return None
+        svc_cls, err2 = _import_gemini_service_via_pkgstub(candidate)
+        if svc_cls is not None:
+            path_env = candidate
+            break
+        log.error(f"GeminiService package-stub import failed: {err2}")
+        # 3) Raw file import
+        svc_cls, err3 = _import_gemini_service_via_file(candidate)
+        if svc_cls is not None:
+            path_env = candidate
+            break
+        log.error(
+            f"Failed to load GeminiService from {candidate}: {err3}"
+        )
+
+    if svc_cls is None:
+        log.info(
+            "No GeminiService available; will use direct google-genai fallback "
+            "(if GEMINI_API_KEY present)."
+        )
+        _GEMINI_SVC_SINGLETON = None
+        return None
 
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
     try:
@@ -482,9 +492,9 @@ def _gemini_via_fallback(img_pil: "Image.Image") -> str:
     except Exception:
         log.error("google-genai not installed. `pip install google-genai`")
         return ""
-    api_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+    api_key = os.getenv("GOOGLE_API_KEY", "").strip() or os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
-        log.error("GEMINI_API_KEY not set and no GEMINI_SERVICE_PATH usable.")
+        log.error("GOOGLE_API_KEY or GEMINI_API_KEY not set and no GEMINI_SERVICE_PATH usable.")
         return ""
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
     max_tokens = int(os.getenv("OCR_GEMINI_MAX_TOKENS", "8192"))
@@ -500,7 +510,10 @@ def _gemini_via_fallback(img_pil: "Image.Image") -> str:
         resp = client.models.generate_content(
             model=model,
             contents=[image_part, _OCR_PROMPT],
-            config={"temperature": 0.0, "max_output_tokens": max_tokens},
+            config={
+                "temperature": 0.0,
+                "max_output_tokens": max_tokens
+                },
         )
         text = (getattr(resp, "text", None) or getattr(resp, "output_text", "") or "").strip()
         if not text:
