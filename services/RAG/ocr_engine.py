@@ -74,19 +74,10 @@ try:
 except Exception:
     fitz = None  # type: ignore
 
-try:
-    import easyocr
-    _HAS_EASYOCR = True
-except Exception:
-    easyocr = None  # type: ignore
-    _HAS_EASYOCR = False
-
-try:
-    from paddleocr import PaddleOCR
-    _HAS_PADDLE = True
-except Exception:
-    PaddleOCR = None  # type: ignore
-    _HAS_PADDLE = False
+easyocr = None  # type: ignore
+PaddleOCR = None  # type: ignore
+_HAS_EASYOCR = False
+_HAS_PADDLE = False
 
 # ----------------- Logging -----------------
 log = logging.getLogger("ocr_engine")
@@ -240,8 +231,14 @@ _EASYOCR_CACHE: Dict[Tuple[str, bool, bool], "easyocr.Reader"] = {}
 _PADDLE_CACHE: Dict[Tuple[str, bool, bool, bool, str], "PaddleOCR"] = {}
 
 def _get_easyocr(lang: str = "en", handwriting: bool = False, *, gpu_env: Optional[bool] = None) -> Optional["easyocr.Reader"]:
+    global easyocr, _HAS_EASYOCR
     if not _HAS_EASYOCR:
-        return None
+        try:
+            import easyocr  # type: ignore
+            _HAS_EASYOCR = True
+        except Exception as e:
+            log.warning(f"EasyOCR import failed: {e}")
+            return None
     langs = [lang or "en"]
     gpu = bool(int(os.getenv("EASYOCR_GPU", "0"))) if gpu_env is None else gpu_env
     key = (langs[0], handwriting, gpu)
@@ -258,8 +255,15 @@ def _get_easyocr(lang: str = "en", handwriting: bool = False, *, gpu_env: Option
         return None
 
 def _get_paddle(lang: str = "en", *, angle: bool = False, gpu_env: Optional[bool] = None, textline: Optional[bool] = None) -> Optional["PaddleOCR"]:
+    global PaddleOCR, _HAS_PADDLE
     if not _HAS_PADDLE:
-        return None
+        try:
+            from paddleocr import PaddleOCR as _PaddleOCR
+            PaddleOCR = _PaddleOCR
+            _HAS_PADDLE = True
+        except Exception as e:
+            log.warning(f"Paddle import failed: {e}")
+            return None
     gpu = bool(int(os.getenv("PADDLE_GPU", "0"))) if gpu_env is None else gpu_env
     textline = bool(int(os.getenv("PADDLE_TEXTLINE_ORI", "1"))) if textline is None else textline
     key = (lang, gpu, textline, angle, "v1")
@@ -570,7 +574,7 @@ def _gemini_via_fallback(img_pil: "Image.Image") -> str:
         image_part = gtypes.Part.from_bytes(mime_type="image/png", data=img_bytes)
         resp = client.models.generate_content(
             model=model,
-            contents=[image_part, _OCR_PROMPT],
+            contents=[image_part, _OCR_PROMPT_SINGLE],
             config={
                 "temperature": 0.0,
                 "max_output_tokens": max_tokens
@@ -675,32 +679,31 @@ def ocr_image(
     # --- Hybrid fallback with Paddle (if needed) ---
     avg = (sum(confs) / len(confs)) if confs else 0.0
     if engine in ("hybrid", "paddleocr") and (len(texts) < min_lines or avg < min_avg):
-        if _HAS_PADDLE:
-            for angle_flag in (False, True):
-                ocr = _get_paddle(lang=lang, angle=angle_flag)
-                if ocr is None:
-                    continue
-                try:
-                    res = ocr.ocr(pre_for_easy)
-                    flat: List[Tuple[str, float]] = []
-                    for blk in res or []:
-                        for line in blk or []:
-                            try:
-                                _box, (tx, cf) = line
-                                flat.append((tx, float(cf)))
-                            except Exception:
-                                continue
-                    p_texts = [t for (t, c) in flat if t and c >= conf_th]
-                    p_confs = [c for (t, c) in flat if t and c >= conf_th]
-                    p_avg = (sum(p_confs) / len(p_confs)) if p_confs else 0.0
-                    if len(p_texts) > len(texts) or p_avg > avg:
-                        texts, confs = p_texts, p_confs
-                        used_engine = f"paddleocr(angle_cls={angle_flag})"
-                        avg = p_avg
-                    if texts and (len(texts) >= min_lines and avg >= min_avg):
-                        break
-                except Exception as e:
-                    log.warning(f"Paddle pass failed: {e}")
+        for angle_flag in (False, True):
+            ocr = _get_paddle(lang=lang, angle=angle_flag)
+            if ocr is None:
+                continue
+            try:
+                res = ocr.ocr(pre_for_easy)
+                flat: List[Tuple[str, float]] = []
+                for blk in res or []:
+                    for line in blk or []:
+                        try:
+                            _box, (tx, cf) = line
+                            flat.append((tx, float(cf)))
+                        except Exception:
+                            continue
+                p_texts = [t for (t, c) in flat if t and c >= conf_th]
+                p_confs = [c for (t, c) in flat if t and c >= conf_th]
+                p_avg = (sum(p_confs) / len(p_confs)) if p_confs else 0.0
+                if len(p_texts) > len(texts) or p_avg > avg:
+                    texts, confs = p_texts, p_confs
+                    used_engine = f"paddleocr(angle_cls={angle_flag})"
+                    avg = p_avg
+                if texts and (len(texts) >= min_lines and avg >= min_avg):
+                    break
+            except Exception as e:
+                log.warning(f"Paddle pass failed: {e}")
 
     page_metrics = [PageMetrics(
         page=1, engine=used_engine, lines=len(texts),
@@ -798,6 +801,7 @@ def ocr_pdf(
                         ))
                 pending_imgs = []
                 pending_idx = []
+                gc.collect()
             continue
 
         # --- Non-Gemini: route via ocr_image() for consistency ---
