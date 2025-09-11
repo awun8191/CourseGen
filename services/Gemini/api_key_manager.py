@@ -21,7 +21,7 @@ class ApiKeyManager:
         
         # Set cache file to data/gemini_cache directory
         if cache_file is None:
-            cache_dir = Path(__file__).parent.parent.parent.parent / "data" / "gemini_cache"
+            cache_dir = Path(__file__).parent.parent.parent / "data" / "gemini_cache"
             cache_dir.mkdir(parents=True, exist_ok=True)
             cache_file = str(cache_dir / "api_key_cache.json")
             

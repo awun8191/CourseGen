@@ -3,6 +3,7 @@ import os
 from google import genai
 from google.genai import types
 from chromadb_query import ChromaQuery, MetaData
+from courses import DataFormatting
 
 
 TEMPERATURE = 0.15
@@ -155,7 +156,7 @@ class GeminiQuestionGen:
 
 
 
-    def generate_with_RAG(self, course="Contol Systems", topic="Laplace Transform", department ="ELECTRICAL ELECTONICS", difficulty="medium", is_calculation = False, metadata: MetaData = MetaData(COURSE_FOLDER="EEE 511"), variation = False):
+    def generate_with_RAG(self, course="ELECTRONICS", topic="TRANSISTORS", department ="ELECTRICAL ELECTONICS", difficulty="medium", is_calculation = False, metadata: MetaData = MetaData(COURSE_FOLDER="EEE 313"), variation = False):
         # Chroma expects a plain dict for the `where` filter. If a MetaData
         # dataclass is provided, convert it to a dict using `to_where()`.
         where_arg = metadata.to_where() if isinstance(metadata, MetaData) else (metadata or {})
@@ -302,19 +303,27 @@ class GeminiQuestionGen:
             
             
             I want you to generate only the description and a very relevant course outline for a {course} course for a {department} student.
+            
+            Do it in a json format:
+            
+            
+            {{
+                "description": "Text",
+                "topics": []
+            }}
         
     
     """
 
 
-    def course_outline_RAG(self, course="Contol Systems", department ="ELECTRICAL ELECTONICS", metadata: MetaData = MetaData(COURSE_FOLDER="EEE 511"), variation = True):
+    def course_outline_RAG(self, course="Electronics", department ="ELECTRICAL ELECTONICS", metadata: MetaData = MetaData(COURSE_FOLDER="EEE 313"), variation = True):
         # Chroma expects a plain dict for the `where` filter. If a MetaData
         # dataclass is provided, convert it to a dict using `to_where()`.
         where_arg = metadata.to_where() if isinstance(metadata, MetaData) else (metadata or {})
         
         if variation:
             rag = ChromaQuery().search_with_temperature(
-                f"Obtain texbooks and questions for the course f{course} on the {topic} for an f{department} engineering student",
+                f"COURSE OUTLINE, SUMMARY, OBJECTIVES, OVERVIEW for {course} {department}",
                 where=where_arg,
                 topk=50,
                 tau=0.35,
@@ -324,7 +333,7 @@ class GeminiQuestionGen:
             )
         else:
             rag = ChromaQuery().search(
-                f"Obtain texbooks and questions for the course f{course} on the {topic} for an f{department} engineering student",
+                f"COURSE OUTLINE, SUMMARY, OBJECTIVES, OVERVIEW for {course} {department}",
                 where=where_arg,
                 show_snippet=True
             )
@@ -335,7 +344,7 @@ class GeminiQuestionGen:
             )
 
             model = "gemini-2.5-flash-lite"
-            prompt = self._build_RAG_prompt(course, topic, difficulty, is_calculation=is_calculation, RAG_data=rag)
+            prompt = self._build_Course_Outline_Prompt(course=course, RAG_data=rag)
             contents = [
                 types.Content(
                     role="user",
@@ -364,7 +373,7 @@ class GeminiQuestionGen:
             )
 
             model = "gemma-3-27b-it"
-            prompt = self._build_prompt(course, topic, difficulty, is_calculation=is_calculation)
+            prompt = self._build_Course_Outline_Prompt(course=course, RAG_data=rag)
             contents = [
                 types.Content(
                     role="user",
@@ -412,6 +421,9 @@ class GeminiQuestionGen:
         return response
 
 
+
 if __name__ == "__main__":
     # gemini = GeminiQuestionGen(is_thinking=False).generate(is_calculation=True, difficulty="medium")
-    gemini = GeminiQuestionGen(is_thinking=True).generate_with_RAG(is_calculation=True, difficulty="medium", variation=False)
+    # gemini = GeminiQuestionGen(is_thinking=True).generate_with_RAG(is_calculation=True, difficulty="medium", variation=False)
+    course_info = DataFormatting().search_course("EEE 313")
+    gemini = GeminiQuestionGen(is_thinking=True).course_outline_RAG(variation=False, course=course_info[0].title, department=", 0".join(course_info[1]), metadata=MetaData(COURSE_FOLDER=course_info[0].code))
