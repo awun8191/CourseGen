@@ -18,35 +18,25 @@ import time
 import re
 import gc
 
-from data_models.gemini_config import GeminiConfig
+from typing import Any, Dict, Iterable, List, Optional, Type, TypeVar, get_args, get_origin
 
 # Add the project root to the Python path to allow for absolute imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Type,
-    TypeVar,
-    Union,
-)
-from typing import get_origin, get_args
 
-from google import genai
-from google.genai import types as gtypes
-from google.genai import errors as genai_errors
-import httpx
-from pydantic import BaseModel
+from data_models.gemini_config import GeminiConfig  # noqa: E402
+
+from google import genai  # noqa: E402
+from google.genai import types as gtypes  # noqa: E402
+from google.genai import errors as genai_errors  # noqa: E402
+import httpx  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 # --- Project imports ---
-from ..Gemini.api_key_manager import ApiKeyManager  # relative import (same folder)
+from ..Gemini.api_key_manager import ApiKeyManager  # noqa: E402  # relative import (same folder)
 try:
-    from ..Gemini.gemini_api_keys import GeminiApiKeys  # optional convenience provider
+    from ..Gemini.gemini_api_keys import GeminiApiKeys  # noqa: E402  # optional convenience provider
 except Exception:
     GeminiApiKeys = None  # type: ignore
 
@@ -285,9 +275,15 @@ class GeminiService:
 
             # If structured output isn't requested, return raw text
             if generation_config and isinstance(generation_config, GeminiConfig) and generation_config.response_schema is None:
-                return {"result": response_text.strip()}
+                result = {"result": response_text.strip()}
+                del response
+                gc.collect()
+                return result
             if isinstance(generation_config, dict) and generation_config.get("response_schema") is None:
-                return {"result": response_text.strip()}
+                result = {"result": response_text.strip()}
+                del response
+                gc.collect()
+                return result
 
             # Otherwise parse to JSON-like structure when possible
             def _extract_function_args(resp) -> Optional[Dict[str, Any]]:
@@ -411,8 +407,14 @@ class GeminiService:
                                     q["question"] = _sanitize(q["question"])
                 except Exception:
                     pass
-                return response_model.model_validate(data)
-            return {"result": data}
+                result = response_model.model_validate(data)
+                del response
+                gc.collect()
+                return result
+            result = {"result": data}
+            del response
+            gc.collect()
+            return result
 
         except genai_errors.ClientError as e:
             # 4xx (including 429)
@@ -561,6 +563,10 @@ class GeminiService:
             )
         finally:
             del parts
+            try:
+                del images
+            except Exception:
+                pass
             gc.collect()
 
     # -------------------- Embeddings with batching & key rotation --------------------

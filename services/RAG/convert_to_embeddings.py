@@ -431,16 +431,6 @@ def extract_text(pdf_path, cache_dir, force_ocr, ocr_engine, ocr_dpi, ocr_lang):
     result = ocr_pdf(pdf_path, lang=ocr_lang, dpi=ocr_dpi, engine=engine)
     return result.text
 
-# Worker init for OCR
-def _worker_init_for_ocr(lang: str) -> None:
-    if PADDLE_AVAILABLE:
-        try:
-            from services.RAG.ocr_engine import get_paddle_ocr as _warm
-            _ = _warm(lang)
-            log(f"[WARMUP] Worker preloaded PaddleOCR (lang={lang})")
-        except Exception as e:
-            log(f"[WARN] Worker OCR warmup failed: {e}")
-
 # Per-file processing
 def process_one(pdf_path: str, root: str, export_tmp: str,
                 cache_dir: str, cf_acct: str, cf_token: str,
@@ -734,14 +724,6 @@ def main():
     if tasks:
         log(f"[RESUME] Files to process: {[fp.name for fp in tasks[:5]]}" + ("..." if len(tasks) > 5 else ""))
 
-    # Pre-warm OCR
-    if PADDLE_AVAILABLE:
-        try:
-            log(f"[WARMUP] Preloading PaddleOCR models (lang={args.ocr_lang})")
-            _ = get_paddle_ocr(args.ocr_lang)
-        except Exception as e:
-            log(f"[WARN] OCR warmup failed: {e}")
-
     def archive_tmp(tmp: Path) -> Path:
         final = export_dir / tmp.name
         if final.exists():
@@ -761,9 +743,7 @@ def main():
     if args.workers == 1:
         # Use a single process pool for all files in single-threaded mode
         # This avoids the overhead of creating/destroying pools for each file
-        with ProcessPoolExecutor(max_workers=1,
-                                initializer=_worker_init_for_ocr,
-                                initargs=(args.ocr_lang,)) as ex:
+        with ProcessPoolExecutor(max_workers=1) as ex:
             for fp in tasks:
                 files_state[str(fp)]["status"] = "in_progress"
                 files_state[str(fp)]["started_at"] = now_iso()
@@ -846,9 +826,7 @@ def main():
                 })
                 save_progress(progress_path, prog)
     else:
-        with ProcessPoolExecutor(max_workers=args.workers,
-                                 initializer=_worker_init_for_ocr,
-                                 initargs=(args.ocr_lang,)) as ex:
+        with ProcessPoolExecutor(max_workers=args.workers) as ex:
             fut_map = {
                 ex.submit(
                     process_one, str(fp), str(root), str(export_tmp), str(cache_dir),
