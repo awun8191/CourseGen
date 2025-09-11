@@ -35,8 +35,8 @@ try:
     cq = ChromaQuery()
 
     result = cq.search_with_temperature(
-        "CIRCUIT THEORY",
-        where={"COURSE_FOLDER": "PQ"},
+        "course outline",
+        where={"COURSE_FOLDER": "EEE 313"},
         topk=50,
         tau=0.35,
         min_sim=0.65,
