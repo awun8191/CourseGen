@@ -13,8 +13,11 @@ import requests
 from chromadb import PersistentClient, Where
 
 # ========= Config =========
-CHROMA_PATH = r"/home/raregazetto/Documents/Recursive-PDF-EXTRACTION-AND-RAG/src/services/RAG/OUTPUT_DATA/chroma_db_data"
-COLLECTION = "pdfs_bge_m3_cloudflare"
+# CHROMA_PATH = r"/home/raregazetto/Documents/Recursive-PDF-EXTRACTION-AND-RAG/src/services/RAG/OUTPUT_DATA/chroma_db_data"
+# COLLECTION = "pdfs_bge_m3_cloudflare"
+
+CHROMA_PATH = r"/home/raregazetto/Documents/Recursive-PDF-EXTRACTION-AND-RAG/COURSEGEN/services/RAG/OUTPUT_DATA2/emdeddings"
+COLLECTION = "course_embeddings"
 
 # Cloudflare (required)
 CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")

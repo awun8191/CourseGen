@@ -16,6 +16,7 @@ import os
 import sys
 import time
 import re
+import gc
 
 from data_models.gemini_config import GeminiConfig
 
@@ -39,6 +40,7 @@ from typing import get_origin, get_args
 from google import genai
 from google.genai import types as gtypes
 from google.genai import errors as genai_errors
+import httpx
 from pydantic import BaseModel
 
 # --- Project imports ---
@@ -63,6 +65,7 @@ T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_MODEL = "gemini-2.5-flash"
 EMBEDDING_MODEL = "gemini-embedding-001"
+IMAGE_TOKEN_COST = 1000
 
 # --- sample models (you can remove if unused) ---
 class CourseOutline(BaseModel):
@@ -229,20 +232,34 @@ class GeminiService:
         model: str,
         generation_config: Optional[GeminiConfig | Dict[str, Any]],
         response_model: Optional[Type[T]] = None,
+        input_tokens: int = 0,
     ) -> T | Dict[str, Any]:
         """Perform a generation request against google-genai."""
         try:
             gen_config, tools = self._to_generation_config(generation_config)
 
-            # Configure per-model family key (flash/lite/pro/embedding)
             model_name = self._get_model_name(model)
-            self._configure_genai(model_name)
-
-            response = self.client.models.generate_content(
-                model=model,
-                contents=list(parts),
-                config=gen_config,
-            )
+            attempt = 0
+            max_attempts = max(1, len(self.api_key_manager.api_keys) * 2)
+            while True:
+                try:
+                    self._configure_genai(model_name)
+                    response = self.client.models.generate_content(
+                        model=model,
+                        contents=list(parts),
+                        config=gen_config,
+                    )
+                    break
+                except (genai_errors.APIError, httpx.HTTPError, OSError) as e:
+                    attempt += 1
+                    if attempt >= max_attempts:
+                        raise e
+                    time.sleep(min(2 ** attempt, 30))
+                    try:
+                        self.api_key_manager.rotate_key(model_name)
+                    except Exception:
+                        pass
+                    continue
 
             # Extract text (robustly)
             response_text = getattr(response, "text", "") or ""
@@ -262,7 +279,7 @@ class GeminiService:
 
             # Update usage heuristically
             key = self.api_key_manager.get_key(model_name)
-            tokens = max(1, len(response_text) // 4)
+            tokens = max(1, input_tokens + len(response_text) // 4)
             if key:
                 self.api_key_manager.update_usage(key, model_name, int(tokens))
 
@@ -482,8 +499,14 @@ class GeminiService:
             if getattr(gen_conf, "response_schema", None) is None:
                 gen_conf.response_schema = response_model
 
+        input_tokens = max(1, len(prompt) // 4)
+
         return self._generate(
-            parts=[prompt], model=(model or self.model), generation_config=gen_conf, response_model=response_model
+            parts=[prompt],
+            model=(model or self.model),
+            generation_config=gen_conf,
+            response_model=response_model,
+            input_tokens=input_tokens,
         )
 
     # -------------------- OCR helper (fixed for google-genai v1.x) --------------------
@@ -525,10 +548,20 @@ class GeminiService:
         # Select model/config
         use_model = model or self.model
         use_conf = generation_config if generation_config is not None else self.default_config
+        prompt_tokens = len(prompt) // 4
+        img_tokens = len(images) * IMAGE_TOKEN_COST
 
-        return self._generate(
-            parts=parts, model=use_model, generation_config=use_conf, response_model=response_model
-        )
+        try:
+            return self._generate(
+                parts=parts,
+                model=use_model,
+                generation_config=use_conf,
+                response_model=response_model,
+                input_tokens=prompt_tokens + img_tokens,
+            )
+        finally:
+            del parts
+            gc.collect()
 
     # -------------------- Embeddings with batching & key rotation --------------------
 

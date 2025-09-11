@@ -35,7 +35,7 @@ try:
     cq = ChromaQuery()
 
     result = cq.search_with_temperature(
-        "Obtain textbooks and questions for the course EEE 511 on Laplace Transform for an EEE engineering student",
+        "CIRCUIT THEORY",
         where={"COURSE_FOLDER": "PQ"},
         topk=50,
         tau=0.35,

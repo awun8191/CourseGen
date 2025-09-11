@@ -47,6 +47,8 @@ import logging
 import importlib
 import importlib.util
 import types
+import re
+import gc
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -479,30 +481,69 @@ def _create_gemini_service_instance():
         log.error(f"GeminiService init failed: {e}")
         return None
 
-def _gemini_via_service(img_pil: "Image.Image") -> str:
+def _gemini_via_service(img_pils: List["Image.Image"]) -> List[str]:
     svc = _get_gemini_service()
     if svc is None:
-        return ""
+        return ["" for _ in img_pils]
+
     max_edge = int(os.getenv("OCR_GEMINI_MAX_EDGE", "2000"))
-    if max_edge > 0:
-        img_pil = _limit_long_edge(img_pil, max_edge)
-    buf = io.BytesIO()
-    img_pil.save(buf, format="PNG")
-    img_bytes = buf.getvalue()
-    try:
-        out = svc.ocr(images=[{"mime_type": "image/png", "data": img_bytes}],
-                      prompt=_OCR_PROMPT_BATCH, response_model=None)
-        if isinstance(out, dict) and "result" in out:
-            return (out["result"] or "").strip()
-        if isinstance(out, str):
-            return out.strip()
-        try:
-            return str(out).strip()
-        except Exception:
-            return ""
-    except Exception as e:
-        log.error(f"GeminiService.ocr failed: {e}")
-        return ""
+    texts: List[str] = []
+
+    for i in range(0, len(img_pils), 3):
+        chunk_imgs: List[Dict[str, bytes]] = []
+        for img_pil in img_pils[i:i + 3]:
+            if max_edge > 0:
+                img_pil = _limit_long_edge(img_pil, max_edge)
+            with io.BytesIO() as buf:
+                img_pil.save(buf, format="PNG")
+                chunk_imgs.append({"mime_type": "image/png", "data": buf.getvalue()})
+            try:
+                img_pil.close()
+            except Exception:
+                pass
+
+        prompt = _OCR_PROMPT_BATCH if len(chunk_imgs) > 1 else _OCR_PROMPT_SINGLE
+
+        attempt = 0
+        while attempt < 3:
+            try:
+                out = svc.ocr(images=chunk_imgs, prompt=prompt, response_model=None)
+                if isinstance(out, dict) and "result" in out:
+                    text_block = out["result"] or ""
+                elif isinstance(out, str):
+                    text_block = out
+                else:
+                    try:
+                        text_block = str(out)
+                    except Exception:
+                        text_block = ""
+
+                if len(chunk_imgs) == 1:
+                    texts.append(text_block.strip())
+                else:
+                    pages: List[str] = []
+                    pattern = r"Page\s*\d+\s*:\s*(.*?)\s*(?=Page\s*\d+\s*:|$)"
+                    for m in re.finditer(pattern, text_block, re.DOTALL):
+                        pages.append(m.group(1).strip())
+                    if not pages:
+                        splits = text_block.split("Page ")
+                        for s in splits[1:]:
+                            pages.append(s.split(":", 1)[-1].strip())
+                    while len(pages) < len(chunk_imgs):
+                        pages.append("")
+                    texts.extend(pages[: len(chunk_imgs)])
+                break
+            except Exception as e:
+                attempt += 1
+                log.error(f"GeminiService.ocr failed (attempt {attempt}): {e}")
+                time.sleep(min(2 ** attempt, 8))
+        else:
+            texts.extend(["" for _ in chunk_imgs])
+
+        del chunk_imgs
+        gc.collect()
+
+    return texts
 
 def _gemini_via_fallback(img_pil: "Image.Image") -> str:
     """Direct google-genai fallback (requires GEMINI_API_KEY)."""
@@ -582,7 +623,10 @@ def ocr_image(
     # --- Gemini path ---
     if engine == "gemini":
         pil_img = _to_pil(img_rgb)
-        text = _gemini_via_service(pil_img) or _gemini_via_fallback(pil_img)
+        text_list = _gemini_via_service([pil_img])
+        text = text_list[0] if text_list else ""
+        if not text:
+            text = _gemini_via_fallback(pil_img)
 
         if not text.strip():
             # Optional auto-fallback to a local engine
@@ -693,6 +737,9 @@ def ocr_pdf(
     metrics: List[PageMetrics] = []
     debug_imgs: List["np.ndarray"] = []
 
+    pending_imgs: List["Image.Image"] = []
+    pending_idx: List[int] = []
+
     for i in range(len(doc)):
         pg = doc.load_page(i)
         zoom = max(1.0, dpi / 72.0)
@@ -703,50 +750,54 @@ def ocr_pdf(
             if Image is None:
                 raise RuntimeError("Pillow required for Gemini OCR")
             img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
-            page_text = _gemini_via_service(img) or _gemini_via_fallback(img)
+            pending_imgs.append(img)
+            pending_idx.append(i)
 
-            if not page_text.strip():
-                if bool(int(os.getenv("OCR_GEMINI_AUTOFALLBACK", "1"))):
-                    fb_engine = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "hybrid").lower()
-                    fb_hand = bool(int(os.getenv("OCR_GEMINI_FALLBACK_HAND", "1")))
-                    if fb_engine not in ("easyocr", "paddleocr", "hybrid"):
-                        fb_engine = "hybrid"
-                    log.warning(f"[p{i+1}] Gemini empty; falling back to {fb_engine} (hand={int(fb_hand)})")
+            if len(pending_imgs) == 3 or i == len(doc) - 1:
+                batch_texts = _gemini_via_service(pending_imgs)
+                for j, (idx, page_text) in enumerate(zip(pending_idx, batch_texts)):
+                    if not page_text.strip():
+                        if bool(int(os.getenv("OCR_GEMINI_AUTOFALLBACK", "1"))):
+                            fb_engine = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "hybrid").lower()
+                            fb_hand = bool(int(os.getenv("OCR_GEMINI_FALLBACK_HAND", "1")))
+                            if fb_engine not in ("easyocr", "paddleocr", "hybrid"):
+                                fb_engine = "hybrid"
+                            log.warning(f"[p{idx+1}] Gemini empty; falling back to {fb_engine} (hand={int(fb_hand)})")
 
-                    # Build ndarray for local OCR path
-                    if cv2 is not None:
-                        arr = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)
-                        if pm.n == 4:
-                            arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
-                        rgb = arr
+                            rgb = np.array(pending_imgs[j])
+                            fb = ocr_image(
+                                rgb,
+                                lang=lang,
+                                handwriting=fb_hand,
+                                engine=fb_engine,
+                                dpi_hint=dpi,
+                                return_debug=return_debug,
+                            )
+                            pages_text.append(fb.text)
+                            metrics.append(PageMetrics(
+                                page=idx + 1,
+                                engine=f"gemini→{fb.by_page[0].engine}",
+                                lines=len(fb.text.splitlines()) if fb.text else 0,
+                                avg_conf=fb.by_page[0].avg_conf,
+                                min_conf=fb.by_page[0].min_conf,
+                                max_conf=fb.by_page[0].max_conf,
+                                dpi=dpi,
+                            ))
+                        else:
+                            raise RuntimeError("Gemini OCR returned empty text (page).")
                     else:
-                        _pil = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
-                        rgb = np.array(_pil)
-
-                    fb = ocr_image(
-                        rgb, lang=lang, handwriting=fb_hand,
-                        engine=fb_engine, dpi_hint=dpi, return_debug=return_debug
-                    )
-                    pages_text.append(fb.text)
-                    metrics.append(PageMetrics(
-                        page=i + 1, engine=f"gemini→{fb.by_page[0].engine}",
-                        lines=len(fb.text.splitlines()) if fb.text else 0,
-                        avg_conf=fb.by_page[0].avg_conf,
-                        min_conf=fb.by_page[0].min_conf,
-                        max_conf=fb.by_page[0].max_conf,
-                        dpi=dpi,
-                    ))
-                    continue  # next page
-                else:
-                    raise RuntimeError("Gemini OCR returned empty text (page).")
-
-            # Normal Gemini success
-            pages_text.append(page_text)
-            metrics.append(PageMetrics(
-                page=i + 1, engine="gemini",
-                lines=len(page_text.splitlines()),
-                avg_conf=0.0, min_conf=0.0, max_conf=0.0, dpi=dpi
-            ))
+                        pages_text.append(page_text)
+                        metrics.append(PageMetrics(
+                            page=idx + 1,
+                            engine="gemini",
+                            lines=len(page_text.splitlines()),
+                            avg_conf=0.0,
+                            min_conf=0.0,
+                            max_conf=0.0,
+                            dpi=dpi,
+                        ))
+                pending_imgs = []
+                pending_idx = []
             continue
 
         # --- Non-Gemini: route via ocr_image() for consistency ---
