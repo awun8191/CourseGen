@@ -426,4 +426,7 @@ if __name__ == "__main__":
     # gemini = GeminiQuestionGen(is_thinking=False).generate(is_calculation=True, difficulty="medium")
     # gemini = GeminiQuestionGen(is_thinking=True).generate_with_RAG(is_calculation=True, difficulty="medium", variation=False)
     course_info = DataFormatting().search_course("EEE 313")
+    
+    
+    
     gemini = GeminiQuestionGen(is_thinking=True).course_outline_RAG(variation=False, course=course_info[0].title, department=", 0".join(course_info[1]), metadata=MetaData(COURSE_FOLDER=course_info[0].code))

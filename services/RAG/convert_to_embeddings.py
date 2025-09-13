@@ -177,29 +177,53 @@ class CFEmbeddings:
         for attempt in range(1, self.retry.tries + 1):
             try:
                 r = self.s.post(self.url, json=payload, timeout=90)
-                if r.status_code in (429, 500, 502, 503, 504):
+                if r.status_code in (408, 429, 500, 502, 503, 504):
                     raise requests.HTTPError(f"{r.status_code} {r.text[:200]}")
                 r.raise_for_status()
                 return r.json()
-            except Exception:
+            except Exception as e:
                 if attempt == self.retry.tries:
                     raise
+                # backoff then retry
                 time.sleep(min(self.retry.max_sleep, sleep))
                 sleep *= self.retry.backoff
         raise RuntimeError("unhandled retry loop")
 
     def embed_iter(self, texts: List[str], batch_size: int):
-        """Yield (embeddings_for_batch, tokens_for_batch) to reduce RAM spikes."""
-        bsz = min(batch_size, self.batch_max)
-        for i in range(0, len(texts), bsz):
-            sub = texts[i:i+bsz]
+        """Yield (embeddings_for_batch, tokens_for_batch) with adaptive batching.
+
+        On transient CF errors (e.g., 408/429/5xx) this halves the batch size and retries
+        the same window, down to size 1 before surfacing an error.
+        """
+        n = len(texts)
+        if n == 0:
+            return
+        max_bsz = min(max(1, batch_size), self.batch_max)
+        i = 0
+        cur_bsz = max_bsz
+        while i < n:
+            sub = texts[i : min(i + cur_bsz, n)]
             payload = {"text": sub, "truncate_inputs": True}
-            js = self._post_embed(payload)
-            data = js.get("result", {}).get("data")
-            if not isinstance(data, list):
-                raise RuntimeError(f"Bad embedding response: {str(js)[:200]}")
-            tokens = self.counter.count_batch(sub)
-            yield data, tokens
+            try:
+                js = self._post_embed(payload)
+                data = js.get("result", {}).get("data")
+                if not isinstance(data, list):
+                    raise RuntimeError(f"Bad embedding response: {str(js)[:200]}")
+                tokens = self.counter.count_batch(sub)
+                yield data, tokens
+                i += len(sub)
+                # If we had previously reduced batch size due to errors, gradually ramp back up
+                if cur_bsz < max_bsz:
+                    cur_bsz = min(max_bsz, cur_bsz * 2)
+            except Exception as e:
+                # Reduce batch size on failure; if already at 1, propagate
+                if cur_bsz > 1:
+                    new_bsz = max(1, cur_bsz // 2)
+                    log(f"[EMBED] Batch failed ({type(e).__name__}); reducing batch {cur_bsz}->{new_bsz} and retrying")
+                    cur_bsz = new_bsz
+                    continue
+                # cur_bsz == 1 -> give up
+                raise
 
 # OCR decision
 def need_ocr(doc: fitz.Document, sample_pages: int = 8, min_chars_per_page: int = 200) -> bool:
@@ -459,27 +483,99 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
             return {"file": rel, "skip": True, "reason": "no_chunks"}
         log(f"[CHUNK] {path.name} uniq_chunks={len(uniq)} first_chunk='{snapshot(uniq[0]) if uniq else ''}'")
 
-        # Cloudflare embeddings
-        log(f"[EMBED] Creating Cloudflare BGE-M3 embeddings for {path.name} ({len(uniq)} chunks)")
+        # Compute doc hash then free raw text to reduce peak RAM
+        doc_hash_for_stream = sha1_text(text)
+        try:
+            del text
+        except Exception:
+            pass
+
+        # Cloudflare embeddings (streamed to JSONL to reduce RAM)
+        log(f"[EMBED] Creating Cloudflare BGE-M3 embeddings for {path.name} ({len(uniq)} chunks) [streaming]")
         cf = None
+        total_tokens = 0
         try:
             cf = CFEmbeddings(cf_acct, cf_token, int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
             log(f"[EMBED] Cloudflare client initialized with account: {cf_acct[:8]}...")
-            vecs, total_tokens = [], 0
-            batch_count = 0
-            for emb_batch, tok_batch in cf.embed_iter(uniq, batch_size=embed_batch):
-                vecs.extend(emb_batch)
-                total_tokens += tok_batch
-                batch_count += 1
-                log(f"[EMBED] Processed batch {batch_count}: {len(emb_batch)} vectors, {tok_batch} tokens")
-            if len(vecs) != len(uniq):
-                return {"file": rel, "error": f"embedding_mismatch: got {len(vecs)} vectors, expected {len(uniq)}"}
-            log(f"[EMBED] Successfully created {len(vecs)} Cloudflare embeddings, total tokens: {total_tokens}")
+
+            # Prepare JSONL for streaming writes of unique chunks
+            tmp_dir = Path(export_tmp); tmp_dir.mkdir(parents=True, exist_ok=True)
+            group = meta_path["GROUP_KEY"]
+            jsonl_name = f"{re.sub(r'[^A-Za-z0-9._-]+','_',group)}__{sha1_text(rel)}.jsonl"
+            jsonl_tmp = tmp_dir / jsonl_name
+
+            file_hash = sha256_file(path)[:16]
+            st = path.stat()
+            doc_hash = doc_hash_for_stream
+
+            # Build index list of unique chunk positions to align embeddings without storing them
+            total = len(chunks_all)
+            uniq_indices = [i for i in range(total) if i not in dup_map]
+
+            with jsonl_tmp.open("w", encoding="utf-8") as out:
+                k = 0
+                batch_count = 0
+                for emb_batch, tok_batch in cf.embed_iter(uniq, batch_size=embed_batch):
+                    batch_count += 1
+                    total_tokens += tok_batch
+                    # Stream-write one JSONL row per embedding
+                    for j, vec in enumerate(emb_batch):
+                        idx = uniq_indices[k + j]
+                        ch = chunks_all[idx]
+                        chash = sha1_text(ch)
+                        rid = sha1_text(f"{doc_hash}:{idx}:{chash}")
+                        md = {
+                            "path": str(path),
+                            "chunk_index": idx,
+                            "total_chunks_in_doc": total,
+                            "file_size": st.st_size,
+                            "file_mtime": int(st.st_mtime),
+                            "file_hash": file_hash,
+                            "chunk_hash": chash,
+                            **meta_path,
+                        }
+                        out.write(json.dumps({
+                            "id": rid,
+                            "text": ch,
+                            "metadata": md,
+                            "embedding": vec,
+                            "embedding_type": "cloudflare-bge-m3"
+                        }) + "\n")
+                    log(f"[EMBED] Processed batch {batch_count}: {len(emb_batch)} vectors, {tok_batch} tokens")
+                    k += len(emb_batch)
+
+                # Write duplicate chunks (no embeddings)
+                for idx, (orig_idx, orig_h) in dup_map.items():
+                    ch = chunks_all[idx]
+                    rid = sha1_text(f"{doc_hash}:{idx}:{orig_h}:dup")
+                    md = {
+                        "path": str(path),
+                        "chunk_index": idx,
+                        "total_chunks_in_doc": total,
+                        "file_hash": file_hash,
+                        "chunk_hash": sha1_text(ch),
+                        "is_duplicate": True,
+                        "duplicate_of_index": orig_idx,
+                        "duplicate_of_hash": orig_h,
+                        "skip_index": True,
+                        **meta_path
+                    }
+                    out.write(json.dumps({"id": rid, "text": ch, "metadata": md}) + "\n")
+
+            if k != len(uniq):
+                return {"file": rel, "error": f"embedding_mismatch: wrote {k} vectors, expected {len(uniq)}"}
+            log(f"[EMBED] Successfully streamed {k} embeddings, total tokens: {total_tokens}")
+
         except Exception as e:
+            # If streaming failed, try to remove partial file to avoid confusion
+            try:
+                if 'jsonl_tmp' in locals() and Path(jsonl_tmp).exists():
+                    Path(jsonl_tmp).unlink(missing_ok=True)
+            except Exception:
+                pass
             log(f"[ERROR] Cloudflare embedding failed: {e}")
             return {"file": rel, "error": f"cloudflare_embedding_error: {e}"}
         finally:
-            # Clean up Cloudflare client
             if cf is not None:
                 cf.close()
 
@@ -490,59 +586,7 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
         # Clean up PaddleOCR resources after processing each file
         cleanup_paddle_ocr()
 
-    # Write per-file JSONL
-    tmp_dir = Path(export_tmp); tmp_dir.mkdir(parents=True, exist_ok=True)
-    group = meta_path["GROUP_KEY"]
-    jsonl_name = f"{re.sub(r'[^A-Za-z0-9._-]+','_',group)}__{sha1_text(rel)}.jsonl"
-    jsonl_tmp = tmp_dir / jsonl_name
-
-    file_hash = sha256_file(path)[:16]
-    st = path.stat()
-    doc_hash = sha1_text(text)
-    with jsonl_tmp.open("w", encoding="utf-8") as out:
-        total = len(chunks_all)
-        k = 0
-        for idx, ch in enumerate(chunks_all):
-            if idx in dup_map:
-                continue
-            chash = sha1_text(ch)
-            rid = sha1_text(f"{doc_hash}:{idx}:{chash}")
-            md = {
-                "path": str(path),
-                "chunk_index": idx,
-                "total_chunks_in_doc": total,
-                "file_size": st.st_size,
-                "file_mtime": int(st.st_mtime),
-                "file_hash": file_hash,
-                "chunk_hash": chash,
-                **meta_path,
-            }
-            out.write(json.dumps({
-                "id": rid,
-                "text": ch,
-                "metadata": md,
-                "embedding": vecs[k],
-                "embedding_type": "cloudflare-bge-m3"
-            }) + "\n")
-            k += 1
-        # duplicates
-        for idx, (orig_idx, orig_h) in dup_map.items():
-            ch = chunks_all[idx]
-            rid = sha1_text(f"{doc_hash}:{idx}:{orig_h}:dup")
-            md = {
-                "path": str(path),
-                "chunk_index": idx,
-                "total_chunks_in_doc": total,
-                "file_hash": file_hash,
-                "chunk_hash": sha1_text(ch),
-                "is_duplicate": True,
-                "duplicate_of_index": orig_idx,
-                "duplicate_of_hash": orig_h,
-                "skip_index": True,
-                **meta_path
-            }
-            out.write(json.dumps({"id": rid, "text": ch, "metadata": md}) + "\n")
-
+    # jsonl_tmp and jsonl_name already created during streaming
     return {"file": rel, "jsonl_tmp": str(jsonl_tmp),
             "chunks": len(uniq), "dups": len(dup_map), "jsonl_name": jsonl_name,
             "total_tokens": total_tokens}
@@ -561,15 +605,18 @@ def main():
 
     ap = argparse.ArgumentParser("Streamlined BGE-M3 pipeline")
     ap.add_argument("-i", "--input-dir", required=True)
-    ap.add_argument("--export-dir", default="OUTPUT_DATA2/progress_report")
-    ap.add_argument("--cache-dir", default="OUTPUT_DATA2/cache")
+
+    # Use a single, repo-root anchored default to avoid duplicate OUTPUT_DATA2 trees
+    default_output_root = Path(os.getenv("COURSEGEN_OUTPUT_ROOT", str((repo_root / "OUTPUT_DATA2").resolve())))
+    ap.add_argument("--export-dir", default=str(default_output_root / "progress_report"))
+    ap.add_argument("--cache-dir", default=str(default_output_root / "cache"))
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--omp-threads", type=int, default=1)
     ap.add_argument("--timeout", type=int, default=1800, help="Timeout per file in seconds")
     ap.add_argument("--with-chroma", dest="with_chroma", action="store_true", default=True)
     ap.add_argument("--no-chroma", dest="with_chroma", action="store_false")
     ap.add_argument("-c", "--collection", default="course_embeddings")
-    ap.add_argument("--persist-dir", default="OUTPUT_DATA2/emdeddings")
+    ap.add_argument("--persist-dir", default=str(default_output_root / "emdeddings"))
     ap.add_argument("--ocr-on-missing", choices=["fallback", "error", "skip"], default="fallback")
     ap.add_argument("--force-ocr", action="store_true")
     ap.add_argument("--max-pdfs", type=int, default=0)
@@ -578,6 +625,13 @@ def main():
     ap.add_argument("--ocr-lang", default=os.getenv("PADDLE_LANG", "en"))
     ap.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
                     choices=["gemini", "hybrid", "easyocr", "paddleocr"], help="OCR engine")
+    # Gemini fallback controls
+    ap.add_argument("--ocr-fallback-engine",
+                    choices=["easyocr", "hybrid", "paddleocr"],
+                    default=os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "easyocr"),
+                    help="When using --engine gemini, choose local fallback engine if a page returns empty text. Use 'easyocr' to avoid initializing PaddleOCR.")
+    ap.add_argument("--no-gemini-fallback", action="store_true",
+                    help="Disable auto local OCR fallback when Gemini returns empty text. If disabled, empty Gemini pages raise an error.")
     ap.add_argument("--memory-limit", type=int, default=0, help="Memory limit in MB (0 = no limit)")
     ap.add_argument("--retry-limit", type=int, default=3, help="Maximum retry attempts per file")
     args = ap.parse_args()
@@ -605,6 +659,10 @@ def main():
     export_tmp = export_dir / "_tmp"; export_tmp.mkdir(parents=True, exist_ok=True)
     cache_dir = Path(args.cache_dir).resolve(); cache_dir.mkdir(parents=True, exist_ok=True)
     persist_dir = Path(args.persist_dir).resolve(); persist_dir.mkdir(parents=True, exist_ok=True)
+
+    log(f"[PATHS] export_dir={export_dir}")
+    log(f"[PATHS] cache_dir={cache_dir}")
+    log(f"[PATHS] persist_dir={persist_dir}")
     billing_file = persist_dir / "billing_state.json"
     seen_index_path = persist_dir / "seen_files.json"
     progress_path = export_dir / "progress_state.json"
@@ -655,6 +713,15 @@ def main():
     existing_files = len(files_state)
     log(f"[RESUME] Found {existing_files} files in progress state")
 
+    # Configure Gemini fallback behavior via env for the OCR layer
+    if args.no_gemini_fallback:
+        os.environ["OCR_GEMINI_AUTOFALLBACK"] = "0"
+        log("[OCR] Gemini fallback: disabled")
+    else:
+        os.environ.setdefault("OCR_GEMINI_AUTOFALLBACK", "1")
+        os.environ["OCR_GEMINI_FALLBACK_ENGINE"] = args.ocr_fallback_engine
+        log(f"[OCR] Gemini fallback engine: {args.ocr_fallback_engine}")
+
     try:
         seen = json.loads(seen_index_path.read_text(encoding="utf-8")) if seen_index_path.exists() else {}
         log(f"[RESUME] Found {len(seen)} entries in seen files index")
@@ -684,10 +751,12 @@ def main():
         # Check if file should be skipped
         try:
             if should_skip(files_state[file_key], st.st_size, int(st.st_mtime)):
-                # Update status and save progress
-                files_state[file_key]["status"] = "skipped"
-                files_state[file_key]["reason"] = "already_processed"
-                files_state[file_key]["finished_at"] = now_iso()
+                # Do not downgrade a previously completed record to "skipped"
+                if files_state[file_key].get("status") != "completed":
+                    files_state[file_key]["status"] = "skipped"
+                    files_state[file_key]["reason"] = "already_processed"
+                    files_state[file_key]["finished_at"] = now_iso()
+                # Persist any metadata updates but keep the original completion status intact
                 save_progress(progress_path, prog)
                 log(f"[RESUME] Skipping already processed: {fp.name}")
                 continue
@@ -723,6 +792,36 @@ def main():
     log(f"[RESUME] Summary: {total_files} total files, {queued_files} queued for processing, {skipped_files} skipped (already processed)")
     if tasks:
         log(f"[RESUME] Files to process: {[fp.name for fp in tasks[:5]]}" + ("..." if len(tasks) > 5 else ""))
+
+    # If previous runs archived JSONL files but Chroma upsert failed, re-attempt
+    # those upserts now without reprocessing the PDFs. This makes resume more robust
+    # when only the vector DB step failed.
+    if args.with_chroma and collection:
+        retry_chroma = 0
+        for file_key, rec in list(files_state.items()):
+            try:
+                if rec.get("jsonl_archived") and not rec.get("chroma_upserted"):
+                    name = rec.get("jsonl_name")
+                    if not name:
+                        continue
+                    jsonl_path = (export_dir / name)
+                    if not jsonl_path.exists():
+                        continue
+                    try:
+                        added = chroma_upsert_jsonl(jsonl_path, collection, client, batch=64)
+                        if added > 0:
+                            base = rec.copy()
+                            base["chroma_upserted"] = True
+                            files_state[file_key] = base
+                            save_progress(progress_path, prog)
+                            log(f"[Chroma][RESUME] Re-upserted {added} vectors from {name}")
+                            retry_chroma += 1
+                    except Exception as e:
+                        log(f"[ERROR][RESUME] Chroma re-upsert failed for {name}: {e}")
+            except Exception:
+                pass
+        if retry_chroma:
+            log(f"[RESUME] Recovered Chroma upserts for {retry_chroma} file(s)")
 
     def archive_tmp(tmp: Path) -> Path:
         final = export_dir / tmp.name
