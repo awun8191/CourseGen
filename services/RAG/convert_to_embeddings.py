@@ -18,7 +18,9 @@ Env:
   CLOUDFLARE_ACCOUNT_ID          (required)
   CLOUDFLARE_API_TOKEN           (required)
   CF_PRICE_PER_M_TOKENS=0.012    # USD per 1M input tokens (BGE-M3 input price)
-  CF_EMBED_MAX_BATCH=96
+  CF_EMBED_MAX_BATCH=64
+  CF_EMBED_MAX_TOKENS=7500       # Hard cap on tokens per request batch
+  CF_EMBED_MIN_BATCH=16
   OMP_NUM_THREADS=4
   BILLING_ENABLED=1
   PADDLE_LANG=en                  # optional; e.g., en, fr, de, ar, hi
@@ -42,6 +44,7 @@ except Exception:
     pass
 
 from typing import List, Dict, Any, Tuple, Optional
+import shutil
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 
 import fitz  # PyMuPDF
@@ -193,36 +196,65 @@ class CFEmbeddings:
         """Yield (embeddings_for_batch, tokens_for_batch) with adaptive batching.
 
         On transient CF errors (e.g., 408/429/5xx) this halves the batch size and retries
-        the same window, down to size 1 before surfacing an error.
+        the same window, but never below a minimum floor (default 16).
+        Additionally enforces a per-request token cap (CF_EMBED_MAX_TOKENS, default 7500).
         """
         n = len(texts)
         if n == 0:
             return
-        max_bsz = min(max(1, batch_size), self.batch_max)
+        # Enforce floor via env CF_EMBED_MIN_BATCH (default 16)
+        try:
+            min_floor = max(1, int(os.getenv("CF_EMBED_MIN_BATCH", "16")))
+        except Exception:
+            min_floor = 16
+        try:
+            max_tokens = max(512, int(os.getenv("CF_EMBED_MAX_TOKENS", "7500")))
+        except Exception:
+            max_tokens = 7500
+        max_bsz = min(max(min_floor, batch_size), self.batch_max)
         i = 0
         cur_bsz = max_bsz
         while i < n:
-            sub = texts[i : min(i + cur_bsz, n)]
+            # Greedily pack up to cur_bsz items but cap total tokens to max_tokens
+            j = i
+            packed: List[str] = []
+            token_sum = 0
+            while j < n and len(packed) < cur_bsz:
+                t = texts[j]
+                t_tokens = self.counter.count_batch([t])
+                if not packed:
+                    # Always include at least one item
+                    packed.append(t)
+                    token_sum += t_tokens
+                    j += 1
+                    continue
+                if token_sum + t_tokens <= max_tokens:
+                    packed.append(t)
+                    token_sum += t_tokens
+                    j += 1
+                else:
+                    break
+            sub = packed
             payload = {"text": sub, "truncate_inputs": True}
             try:
                 js = self._post_embed(payload)
                 data = js.get("result", {}).get("data")
                 if not isinstance(data, list):
                     raise RuntimeError(f"Bad embedding response: {str(js)[:200]}")
-                tokens = self.counter.count_batch(sub)
+                tokens = token_sum if token_sum > 0 else self.counter.count_batch(sub)
                 yield data, tokens
                 i += len(sub)
                 # If we had previously reduced batch size due to errors, gradually ramp back up
                 if cur_bsz < max_bsz:
                     cur_bsz = min(max_bsz, cur_bsz * 2)
             except Exception as e:
-                # Reduce batch size on failure; if already at 1, propagate
-                if cur_bsz > 1:
-                    new_bsz = max(1, cur_bsz // 2)
-                    log(f"[EMBED] Batch failed ({type(e).__name__}); reducing batch {cur_bsz}->{new_bsz} and retrying")
+                # Reduce batch size on failure; respect minimum floor
+                if cur_bsz > min_floor:
+                    new_bsz = max(min_floor, cur_bsz // 2)
+                    log(f"[EMBED] Batch failed ({type(e).__name__}); reducing batch {cur_bsz}->{new_bsz} (min={min_floor}) and retrying")
                     cur_bsz = new_bsz
                     continue
-                # cur_bsz == 1 -> give up
+                # cur_bsz <= min_floor -> give up
                 raise
 
 # OCR decision
@@ -477,7 +509,8 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
         log(f"[EXTRACT] {path.name} chars={len(text)} snapshot='{snapshot(text)}'")
 
         log(f"[CHUNK] Chunking text for {path.name}")
-        chunks_all = chunk(text)
+        # Use 2-paragraph chunks with 2-sentence overlap for better continuity
+        chunks_all = chunk(text, paras_per_chunk=2, paras_overlap=0, sentence_overlap=2)
         uniq, dup_map = dedupe(chunks_all)
         if not uniq:
             return {"file": rel, "skip": True, "reason": "no_chunks"}
@@ -495,14 +528,46 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
         cf = None
         total_tokens = 0
         try:
-            cf = CFEmbeddings(cf_acct, cf_token, int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
+            cf = CFEmbeddings(cf_acct, cf_token, int(os.getenv("CF_EMBED_MAX_BATCH", "64")))
             log(f"[EMBED] Cloudflare client initialized with account: {cf_acct[:8]}...")
 
-            # Prepare JSONL for streaming writes of unique chunks
+            # Prepare JSONL for streaming writes with resume support
             tmp_dir = Path(export_tmp); tmp_dir.mkdir(parents=True, exist_ok=True)
+            export_dir_guess = tmp_dir.parent
             group = meta_path["GROUP_KEY"]
             jsonl_name = f"{re.sub(r'[^A-Za-z0-9._-]+','_',group)}__{sha1_text(rel)}.jsonl"
             jsonl_tmp = tmp_dir / jsonl_name
+            jsonl_final = export_dir_guess / jsonl_name
+
+            # Determine resume state: copy final to tmp if resuming from archived,
+            # or continue appending to existing tmp.
+            seen_chunk_indexes: set[int] = set()
+            if jsonl_final.exists() and not jsonl_tmp.exists():
+                try:
+                    shutil.copy2(jsonl_final, jsonl_tmp)
+                    log(f"[RESUME] Copied archived JSONL to tmp for resume: {jsonl_name}")
+                except Exception as e:
+                    log(f"[WARN] Failed to copy archived JSONL for resume: {e}")
+            # If either tmp or final exists, parse for seen chunk indices
+            resume_path = jsonl_tmp if jsonl_tmp.exists() else (jsonl_final if jsonl_final.exists() else None)
+            if resume_path and resume_path.exists():
+                try:
+                    with resume_path.open("r", encoding="utf-8") as rf:
+                        for line in rf:
+                            if not line.strip():
+                                continue
+                            try:
+                                rec = json.loads(line)
+                                md = rec.get("metadata", {}) or {}
+                                idx0 = md.get("chunk_index")
+                                if isinstance(idx0, int):
+                                    seen_chunk_indexes.add(idx0)
+                            except Exception:
+                                continue
+                    if seen_chunk_indexes:
+                        log(f"[RESUME] Found {len(seen_chunk_indexes)} embedded chunks already in {resume_path.name}")
+                except Exception as e:
+                    log(f"[WARN] Failed to read existing JSONL for resume: {e}")
 
             file_hash = sha256_file(path)[:16]
             st = path.stat()
@@ -512,15 +577,36 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
             total = len(chunks_all)
             uniq_indices = [i for i in range(total) if i not in dup_map]
 
-            with jsonl_tmp.open("w", encoding="utf-8") as out:
+            # Filter for remaining unique chunks if resuming
+            if seen_chunk_indexes:
+                remaining_pairs = [(i, chunks_all[i]) for i in uniq_indices if i not in seen_chunk_indexes]
+                if remaining_pairs:
+                    rem_indices, rem_texts = zip(*remaining_pairs)
+                    uniq_indices_remaining = list(rem_indices)
+                    uniq_remaining = list(rem_texts)
+                else:
+                    uniq_indices_remaining = []
+                    uniq_remaining = []
+            else:
+                uniq_indices_remaining = list(uniq_indices)
+                uniq_remaining = list(uniq)
+
+            # Open in append mode to preserve any previous progress
+            with jsonl_tmp.open("a", encoding="utf-8") as out:
                 k = 0
                 batch_count = 0
-                for emb_batch, tok_batch in cf.embed_iter(uniq, batch_size=embed_batch):
+                # BGE-M3 benefits from instruction prefixes; enable by default for documents
+                use_bge_prefix = os.getenv("BGE_USE_PREFIX", "1") not in ("0", "false", "False")
+                embed_source = [
+                    (f"passage: {t}" if use_bge_prefix and not str(t).startswith("passage:") else t)
+                    for t in uniq_remaining
+                ]
+                for emb_batch, tok_batch in cf.embed_iter(embed_source, batch_size=embed_batch):
                     batch_count += 1
                     total_tokens += tok_batch
                     # Stream-write one JSONL row per embedding
                     for j, vec in enumerate(emb_batch):
-                        idx = uniq_indices[k + j]
+                        idx = uniq_indices_remaining[k + j]
                         ch = chunks_all[idx]
                         chash = sha1_text(ch)
                         rid = sha1_text(f"{doc_hash}:{idx}:{chash}")
@@ -546,6 +632,8 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
 
                 # Write duplicate chunks (no embeddings)
                 for idx, (orig_idx, orig_h) in dup_map.items():
+                    if idx in seen_chunk_indexes:
+                        continue
                     ch = chunks_all[idx]
                     rid = sha1_text(f"{doc_hash}:{idx}:{orig_h}:dup")
                     md = {
@@ -562,17 +650,13 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
                     }
                     out.write(json.dumps({"id": rid, "text": ch, "metadata": md}) + "\n")
 
-            if k != len(uniq):
-                return {"file": rel, "error": f"embedding_mismatch: wrote {k} vectors, expected {len(uniq)}"}
-            log(f"[EMBED] Successfully streamed {k} embeddings, total tokens: {total_tokens}")
+            if len(uniq_remaining) != 0 and k != len(uniq_remaining):
+                return {"file": rel, "error": f"embedding_mismatch: wrote {k} vectors, expected {len(uniq_remaining)}"}
+            already = len(seen_chunk_indexes)
+            log(f"[EMBED] Successfully streamed {k} embeddings (+{already} existing), total tokens this run: {total_tokens}")
 
         except Exception as e:
-            # If streaming failed, try to remove partial file to avoid confusion
-            try:
-                if 'jsonl_tmp' in locals() and Path(jsonl_tmp).exists():
-                    Path(jsonl_tmp).unlink(missing_ok=True)
-            except Exception:
-                pass
+            # Keep partial file for resume; do not delete
             log(f"[ERROR] Cloudflare embedding failed: {e}")
             return {"file": rel, "error": f"cloudflare_embedding_error: {e}"}
         finally:
@@ -610,8 +694,8 @@ def main():
     default_output_root = Path(os.getenv("COURSEGEN_OUTPUT_ROOT", str((repo_root / "OUTPUT_DATA2").resolve())))
     ap.add_argument("--export-dir", default=str(default_output_root / "progress_report"))
     ap.add_argument("--cache-dir", default=str(default_output_root / "cache"))
-    ap.add_argument("--workers", type=int, default=3)
-    ap.add_argument("--omp-threads", type=int, default=1)
+    ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--omp-threads", type=int, default=2)
     ap.add_argument("--timeout", type=int, default=1800, help="Timeout per file in seconds")
     ap.add_argument("--with-chroma", dest="with_chroma", action="store_true", default=True)
     ap.add_argument("--no-chroma", dest="with_chroma", action="store_false")
@@ -620,7 +704,7 @@ def main():
     ap.add_argument("--ocr-on-missing", choices=["fallback", "error", "skip"], default="fallback")
     ap.add_argument("--force-ocr", action="store_true")
     ap.add_argument("--max-pdfs", type=int, default=0)
-    ap.add_argument("--embed-batch", type=int, default=int(os.getenv("CF_EMBED_MAX_BATCH", "96")))
+    ap.add_argument("--embed-batch", type=int, default=int(os.getenv("CF_EMBED_MAX_BATCH", "64")))
     ap.add_argument("--ocr-dpi", type=int, default=200)
     ap.add_argument("--ocr-lang", default=os.getenv("PADDLE_LANG", "en"))
     ap.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
@@ -926,13 +1010,18 @@ def main():
                 save_progress(progress_path, prog)
     else:
         with ProcessPoolExecutor(max_workers=args.workers) as ex:
-            fut_map = {
-                ex.submit(
+            fut_map = {}
+            for fp in tasks:
+                # Mark as in-progress before submitting
+                files_state[str(fp)]["status"] = "in_progress"
+                files_state[str(fp)]["started_at"] = now_iso()
+                save_progress(progress_path, prog)
+                fut = ex.submit(
                     process_one, str(fp), str(root), str(export_tmp), str(cache_dir),
                     acct, tok, str(billing_file), args.embed_batch,
                     args.force_ocr, args.engine, args.ocr_dpi, args.ocr_lang,
-                ): fp for fp in tasks
-            }
+                )
+                fut_map[fut] = fp
             
             # Track processing progress and handle failures gracefully
             completed_count = 0
@@ -1019,3 +1108,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+#  python services/RAG/convert_to_embeddings.py -i "/home/user/Documents/SCHOOL/COMPILATION/EEE/" --engine gemini
+
+
