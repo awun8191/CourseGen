@@ -11,13 +11,21 @@ from typing import Any, Dict, Iterable, List, Optional
 import numpy as np
 import requests
 from chromadb import PersistentClient, Where
+from pathlib import Path
 
 # ========= Config =========
-# CHROMA_PATH = r"/home/raregazetto/Documents/Recursive-PDF-EXTRACTION-AND-RAG/src/services/RAG/OUTPUT_DATA/chroma_db_data"
-# COLLECTION = "pdfs_bge_m3_cloudflare"
+# Resolve repo root and provide stable, repo-anchored defaults.
+try:
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+except Exception:
+    REPO_ROOT = Path.cwd()
 
-CHROMA_PATH = r"/home/raregazetto/Documents/Recursive-PDF-EXTRACTION-AND-RAG/COURSEGEN/services/RAG/OUTPUT_DATA2/emdeddings"
-COLLECTION = "course_embeddings"
+# Allow overrides via env; otherwise default to repo_root/OUTPUT_DATA2/emdeddings
+CHROMA_PATH = os.environ.get(
+    "COURSEGEN_PERSIST_DIR",
+    str((REPO_ROOT / "OUTPUT_DATA2/emdeddings").resolve()),
+)
+COLLECTION = os.environ.get("COURSEGEN_COLLECTION", "course_embeddings")
 
 # Cloudflare (required)
 CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")

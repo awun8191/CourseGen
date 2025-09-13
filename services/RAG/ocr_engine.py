@@ -501,10 +501,7 @@ def _gemini_via_service(img_pils: List["Image.Image"]) -> List[str]:
             with io.BytesIO() as buf:
                 img_pil.save(buf, format="PNG")
                 chunk_imgs.append({"mime_type": "image/png", "data": buf.getvalue()})
-            try:
-                img_pil.close()
-            except Exception:
-                pass
+            # Do not close img_pil here; caller may reuse for fallback
 
         prompt = _OCR_PROMPT_BATCH if len(chunk_imgs) > 1 else _OCR_PROMPT_SINGLE
 
@@ -736,98 +733,131 @@ def ocr_pdf(
 ) -> OCRResult:
     doc = _open_pdf(Path(pdf_path))
 
-    pages_text: List[str] = []
-    metrics: List[PageMetrics] = []
-    debug_imgs: List["np.ndarray"] = []
+    try:
+        pages_text: List[str] = []
+        metrics: List[PageMetrics] = []
+        debug_imgs: List["np.ndarray"] = []
 
-    pending_imgs: List["Image.Image"] = []
-    pending_idx: List[int] = []
+        pending_imgs: List["Image.Image"] = []
+        pending_idx: List[int] = []
 
-    for i in range(len(doc)):
-        pg = doc.load_page(i)
-        zoom = max(1.0, dpi / 72.0)
-        pm = pg.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+        for i in range(len(doc)):
+            pg = doc.load_page(i)
+            # For Gemini, cap long edge to OCR_GEMINI_MAX_EDGE without upscaling to keep RAM low
+            if engine == "gemini":
+                max_edge = int(os.getenv("OCR_GEMINI_MAX_EDGE", "2000"))
+                w_pt, h_pt = pg.rect.width, pg.rect.height
+                long_edge = max(w_pt, h_pt)
+                scale = min(1.0, (max_edge / long_edge) if long_edge > 0 else 1.0)
+                mat = fitz.Matrix(scale, scale)
+            else:
+                zoom = max(1.0, dpi / 72.0)
+                mat = fitz.Matrix(zoom, zoom)
+            pm = pg.get_pixmap(matrix=mat, alpha=False)
 
-        # --- Gemini path for PDF ---
-        if engine == "gemini":
-            if Image is None:
-                raise RuntimeError("Pillow required for Gemini OCR")
-            img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
-            pending_imgs.append(img)
-            pending_idx.append(i)
+            # --- Gemini path for PDF ---
+            if engine == "gemini":
+                if Image is None:
+                    try:
+                        del pm
+                    except Exception:
+                        pass
+                    raise RuntimeError("Pillow required for Gemini OCR")
+                img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
+                try:
+                    del pm
+                except Exception:
+                    pass
+                pending_imgs.append(img)
+                pending_idx.append(i)
 
-            if len(pending_imgs) == 3 or i == len(doc) - 1:
-                batch_texts = _gemini_via_service(pending_imgs)
-                for j, (idx, page_text) in enumerate(zip(pending_idx, batch_texts)):
-                    if not page_text.strip():
-                        if bool(int(os.getenv("OCR_GEMINI_AUTOFALLBACK", "1"))):
-                            fb_engine = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "hybrid").lower()
-                            fb_hand = bool(int(os.getenv("OCR_GEMINI_FALLBACK_HAND", "1")))
-                            if fb_engine not in ("easyocr", "paddleocr", "hybrid"):
-                                fb_engine = "hybrid"
-                            log.warning(f"[p{idx+1}] Gemini empty; falling back to {fb_engine} (hand={int(fb_hand)})")
+                if len(pending_imgs) == 3 or i == len(doc) - 1:
+                    batch_texts = _gemini_via_service(pending_imgs)
+                    for j, (idx, page_text) in enumerate(zip(pending_idx, batch_texts)):
+                        if not page_text.strip():
+                            if bool(int(os.getenv("OCR_GEMINI_AUTOFALLBACK", "1"))):
+                                fb_engine = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "hybrid").lower()
+                                fb_hand = bool(int(os.getenv("OCR_GEMINI_FALLBACK_HAND", "1")))
+                                if fb_engine not in ("easyocr", "paddleocr", "hybrid"):
+                                    fb_engine = "hybrid"
+                                log.warning(f"[p{idx+1}] Gemini empty; falling back to {fb_engine} (hand={int(fb_hand)})")
 
-                            rgb = np.array(pending_imgs[j])
-                            fb = ocr_image(
-                                rgb,
-                                lang=lang,
-                                handwriting=fb_hand,
-                                engine=fb_engine,
-                                dpi_hint=dpi,
-                                return_debug=return_debug,
-                            )
-                            pages_text.append(fb.text)
+                                rgb = np.array(pending_imgs[j])
+                                fb = ocr_image(
+                                    rgb,
+                                    lang=lang,
+                                    handwriting=fb_hand,
+                                    engine=fb_engine,
+                                    dpi_hint=dpi,
+                                    return_debug=return_debug,
+                                )
+                                pages_text.append(fb.text)
+                                metrics.append(PageMetrics(
+                                    page=idx + 1,
+                                    engine=f"gemini→{fb.by_page[0].engine}",
+                                    lines=len(fb.text.splitlines()) if fb.text else 0,
+                                    avg_conf=fb.by_page[0].avg_conf,
+                                    min_conf=fb.by_page[0].min_conf,
+                                    max_conf=fb.by_page[0].max_conf,
+                                    dpi=dpi,
+                                ))
+                            else:
+                                raise RuntimeError("Gemini OCR returned empty text (page).")
+                        else:
+                            pages_text.append(page_text)
                             metrics.append(PageMetrics(
                                 page=idx + 1,
-                                engine=f"gemini→{fb.by_page[0].engine}",
-                                lines=len(fb.text.splitlines()) if fb.text else 0,
-                                avg_conf=fb.by_page[0].avg_conf,
-                                min_conf=fb.by_page[0].min_conf,
-                                max_conf=fb.by_page[0].max_conf,
+                                engine="gemini",
+                                lines=len(page_text.splitlines()),
+                                avg_conf=0.0,
+                                min_conf=0.0,
+                                max_conf=0.0,
                                 dpi=dpi,
                             ))
-                        else:
-                            raise RuntimeError("Gemini OCR returned empty text (page).")
-                    else:
-                        pages_text.append(page_text)
-                        metrics.append(PageMetrics(
-                            page=idx + 1,
-                            engine="gemini",
-                            lines=len(page_text.splitlines()),
-                            avg_conf=0.0,
-                            min_conf=0.0,
-                            max_conf=0.0,
-                            dpi=dpi,
-                        ))
-                pending_imgs = []
-                pending_idx = []
-                gc.collect()
-            continue
+                    pending_imgs = []
+                    pending_idx = []
+                    gc.collect()
+                # Skip non-Gemini path for this iteration
+                continue
 
-        # --- Non-Gemini: route via ocr_image() for consistency ---
-        if cv2 is not None:
-            arr = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)
-            if pm.n == 4:
-                arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
-            rgb = arr
-        else:
-            img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
-            rgb = np.array(img)
+            # --- Non-Gemini: route via ocr_image() for consistency ---
+            if cv2 is not None:
+                arr = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)
+                if pm.n == 4:
+                    arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+                rgb = arr
+                try:
+                    del pm
+                except Exception:
+                    pass
+            else:
+                img = Image.frombytes("RGB", [pm.width, pm.height], pm.samples)
+                try:
+                    del pm
+                except Exception:
+                    pass
+                rgb = np.array(img)
 
-        single = ocr_image(
-            rgb, lang=lang, handwriting=handwriting,
-            engine=engine, dpi_hint=dpi, return_debug=return_debug
-        )
-        pages_text.append(single.text)
-        m = single.by_page[0]
-        m.page = i + 1
-        metrics.append(m)
-        if return_debug and single.debug_images:
-            debug_imgs.extend(single.debug_images)
+            single = ocr_image(
+                rgb, lang=lang, handwriting=handwriting,
+                engine=engine, dpi_hint=dpi, return_debug=return_debug
+            )
+            pages_text.append(single.text)
+            m = single.by_page[0]
+            m.page = i + 1
+            metrics.append(m)
+            if return_debug and single.debug_images:
+                debug_imgs.extend(single.debug_images)
 
-    full = "\n".join(pages_text)
-    meta = {"engine": engine, "handwriting": handwriting, "dpi": dpi, "pages": len(doc)}
-    return OCRResult(text=full, by_page=metrics, meta=meta, debug_images=(debug_imgs if return_debug else None))
+        # After processing all pages, assemble the result
+        full = "\n".join(pages_text)
+        meta = {"engine": engine, "handwriting": handwriting, "dpi": dpi, "pages": len(doc)}
+        return OCRResult(text=full, by_page=metrics, meta=meta, debug_images=(debug_imgs if return_debug else None))
+    finally:
+        try:
+            doc.close()
+        except Exception:
+            pass
 
 # ----------------- CLI -----------------
 if __name__ == "__main__":

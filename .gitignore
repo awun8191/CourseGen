@@ -115,6 +115,9 @@ chroma_db_bge_m3
 data/gemini_cache
 data/exported_data
 
-
+OUTPUT_DATA2
 services/RAG/OUTPUT_DATA
 services/RAG/OUTPUT_DATA2
+
+
+
