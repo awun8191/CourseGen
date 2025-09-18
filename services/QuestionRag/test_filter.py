@@ -3,8 +3,8 @@ import chromadb
 from chromadb import PersistentClient
 
 # Test ChromaDB collection with filters
-CHROMA_PATH = r"/home/user/Documents/Recursive-PDF-EXTRACTION-AND-RAG/src/services/RAG/OUTPUT_DATA/chroma_db_data"
-COLLECTION = "pdfs_bge_m3_cloudflare"
+CHROMA_PATH = r"/home/user/Documents/Recursive-PDF-EXTRACTION-AND-RAG/COURSEGEN/OUTPUT_DATA2/emdeddings"
+COLLECTION = "embeddings"
 
 try:
     print("Connecting to ChromaDB...")

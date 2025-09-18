@@ -20,7 +20,7 @@ Env:
   CF_PRICE_PER_M_TOKENS=0.012    # USD per 1M input tokens (BGE-M3 input price)
   CF_EMBED_MAX_BATCH=64
   CF_EMBED_MAX_TOKENS=7500       # Hard cap on tokens per request batch
-  CF_EMBED_MIN_BATCH=16
+  CF_EMBED_MIN_BATCH=8
   OMP_NUM_THREADS=4
   BILLING_ENABLED=1
   PADDLE_LANG=en                  # optional; e.g., en, fr, de, ar, hi
@@ -46,6 +46,7 @@ except Exception:
 from typing import List, Dict, Any, Tuple, Optional
 import shutil
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
+import multiprocessing as mp
 
 import fitz  # PyMuPDF
 from PIL import Image
@@ -196,17 +197,17 @@ class CFEmbeddings:
         """Yield (embeddings_for_batch, tokens_for_batch) with adaptive batching.
 
         On transient CF errors (e.g., 408/429/5xx) this halves the batch size and retries
-        the same window, but never below a minimum floor (default 16).
+        the same window, but never below a minimum floor (default 8).
         Additionally enforces a per-request token cap (CF_EMBED_MAX_TOKENS, default 7500).
         """
         n = len(texts)
         if n == 0:
             return
-        # Enforce floor via env CF_EMBED_MIN_BATCH (default 16)
+        # Enforce floor via env CF_EMBED_MIN_BATCH (default 8)
         try:
-            min_floor = max(1, int(os.getenv("CF_EMBED_MIN_BATCH", "16")))
+            min_floor = max(1, int(os.getenv("CF_EMBED_MIN_BATCH", "8")))
         except Exception:
-            min_floor = 16
+            min_floor = 8
         try:
             max_tokens = max(512, int(os.getenv("CF_EMBED_MAX_TOKENS", "7500")))
         except Exception:
@@ -704,7 +705,7 @@ def main():
     ap.add_argument("--ocr-on-missing", choices=["fallback", "error", "skip"], default="fallback")
     ap.add_argument("--force-ocr", action="store_true")
     ap.add_argument("--max-pdfs", type=int, default=0)
-    ap.add_argument("--embed-batch", type=int, default=int(os.getenv("CF_EMBED_MAX_BATCH", "64")))
+    ap.add_argument("--embed-batch", type=int, default=int(os.getenv("CF_EMBED_MAX_BATCH", "16")))
     ap.add_argument("--ocr-dpi", type=int, default=200)
     ap.add_argument("--ocr-lang", default=os.getenv("PADDLE_LANG", "en"))
     ap.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
@@ -713,7 +714,7 @@ def main():
     ap.add_argument("--ocr-fallback-engine",
                     choices=["easyocr", "hybrid", "paddleocr"],
                     default=os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "easyocr"),
-                    help="When using --engine gemini, choose local fallback engine if a page returns empty text. Use 'easyocr' to avoid initializing PaddleOCR.")
+                    help="When using --engine gemini, choose local fallback engine if a page returns empty text. Use 'paddleocr' to avoid importing EasyOCR/PyTorch.")
     ap.add_argument("--no-gemini-fallback", action="store_true",
                     help="Disable auto local OCR fallback when Gemini returns empty text. If disabled, empty Gemini pages raise an error.")
     ap.add_argument("--memory-limit", type=int, default=0, help="Memory limit in MB (0 = no limit)")
@@ -731,6 +732,13 @@ def main():
         for _omp_var in ("OMP_THREAD_LIMIT", "KMP_DEVICE_THREAD_LIMIT", "KMP_TEAMS_THREAD_LIMIT"):
             if _omp_var in os.environ:
                 os.environ.pop(_omp_var, None)
+
+    # Force CPU-only paths in worker processes to avoid CUDA init in forks
+    # Prevent EasyOCR/PyTorch from probing CUDA and Paddle from using GPU by default.
+    os.environ.setdefault("EASYOCR_GPU", "0")
+    os.environ.setdefault("PADDLE_GPU", "0")
+    # Hide GPUs entirely to libraries that probe CUDA at import-time
+    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
     acct = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
     tok = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
@@ -803,6 +811,7 @@ def main():
         log("[OCR] Gemini fallback: disabled")
     else:
         os.environ.setdefault("OCR_GEMINI_AUTOFALLBACK", "1")
+        # Prefer PaddleOCR fallback to avoid importing EasyOCR (PyTorch) in workers
         os.environ["OCR_GEMINI_FALLBACK_ENGINE"] = args.ocr_fallback_engine
         log(f"[OCR] Gemini fallback engine: {args.ocr_fallback_engine}")
 
@@ -923,10 +932,13 @@ def main():
         return final
 
     processed = 0
+    # Use spawn context to avoid forking CUDA/Torch state into children
+    _mp_ctx = mp.get_context("spawn")
+
     if args.workers == 1:
         # Use a single process pool for all files in single-threaded mode
         # This avoids the overhead of creating/destroying pools for each file
-        with ProcessPoolExecutor(max_workers=1) as ex:
+        with ProcessPoolExecutor(max_workers=1, mp_context=_mp_ctx) as ex:
             for fp in tasks:
                 files_state[str(fp)]["status"] = "in_progress"
                 files_state[str(fp)]["started_at"] = now_iso()
@@ -1009,7 +1021,7 @@ def main():
                 })
                 save_progress(progress_path, prog)
     else:
-        with ProcessPoolExecutor(max_workers=args.workers) as ex:
+        with ProcessPoolExecutor(max_workers=args.workers, mp_context=_mp_ctx) as ex:
             fut_map = {}
             for fp in tasks:
                 # Mark as in-progress before submitting
@@ -1106,6 +1118,7 @@ def main():
 
     log(f"Done. Processed this run: {processed}")
 
+
 if __name__ == "__main__":
     main()
 
@@ -1114,5 +1127,3 @@ if __name__ == "__main__":
 
 
 #  python services/RAG/convert_to_embeddings.py -i "/home/user/Documents/SCHOOL/COMPILATION/EEE/" --engine gemini
-
-
