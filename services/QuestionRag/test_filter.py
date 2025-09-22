@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-import chromadb
 from chromadb import PersistentClient
 
-# Test ChromaDB collection with filters
-CHROMA_PATH = r"/home/user/Documents/Recursive-PDF-EXTRACTION-AND-RAG/COURSEGEN/OUTPUT_DATA2/emdeddings"
-COLLECTION = "embeddings"
+from services.QuestionRag.utils.chromadb_query import CHROMA_COLLECTION, CHROMA_PATH
 
 try:
     print("Connecting to ChromaDB...")
     client = PersistentClient(path=CHROMA_PATH)
-    col = client.get_collection(name=COLLECTION)
+    col = client.get_collection(name=CHROMA_COLLECTION)
     print(f"Collection count: {col.count()}")
 
     print("Testing get with COURSE_FOLDER filter...")

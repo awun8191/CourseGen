@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from services.QuestionRag import gemini_question_gen as gq
+from services.QuestionRag.pipelines import course_outline_generator as outline
 
 
 def _make_outline():
@@ -18,7 +18,7 @@ def _make_outline():
 
 
 def test_outline_cache_forget_clears_state(tmp_path: Path):
-    cache = gq.OutlineCache("EEE", cache_dir=tmp_path)
+    cache = outline.OutlineCache("EEE", cache_dir=tmp_path)
     cache.mark_present("EEE 201")
     cache.mark_missing("EEE 101")
 
@@ -90,12 +90,12 @@ def test_department_runner_rechecks_missing_when_embeddings_exist(monkeypatch, t
             self.calls.append(kwargs["course_code"])
             return _make_outline()
 
-    monkeypatch.setattr(gq, "OutlineCache", FakeCache)
-    monkeypatch.setattr(gq, "OutlineProgress", FakeProgress)
-    monkeypatch.setattr(gq, "GeminiQuestionGen", FakeGenerator)
-    monkeypatch.setattr(gq.DepartmentRunner, "_course_has_embeddings", lambda self, dept, course: True)
+    monkeypatch.setattr(outline, "OutlineCache", FakeCache)
+    monkeypatch.setattr(outline, "OutlineProgress", FakeProgress)
+    monkeypatch.setattr(outline, "GeminiQuestionGen", FakeGenerator)
+    monkeypatch.setattr(outline.DepartmentRunner, "_course_has_embeddings", lambda self, dept, course: True)
 
-    runner = gq.DepartmentRunner(courses_json=courses_path, is_thinking=False)
+    runner = outline.DepartmentRunner(courses_json=courses_path, is_thinking=False)
     runner.build_outlines_for_department(
         "EEE 101",
         skip_existing=False,

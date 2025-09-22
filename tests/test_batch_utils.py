@@ -2,7 +2,7 @@ import os
 import json
 import tempfile
 
-from services.QuestionRag.batch_utils import (
+from services.QuestionRag.utils.batch_utils import (
     slugify,
     sha256_text,
     validate_options,
@@ -64,4 +64,3 @@ def test_write_jsonl_roundtrip():
             lines = [json.loads(ln) for ln in f if ln.strip()]
         assert len(lines) == 2
         assert lines[0]["id"] == 1 and lines[1]["id"] == 2
-

@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-import chromadb
 from chromadb import PersistentClient
 
-# Test ChromaDB collection access
-CHROMA_PATH = r"/home/user/Documents/Recursive-PDF-EXTRACTION-AND-RAG/src/services/RAG/OUTPUT_DATA/chroma_db_data"
-COLLECTION = "pdfs_bge_m3_cloudflare"
+from services.QuestionRag.utils.chromadb_query import CHROMA_COLLECTION, CHROMA_PATH
 
 try:
     print("Connecting to ChromaDB...")
     client = PersistentClient(path=CHROMA_PATH)
-    col = client.get_collection(name=COLLECTION)
+    col = client.get_collection(name=CHROMA_COLLECTION)
     print(f"Collection count: {col.count()}")
 
     print("Testing basic get without embeddings...")

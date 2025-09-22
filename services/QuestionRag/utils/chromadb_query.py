@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import requests
+import time
 from chromadb import PersistentClient
 from pathlib import Path
 
@@ -36,7 +37,7 @@ logger.setLevel(os.environ.get("CHROMA_LOG_LVL", "INFO").upper())
 # Paths / Env knobs
 # =========================
 try:
-    REPO_ROOT = Path(__file__).resolve().parents[2]
+    REPO_ROOT = Path(__file__).resolve().parents[3]
 except Exception:
     REPO_ROOT = Path.cwd()
 
@@ -70,6 +71,18 @@ CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
 CF_API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
 USE_BGE_PREFIXES = os.environ.get("CHROMA_USE_BGE_PREFIXES", "1") in ("1", "true", "True")
 OFFLINE = os.environ.get("OFFLINE", "").lower() in ("1", "true", "yes")
+
+# Basic client-side throttling and retry for CF embeddings
+EMBED_QPS = float(os.environ.get("CF_EMBED_QPS", "1.0"))  # max queries per second
+EMBED_MAX_RETRIES = int(os.environ.get("CF_EMBED_RETRIES", "4"))
+EMBED_BACKOFF_BASE = float(os.environ.get("CF_EMBED_BACKOFF_BASE", "0.6"))
+EMBED_BACKOFF_CAP = float(os.environ.get("CF_EMBED_BACKOFF_CAP", "6.0"))
+
+# Search-level strictness and retries (default: require embeddings)
+REQUIRE_EMBEDDINGS = os.environ.get("CHROMA_REQUIRE_EMBEDDINGS", "1") in ("1", "true", "True")
+SEARCH_MAX_RETRIES = int(os.environ.get("CHROMA_SEARCH_RETRIES", "5"))
+SEARCH_BACKOFF_BASE = float(os.environ.get("CHROMA_SEARCH_BACKOFF_BASE", "1.0"))
+SEARCH_BACKOFF_CAP = float(os.environ.get("CHROMA_SEARCH_BACKOFF_CAP", "20.0"))
 
 # HTTP
 HTTP_TIMEOUT = float(os.environ.get("CHROMA_HTTP_TIMEOUT", "35"))
@@ -214,6 +227,8 @@ class ChromaQuery:
         self.CF_ACCOUNT_ID = cf_account_id
         self.CF_API_TOKEN = cf_api_token
         self.USE_BGE_PREFIXES = use_bge_prefixes
+        self._embed_cache: dict[str, List[float]] = {}
+        self._embed_last_ts: float = 0.0
 
         self.client = PersistentClient(path=self.chroma_path)
         self.col = self.client.get_or_create_collection(name=self.collection_name)
@@ -228,6 +243,7 @@ class ChromaQuery:
             self.collection_name,
             cnt,
         )
+        logger.info("Chroma search strict embeddings=%s, QPS=%.2f", str(REQUIRE_EMBEDDINGS), EMBED_QPS)
 
     # ---------- Where normalization ----------
     @staticmethod
@@ -241,39 +257,94 @@ class ChromaQuery:
         return None
 
     # ---------- CF BGE-M3 embeddings ----------
+    def _embed_sleep_if_needed(self):
+        if EMBED_QPS <= 0:
+            return
+        min_interval = 1.0 / max(EMBED_QPS, 1e-6)
+        now = time.time()
+        wait = (self._embed_last_ts + min_interval) - now
+        if wait > 0:
+            time.sleep(wait)
+        self._embed_last_ts = time.time()
+
     def _cf_bge_m3_embed(self, texts: List[str], *, input_type: str = "query") -> List[List[float]]:
         if OFFLINE:
             raise RuntimeError("OFFLINE mode enabled — remote embeddings disabled")
         if not self.CF_ACCOUNT_ID or not self.CF_API_TOKEN:
             raise RuntimeError("Missing Cloudflare credentials (CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN)")
 
-        url = f"https://api.cloudflare.com/client/v4/accounts/{self.CF_ACCOUNT_ID}/ai/run/@cf/baai/bge-m3"
-        headers = {"Authorization": f"Bearer {self.CF_API_TOKEN}", "Content-Type": "application/json"}
+        # Prepare prefixes
         if self.USE_BGE_PREFIXES:
             pref = f"{input_type}: "
-            texts = [t if t.startswith(pref) else (pref + t) for t in texts]
-        payload = {"text": texts}
-
-        r = requests.post(url, headers=headers, json=payload, timeout=HTTP_TIMEOUT)
-        r.raise_for_status()
-        data = r.json()
-        result = data.get("result", {})
-        arr = result.get("data") or result.get("embeddings") or result.get("vectors")
-        if arr is None:
-            raise RuntimeError(f"Unexpected CF response: {json.dumps(data)[:500]}")
-
-        if arr and isinstance(arr[0], dict):
-            embs = [item.get("embedding") or item.get("vector") for item in arr]
+            prefixed = [t if t.startswith(pref) else (pref + t) for t in texts]
         else:
-            embs = arr
+            prefixed = list(texts)
 
-        # L2-normalize
-        out: List[List[float]] = []
-        for v in embs:
-            x = np.array(v, dtype=np.float32)
-            n = float(np.linalg.norm(x))
-            out.append((x / n).tolist() if n > 0 else x.tolist())
-        return out
+        # Check simple cache (works best for single-text usage)
+        results: List[Optional[List[float]]] = [None] * len(prefixed)
+        to_request: List[str] = []
+        to_request_idx: List[int] = []
+        for i, t in enumerate(prefixed):
+            cached = self._embed_cache.get(t)
+            if cached is not None:
+                results[i] = cached
+            else:
+                to_request.append(t)
+                to_request_idx.append(i)
+
+        if to_request:
+            url = f"https://api.cloudflare.com/client/v4/accounts/{self.CF_ACCOUNT_ID}/ai/run/@cf/baai/bge-m3"
+            headers = {"Authorization": f"Bearer {self.CF_API_TOKEN}", "Content-Type": "application/json"}
+            payload = {"text": to_request}
+
+            # Throttle + retry on 429
+            err: Optional[Exception] = None
+            for attempt in range(EMBED_MAX_RETRIES):
+                try:
+                    self._embed_sleep_if_needed()
+                    r = requests.post(url, headers=headers, json=payload, timeout=HTTP_TIMEOUT)
+                    if r.status_code == 429:
+                        # Respect Retry-After if provided
+                        ra = r.headers.get("Retry-After")
+                        try:
+                            wait = float(ra)
+                        except Exception:
+                            wait = min(EMBED_BACKOFF_CAP, EMBED_BACKOFF_BASE * (2 ** attempt))
+                        logger.warning(f"[embed] 429 rate-limited; retrying in {wait:.2f}s")
+                        time.sleep(wait)
+                        continue
+                    r.raise_for_status()
+                    data = r.json()
+                    result = data.get("result", {})
+                    arr = result.get("data") or result.get("embeddings") or result.get("vectors")
+                    if arr is None:
+                        raise RuntimeError(f"Unexpected CF response: {json.dumps(data)[:500]}")
+                    if arr and isinstance(arr[0], dict):
+                        embs = [item.get("embedding") or item.get("vector") for item in arr]
+                    else:
+                        embs = arr
+                    # L2-normalize and cache
+                    for local_i, vec in enumerate(embs):
+                        x = np.array(vec, dtype=np.float32)
+                        n = float(np.linalg.norm(x))
+                        normed = (x / n).tolist() if n > 0 else x.tolist()
+                        original_idx = to_request_idx[local_i]
+                        original_text = prefixed[original_idx]
+                        self._embed_cache[original_text] = normed
+                        results[original_idx] = normed
+                    break  # success
+                except Exception as e:
+                    err = e
+                    wait = min(EMBED_BACKOFF_CAP, EMBED_BACKOFF_BASE * (2 ** attempt))
+                    logger.warning(f"[embed] attempt {attempt+1}/{EMBED_MAX_RETRIES} failed: {e} — sleep {wait:.2f}s")
+                    time.sleep(wait)
+
+            # If failed to fill some results, raise to trigger fallback upstream
+            if any(v is None for v in results):
+                raise err or RuntimeError("Embedding request failed")
+
+        # At this point, all results are filled
+        return [v for v in results if v is not None]
 
     # ---------- Keyword fallback (offline/no-embed) ----------
     @staticmethod
@@ -381,22 +452,37 @@ class ChromaQuery:
         """
         where_norm = self._normalize_where(where)
         logger.info(f"[search] q='{q}' k={k} where={where_norm}")
-        # Try vector search with CF embeddings
-        try:
-            q_vec = self._cf_bge_m3_embed([q], input_type="query")
-            resp = self.col.query(
-                query_embeddings=q_vec,
-                n_results=max(1, int(k)),
-                include=["documents", "metadatas", "distances"],
-                where=where_norm,
-            )
-            if not resp.get("documents") or not resp["documents"][0]:
-                logger.warning("[search] empty vector result; using fallback")
+        # Try vector search with CF embeddings (with search-level retries)
+        last_err = None
+        for attempt in range(max(1, SEARCH_MAX_RETRIES)):
+            try:
+                q_vec = self._cf_bge_m3_embed([q], input_type="query")
+                resp = self.col.query(
+                    query_embeddings=q_vec,
+                    n_results=max(1, int(k)),
+                    include=["documents", "metadatas", "distances"],
+                    where=where_norm,
+                )
+                if not resp.get("documents") or not resp["documents"][0]:
+                    if REQUIRE_EMBEDDINGS:
+                        logger.warning("[search] empty vector result; strict mode active — no fallback")
+                        return []
+                    logger.warning("[search] empty vector result; using fallback")
+                    return self._keyword_fallback(q, k, where_norm)
+                return self._format_results(resp, show_snippet=show_snippet)
+            except Exception as e:
+                last_err = e
+                if attempt < SEARCH_MAX_RETRIES - 1:
+                    wait = min(SEARCH_BACKOFF_CAP, SEARCH_BACKOFF_BASE * (2 ** attempt))
+                    logger.warning(f"[search] vector query failed (attempt {attempt+1}/{SEARCH_MAX_RETRIES}): {e} — retry in {wait:.2f}s")
+                    time.sleep(wait)
+                    continue
+                # Final attempt exhausted
+                if REQUIRE_EMBEDDINGS:
+                    logger.warning(f"[search] vector query failed after retries; strict mode — no fallback: {e}")
+                    return []
+                logger.warning(f"[search] vector query failed: {e} — using fallback")
                 return self._keyword_fallback(q, k, where_norm)
-            return self._format_results(resp, show_snippet=show_snippet)
-        except Exception as e:
-            logger.warning(f"[search] vector query failed: {e} — using fallback")
-            return self._keyword_fallback(q, k, where_norm)
 
     # ---------- Public API: temperature sampling ----------
     def search_with_temperature(

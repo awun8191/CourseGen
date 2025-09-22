@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Streamlined: PDF -> (auto OCR w/ PaddleOCR) -> chunk -> dedupe -> BGE-M3 (Cloudflare)
+Streamlined: PDF -> OCR -> chunk -> dedupe -> BGE-M3 (Cloudflare)
 -> per-file JSONL -> immediate Chroma upsert -> real-time billing -> resume.
 
 Major fixes:
-- Fixed PaddleOCR configuration conflict (use_angle_cls vs use_textline_orientation)
 - Fixed Windows file permission issues with progress saving
 - No hardcoded Cloudflare credentials; strictly require env vars.
 - Proper EasyOCR fallback wired into OCR flow.
@@ -23,7 +22,7 @@ Env:
   CF_EMBED_MIN_BATCH=8
   OMP_NUM_THREADS=4
   BILLING_ENABLED=1
-  PADDLE_LANG=en                  # optional; e.g., en, fr, de, ar, hi
+  OCR_LANG=en                    # optional; e.g., en, fr, de, ar, hi
   EASYOCR_GPU=0                   # optional; set 1 to enable GPU for EasyOCR
   OCR_MAX_IMAGE_BYTES=67108864    # 64MB default; adjust as needed
 """
@@ -66,20 +65,13 @@ from services.RAG.path_meta import parse_path_meta
 from services.RAG.cache_utils import sha256_file
 from services.RAG.chunking import chunk, dedupe, sha1_text
 
-# Optional OpenCV for image handling (Paddle likes numpy arrays)
+# Optional OpenCV for image handling
 try:
     import cv2
     import numpy as np
     OPENCV_AVAILABLE = True
 except Exception:
     OPENCV_AVAILABLE = False
-
-# PaddleOCR (optional)
-try:
-    from paddleocr import PaddleOCR
-    PADDLE_AVAILABLE = True
-except Exception:
-    PADDLE_AVAILABLE = False
 
 # ANSI colors for logging
 ANSI = {
@@ -270,54 +262,6 @@ def need_ocr(doc: fitz.Document, sample_pages: int = 8, min_chars_per_page: int 
             low += 1
     return (low / max(1, n)) >= 0.6
 
-# PaddleOCR (per-process singleton)
-_PADDLE: Optional['PaddleOCR'] = None
-
-def get_paddle_ocr(lang: str = "en") -> Optional['PaddleOCR']:
-    global _PADDLE
-    if not PADDLE_AVAILABLE:
-        return None
-    if _PADDLE is None:
-        try:
-            log(f"[INFO] Initializing PaddleOCR with language: {lang}")
-            local_model_dir = './paddle_models'
-            if os.path.exists(local_model_dir):
-                log(f"[INFO] Using local models from {local_model_dir}")
-                _PADDLE = PaddleOCR(
-                    use_textline_orientation=True,
-                    lang=lang,
-                    det_model_dir=f'{local_model_dir}/det',
-                    rec_model_dir=f'{local_model_dir}/rec',
-                    cls_model_dir=f'{local_model_dir}/cls'
-                )
-            else:
-                log(f"[INFO] Using default PaddleOCR models")
-                _PADDLE = PaddleOCR(
-                    use_textline_orientation=True,
-                    lang=lang,
-                )
-            log(f"[INFO] PaddleOCR initialized successfully")
-        except Exception as e:
-            log(f"[WARN] Failed to initialize PaddleOCR: {e}")
-            _PADDLE = None
-    return _PADDLE
-
-def cleanup_paddle_ocr() -> None:
-    """Clean up PaddleOCR resources to free memory."""
-    global _PADDLE
-    if _PADDLE is not None:
-        try:
-            # PaddleOCR doesn't have an explicit cleanup method, but we can set it to None
-            # to allow garbage collection and force reinitialization if needed
-            log(f"[INFO] Cleaning up PaddleOCR resources")
-            _PADDLE = None
-            # Force garbage collection to free memory
-            import gc
-            gc.collect()
-        except Exception as e:
-            log(f"[WARN] Error during PaddleOCR cleanup: {e}")
-            _PADDLE = None
-
 def _pixmap_to_numpy(pix: fitz.Pixmap) -> 'np.ndarray':
     if not OPENCV_AVAILABLE:
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -327,130 +271,16 @@ def _pixmap_to_numpy(pix: fitz.Pixmap) -> 'np.ndarray':
         arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
     return arr
 
-def ocr_page_with_paddle_or_tesseract(page: fitz.Page, dpi: int = 300, lang: str = "en") -> str:
-    ocr = get_paddle_ocr(lang=lang) if PADDLE_AVAILABLE else None
-    result_text = ""
-    
-    last_img = None
-    ladder = [dpi, 240, 200, 150, 100, 72] if dpi >= 240 else [dpi, 150, 100, 72]
-    MAX_OCR_BYTES = int(os.getenv("OCR_MAX_IMAGE_BYTES", str(64 * 1024 * 1024)))
-
-    for attempt_dpi in ladder:
-        try:
-            zoom = attempt_dpi / 72.0
-            mat = fitz.Matrix(zoom, zoom)
-            pix = page.get_pixmap(matrix=mat, alpha=False)
-            img = _pixmap_to_numpy(pix)
-            last_img = img
-
-            # Clean up pixmap immediately to free memory
-            del pix
-            
-            nbytes = getattr(img, "nbytes", img.size)
-            if nbytes > MAX_OCR_BYTES:
-                if attempt_dpi == ladder[-1]:
-                    log(f"[WARN] Page image {nbytes}B too large at {attempt_dpi} DPI, skipping OCR")
-                    break
-                log(f"[WARN] Page image {nbytes}B > {MAX_OCR_BYTES}B at {attempt_dpi} DPI; trying lower DPI")
-                # Clean up image before trying next DPI
-                if 'img' in locals():
-                    del img
-                continue
-
-            if ocr is not None:
-                res = ocr.ocr(img)
-                # Clean up image immediately after OCR
-                if 'img' in locals():
-                    del img
-                    
-                flat = []
-                for blk in res:
-                    if blk:
-                        flat.extend(blk if isinstance(blk, list) else [blk])
-                lines = []
-                for line in flat:
-                    try:
-                        if line and len(line) >= 2:
-                            box, (text, conf) = line
-                            xs = [p[0] for p in box]; ys = [p[1] for p in box]
-                            cx = sum(xs)/4.0; cy = sum(ys)/4.0
-                            lines.append((text, float(conf), (cx, cy)))
-                    except Exception:
-                        continue
-                lines.sort(key=lambda t: (round(t[2][1]/16.0), round(t[2][0]/16.0)))
-                texts = [t for (t, conf, _) in lines if t and conf >= 0.35]
-                if texts:
-                    if attempt_dpi != dpi:
-                        log(f"[OCR] Paddle used {attempt_dpi} DPI instead of {dpi}")
-                    result_text = "\n".join(texts)
-                    break
-                    
-        except Exception as e:
-            # Clean up image if there's an exception
-            if 'img' in locals():
-                del img
-            if any(s in str(e).lower() for s in ("memory", "alloc")) and attempt_dpi != ladder[-1]:
-                log(f"[WARN] Paddle OOM at {attempt_dpi} DPI; trying lower DPI")
-                continue
-            log(f"[WARN] Paddle error at {attempt_dpi} DPI: {e}")
-            break
-
-    # Clean up last_img if it exists
-    if 'last_img' in locals() and last_img is not None:
-        del last_img
-
-    # If we got text from Paddle, return it
-    if result_text:
-        return result_text
-
-    # Last resort: Tesseract
-    tess_cmd = os.getenv("TESSERACT_CMD")
-    if tess_cmd and os.path.exists(tess_cmd):
-        try:
-            import pytesseract
-            pytesseract.pytesseract.tesseract_cmd = tess_cmd
-
-            tess_lang_map = {"en":"eng","fr":"fra","de":"deu","es":"spa","it":"ita","pt":"por","nl":"nld"}
-            tess_lang = tess_lang_map.get(lang, lang)
-
-            tess_prefix = os.getenv("TESSDATA_PREFIX")
-            if tess_prefix:
-                lang_path = Path(tess_prefix) / "tessdata" / f"{tess_lang}.traineddata"
-                if not lang_path.exists():
-                    log(f"[WARN] Tesseract missing {tess_lang}.traineddata under {lang_path.parent}; skipping Tesseract")
-                    return ""
-            
-            # Get image at lower DPI for Tesseract if not already available
-            if last_img is None:
-                pix = page.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
-                last_img = _pixmap_to_numpy(pix)
-                del pix  # Clean up pixmap immediately
-
-            img_pil = Image.fromarray(last_img)
-            tesseract_text = pytesseract.image_to_string(img_pil, lang=tess_lang)
-            
-            # Clean up Tesseract resources
-            del img_pil
-            if 'last_img' in locals():
-                del last_img
-                
-            if tesseract_text.strip():
-                log("[OCR] Tesseract fallback used")
-                return tesseract_text.strip()
-        except Exception as te:
-            log(f"[WARN] Tesseract fallback failed: {te}")
-            # Clean up any remaining resources
-            if 'last_img' in locals():
-                del last_img
-    return ""
 
 # Text extract wrapper
 def extract_text(pdf_path, cache_dir, force_ocr, ocr_engine, ocr_dpi, ocr_lang):
     from services.RAG.ocr_engine import ocr_pdf
 
+    valid_engines = {"gemini", "hybrid", "easyocr"}
+
     # If force_ocr is enabled, skip text extraction check
     if force_ocr:
-        engine = 'paddleocr'
+        engine = ocr_engine if ocr_engine in valid_engines else "hybrid"
         result = ocr_pdf(pdf_path, lang=ocr_lang, dpi=ocr_dpi, engine=engine)
         return result.text
 
@@ -484,7 +314,7 @@ def extract_text(pdf_path, cache_dir, force_ocr, ocr_engine, ocr_dpi, ocr_lang):
         log(f"[WARN] Failed to extract text directly: {e}, will use OCR")
 
     # Fall back to OCR
-    engine = ocr_engine if ocr_engine in ['gemini', 'hybrid', 'easyocr', 'paddleocr'] else 'hybrid'
+    engine = ocr_engine if ocr_engine in valid_engines else 'hybrid'
     result = ocr_pdf(pdf_path, lang=ocr_lang, dpi=ocr_dpi, engine=engine)
     return result.text
 
@@ -667,9 +497,6 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
     except Exception as e:
         log(f"[ERROR] Processing failed for {path.name}: {e}")
         return {"file": rel, "error": f"processing_error: {e}"}
-    finally:
-        # Clean up PaddleOCR resources after processing each file
-        cleanup_paddle_ocr()
 
     # jsonl_tmp and jsonl_name already created during streaming
     return {"file": rel, "jsonl_tmp": str(jsonl_tmp),
@@ -707,14 +534,34 @@ def main():
     ap.add_argument("--max-pdfs", type=int, default=0)
     ap.add_argument("--embed-batch", type=int, default=int(os.getenv("CF_EMBED_MAX_BATCH", "16")))
     ap.add_argument("--ocr-dpi", type=int, default=200)
-    ap.add_argument("--ocr-lang", default=os.getenv("PADDLE_LANG", "en"))
-    ap.add_argument("--engine", default=os.getenv("OCR_ENGINE", "gemini"),
-                    choices=["gemini", "hybrid", "easyocr", "paddleocr"], help="OCR engine")
+
+    default_lang = (
+        os.getenv("OCR_LANG")
+        or os.getenv("EASYOCR_LANG")
+        or os.getenv("PADDLE_LANG")
+        or "en"
+    )
+    ap.add_argument("--ocr-lang", default=default_lang)
+
+    engine_default = os.getenv("OCR_ENGINE", "gemini")
+    if engine_default not in {"gemini", "hybrid", "easyocr"}:
+        engine_default = "gemini"
+    ap.add_argument(
+        "--engine",
+        default=engine_default,
+        choices=["gemini", "hybrid", "easyocr"],
+        help="OCR engine",
+    )
     # Gemini fallback controls
-    ap.add_argument("--ocr-fallback-engine",
-                    choices=["easyocr", "hybrid", "paddleocr"],
-                    default=os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "easyocr"),
-                    help="When using --engine gemini, choose local fallback engine if a page returns empty text. Use 'paddleocr' to avoid importing EasyOCR/PyTorch.")
+    fallback_default = os.getenv("OCR_GEMINI_FALLBACK_ENGINE", "easyocr").lower()
+    if fallback_default not in {"easyocr", "hybrid"}:
+        fallback_default = "easyocr"
+    ap.add_argument(
+        "--ocr-fallback-engine",
+        choices=["easyocr", "hybrid"],
+        default=fallback_default,
+        help="When using --engine gemini, choose local fallback engine if a page returns empty text.",
+    )
     ap.add_argument("--no-gemini-fallback", action="store_true",
                     help="Disable auto local OCR fallback when Gemini returns empty text. If disabled, empty Gemini pages raise an error.")
     ap.add_argument("--memory-limit", type=int, default=0, help="Memory limit in MB (0 = no limit)")
@@ -734,9 +581,8 @@ def main():
                 os.environ.pop(_omp_var, None)
 
     # Force CPU-only paths in worker processes to avoid CUDA init in forks
-    # Prevent EasyOCR/PyTorch from probing CUDA and Paddle from using GPU by default.
+    # Prevent EasyOCR/PyTorch from probing CUDA by default.
     os.environ.setdefault("EASYOCR_GPU", "0")
-    os.environ.setdefault("PADDLE_GPU", "0")
     # Hide GPUs entirely to libraries that probe CUDA at import-time
     os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
@@ -811,7 +657,7 @@ def main():
         log("[OCR] Gemini fallback: disabled")
     else:
         os.environ.setdefault("OCR_GEMINI_AUTOFALLBACK", "1")
-        # Prefer PaddleOCR fallback to avoid importing EasyOCR (PyTorch) in workers
+        # Persist fallback engine for worker processes
         os.environ["OCR_GEMINI_FALLBACK_ENGINE"] = args.ocr_fallback_engine
         log(f"[OCR] Gemini fallback engine: {args.ocr_fallback_engine}")
 

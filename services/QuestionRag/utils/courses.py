@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, asdict
+import os
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple, Any
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from data_models.course_catalog import CourseCatalogEntry, DepartmentCatalog
 
 # -------------------------------------------------------------------
 # Logging (adjust with env: PYTHONLOGGING or override in your app)
@@ -16,32 +18,6 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
-
-
-# -------------------------------------------------------------------
-# Data models
-# -------------------------------------------------------------------
-@dataclass
-class CourseModel:
-    code: str = ""
-    title: str = ""
-    level: str = ""        # e.g., "400"
-    semester: str = ""     # e.g., "First", "Second"
-    units: int = 0
-    type: str = ""         # e.g., "Core", "Elective"
-    is_elective: bool = False
-
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass
-class DepartmentModel:
-    names: List[str]
-    courses: List[CourseModel]
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {"names": list(self.names), "courses": [c.to_dict() for c in self.courses]}
 
 
 # -------------------------------------------------------------------
@@ -60,15 +36,14 @@ class DataFormatting:
     # 1) explicit json_path param
     # 2) $COURSEGEN_COURSES_JSON
     # 3) repo-local fallback: ./COURSEGEN/data/textbooks/courses.json (if it exists)
-    # 4) last resort: your old absolute path (warned)
-    DEFAULT_RELATIVE = Path("COURSEGEN/data/textbooks/courses.json")
-    LEGACY_ABSOLUTE = Path("/home/user/Documents/Recursive-PDF-EXTRACTION-AND-RAG/COURSEGEN/data/textbooks/courses.json")
+    REPO_ROOT = Path(__file__).resolve().parents[3]
+    DEFAULT_RELATIVE = REPO_ROOT / "data/textbooks/courses.json"
 
     def __init__(self, json_path: Optional[str | Path] = None) -> None:
         self._path = self._resolve_path(json_path)
         self._raw: List[Dict[str, Any]] = self._read_json(self._path)
-        self.courses: List[DepartmentModel] = []  # grouped by identical program sets
-        self._by_code: Dict[str, Tuple[CourseModel, List[str]]] = {}
+        self.courses: List[DepartmentCatalog] = []  # grouped by identical program sets
+        self._by_code: Dict[str, Tuple[CourseCatalogEntry, List[str]]] = {}
         self._map_data()
         logger.info("Course Data initialized: %d department groups | %d unique codes",
                     len(self.courses), len(self._by_code))
@@ -89,16 +64,10 @@ class DataFormatting:
                 return p
             logger.warning("Env COURSEGEN_COURSES_JSON points to missing file: %s", p)
 
-        # relative fallback
-        rel = self.DEFAULT_RELATIVE.expanduser().resolve()
+        # relative fallback alongside repository root
+        rel = self.DEFAULT_RELATIVE
         if rel.exists():
             return rel
-
-        # legacy absolute (warn loudly)
-        legacy = self.LEGACY_ABSOLUTE
-        if legacy.exists():
-            logger.warning("Using legacy absolute path: %s", legacy)
-            return legacy
 
         raise FileNotFoundError(
             "courses.json not found. Set json_path, or $COURSEGEN_COURSES_JSON, "
@@ -136,8 +105,8 @@ class DataFormatting:
             return seq
         return ""
 
-    def _make_course(self, row: Dict[str, Any]) -> CourseModel:
-        return CourseModel(
+    def _make_course(self, row: Dict[str, Any]) -> CourseCatalogEntry:
+        return CourseCatalogEntry(
             code=str(row.get("code", "")).strip(),
             title=str(row.get("title", "")).strip(),
             level=self._first_or_blank(row.get("levels")),
@@ -154,7 +123,7 @@ class DataFormatting:
           - self._by_code: fast lookup by course code (upper)
         """
         # Group rows by program signature (order-insensitive)
-        groups: Dict[Tuple[str, ...], List[CourseModel]] = {}
+        groups: Dict[Tuple[str, ...], List[CourseCatalogEntry]] = {}
         programs_for_code: Dict[str, List[str]] = {}
 
         for row in self._raw:
@@ -182,15 +151,15 @@ class DataFormatting:
                 continue
             self._by_code[code_key] = (course, programs)
 
-        # Build DepartmentModel list
-        dept_models: List[DepartmentModel] = []
+        # Build DepartmentCatalog list
+        dept_models: List[DepartmentCatalog] = []
         for sig, courses in groups.items():
-            dept_models.append(DepartmentModel(names=list(sig), courses=sorted(courses, key=lambda c: c.code)))
+            dept_models.append(DepartmentCatalog(names=list(sig), courses=sorted(courses, key=lambda c: c.code)))
         # Stable sort departments by first program name then by number of courses desc
         self.courses = sorted(dept_models, key=lambda d: (d.names[0] if d.names else "", -len(d.courses)))
 
     # ---------------- Public API (compat + extras) ----------------
-    def search_course(self, course_code: str) -> Tuple[CourseModel, List[str]]:
+    def search_course(self, course_code: str) -> Tuple[CourseCatalogEntry, List[str]]:
         """
         Return (CourseModel, offered_by_programs) for matching code (case-insensitive).
         Raises ValueError if not found.
@@ -202,9 +171,9 @@ class DataFormatting:
         return hit
 
     # Helpful extras (non-breaking)
-    def find_by_title(self, needle: str, limit: int = 10) -> List[Tuple[CourseModel, List[str]]]:
+    def find_by_title(self, needle: str, limit: int = 10) -> List[Tuple[CourseCatalogEntry, List[str]]]:
         q = (needle or "").strip().lower()
-        out: List[Tuple[CourseModel, List[str]]] = []
+        out: List[Tuple[CourseCatalogEntry, List[str]]] = []
         for course, programs in self._by_code.values():
             if q in course.title.lower():
                 out.append((course, programs))
@@ -212,13 +181,13 @@ class DataFormatting:
                     break
         return out
 
-    def list_by_level(self, level: str) -> List[Tuple[CourseModel, List[str]]]:
+    def list_by_level(self, level: str) -> List[Tuple[CourseCatalogEntry, List[str]]]:
         lv = (level or "").strip().lower()
         return [(c, p) for c, p in self._by_code.values() if c.level.strip().lower() == lv]
 
-    def list_by_program_contains(self, text: str) -> List[Tuple[CourseModel, List[str]]]:
+    def list_by_program_contains(self, text: str) -> List[Tuple[CourseCatalogEntry, List[str]]]:
         q = (text or "").strip().lower()
-        hits: List[Tuple[CourseModel, List[str]]] = []
+        hits: List[Tuple[CourseCatalogEntry, List[str]]] = []
         for course, programs in self._by_code.values():
             if any(q in (prog or "").lower() for prog in programs):
                 hits.append((course, programs))

@@ -2,7 +2,7 @@
 import os
 os.environ["CLOUDFLARE_ACCOUNT_ID"] = "c1719c3cf4696ae260e6a5f57b1f3100"
 os.environ["CLOUDFLARE_API_TOKEN"] = "DQNVqFCduZCgliO47GC4kAbjPmWN_oO6lHKmIwrm"
-from chromadb_query import ChromaQuery, MetaData
+from services.QuestionRag.utils.chromadb_query import ChromaQuery, MetaData
 
 # Test the actual ChromaQuery class
 try:
