@@ -116,6 +116,7 @@ data/gemini_cache
 data/exported_data
 
 OUTPUT_DATA2
+enginneringhub_firebase_service.json
 services/RAG/OUTPUT_DATA
 services/RAG/OUTPUT_DATA2
 

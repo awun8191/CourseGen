@@ -1,15 +1,72 @@
-"""Question generation scaffolding separated from course outline logic.
-
-The actual implementation of question batching still needs to be wired in, but
-keeping this module distinct from :mod:`course_outline_generator` reflects the
-new architecture: outlines are produced first, and any downstream question
-pipelines should live here.
-"""
+"""Gemini powered question generation pipeline using RAG + Firestore persistence."""
 
 from __future__ import annotations
 
+import argparse
+import json
+import logging
+import os
+import random
+import time
 from dataclasses import dataclass
-from typing import Iterable, List, Optional
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence
+
+from pydantic import BaseModel, Field, ValidationError
+
+from data_models.gemini_config import GeminiConfig
+from data_models.question_model import Question
+from services.Gemini.gemini_service import GeminiService
+
+from ..utils import ChromaQuery, MetaData, QuestionCache
+from ..utils.batch_utils import (
+    validate_answer_in_options,
+    validate_options,
+    write_jsonl,
+)
+
+try:  # pragma: no cover - Firestore is optional in tests
+    from ...Firestore.firebase_service import FireStore  # type: ignore
+except Exception:  # pragma: no cover - keep optional dependency soft
+    FireStore = None  # type: ignore
+
+
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter("[%(levelname)s] %(asctime)s - %(name)s - %(message)s")
+    )
+    logger.addHandler(handler)
+logger.setLevel(os.environ.get("COURSEGEN_QG_LOGLEVEL", "INFO").upper())
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_COURSES_JSON = Path(
+    os.environ.get(
+        "COURSEGEN_COURSES_JSON", str(REPO_ROOT / "data/textbooks/courses.json")
+    )
+).expanduser()
+DEFAULT_CACHE_ROOT = Path(
+    os.environ.get("COURSEGEN_CACHE_DIR", str(REPO_ROOT / "OUTPUT_DATA2/cache"))
+).expanduser()
+DEFAULT_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+
+DEFAULT_MODEL = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash")
+
+
+class QuestionGenerationError(RuntimeError):
+    """Raised when the model returns invalid or incomplete data."""
+
+
+@dataclass(frozen=True)
+class RequestPlan:
+    """Description of an individual Gemini request within a subtopic run."""
+
+    name: str
+    kind: str
+    question_count: int
+    difficulty_rank: int
 
 
 @dataclass
@@ -17,32 +74,645 @@ class QuestionBatchConfig:
     """Configuration holder for question batch generation."""
 
     course_code: str
-    course_title: str
-    department: str
-    level: Optional[str] = None
-    batch_size: int = 50
-    calc_questions_per_request: int = 5
+    courses_json_path: Path = DEFAULT_COURSES_JSON
+    cache_dir: Path = DEFAULT_CACHE_ROOT
+    rag_topk: int = 30
+    rag_final_k: int = 12
+    rag_tau: float = 0.35
+    rag_min_similarity: float = 0.6
+    rag_where: Optional[Dict[str, Any]] = None
     theory_questions_per_request: int = 10
+    calc_questions_per_request: int = 5
+    resume: bool = True
+    store_firestore: bool = True
+    request_delay_s: float = 1.5
+    delay_jitter: float = 0.25
+    gemini_model: str = DEFAULT_MODEL
+    gemini_temperature: float = 0.25
+    gemini_top_p: float = 0.85
+    gemini_max_output_tokens: int = 6000
+    request_attempts: int = 2
+    rag_attempts: int = 2
+    rag_context_limit: int = 8
+    latex_wrap_steps: bool = True
+    target_topics: Optional[Sequence[str]] = None
+    target_subtopics: Optional[Sequence[str]] = None
+    output_path: Optional[Path] = None
+    custom_plan: Optional[List[RequestPlan]] = None
+
+    def normalized_topics(self) -> Optional[set[str]]:
+        if self.target_topics is None:
+            return None
+        return {t.strip().lower() for t in self.target_topics if str(t).strip()}
+
+    def normalized_subtopics(self) -> Optional[set[str]]:
+        if self.target_subtopics is None:
+            return None
+        return {t.strip().lower() for t in self.target_subtopics if str(t).strip()}
+
+    def request_plan(self) -> List[RequestPlan]:
+        if self.custom_plan is not None:
+            return list(self.custom_plan)
+        return [
+            RequestPlan(
+                name="theory-1",
+                kind="theory",
+                question_count=self.theory_questions_per_request,
+                difficulty_rank=4,
+            ),
+            RequestPlan(
+                name="theory-2",
+                kind="theory",
+                question_count=self.theory_questions_per_request,
+                difficulty_rank=7,
+            ),
+            RequestPlan(
+                name="calculation-1",
+                kind="calculation",
+                question_count=self.calc_questions_per_request,
+                difficulty_rank=6,
+            ),
+            RequestPlan(
+                name="calculation-2",
+                kind="calculation",
+                question_count=self.calc_questions_per_request,
+                difficulty_rank=8,
+            ),
+        ]
+
+
+class GeminiGeneratedQuestion(BaseModel):
+    """Schema describing the expected Gemini JSON payload."""
+
+    question: str = Field(..., description="Main question text")
+    options: List[str] = Field(
+        ...,
+        min_length=4,
+        max_length=4,
+    )
+    correct_answer: str = Field(..., description="Correct option letter (A-D)")
+    correct_answer_text: Optional[str] = Field(
+        None, description="Correct option text (fallback if letter missing)"
+    )
+    explanation: str = Field(..., description="Grounded explanation")
+    solution_steps: Optional[List[str]] = Field(
+        default=None,
+        description="Ordered list of solution steps for calculations",
+    )
+
+
+class GeminiQuestionBatch(BaseModel):
+    questions: List[GeminiGeneratedQuestion] = Field(
+        ...,
+        min_length=1,
+        description="Collection of questions returned from Gemini",
+    )
 
 
 class QuestionGenerator:
-    """Placeholder question generator that will call Gemini with RAG prompts."""
+    """Generate MCQ questions using Gemini with RAG context and caching."""
 
-    def __init__(self) -> None:
-        self._outline_topics: Optional[List[dict]] = None
+    def __init__(
+        self,
+        *,
+        gemini_service: Optional[GeminiService] = None,
+        rag_client: Optional[ChromaQuery] = None,
+        firestore: Optional[Any] = None,
+    ) -> None:
+        self.gemini = gemini_service or GeminiService()
+        self.rag = rag_client or ChromaQuery()
+        self._firestore = firestore
+        self._cache_map: Dict[Path, QuestionCache] = {}
+        self._course_store: Dict[Path, List[Dict[str, Any]]] = {}
 
-    def load_outline_topics(self, topics: Iterable[dict]) -> None:
-        """Attach outline topics that future batches will rely on."""
+    # ------------------------------------------------------------------
+    # Public orchestrators
+    # ------------------------------------------------------------------
+    def generate_course_questions(self, config: QuestionBatchConfig) -> List[Question]:
+        course = self._load_course(config.courses_json_path, config.course_code)
+        outline = course.get("outline") or []
+        normalized_topics = config.normalized_topics()
+        normalized_subtopics = config.normalized_subtopics()
 
-        self._outline_topics = list(topics) if topics is not None else None
+        results: List[Question] = []
+        for topic in outline:
+            topic_title = str(topic.get("title") or "").strip()
+            if normalized_topics and topic_title.lower() not in normalized_topics:
+                logger.debug("Skipping topic '%s' not in filter", topic_title)
+                continue
 
-    def generate_batch(self, config: QuestionBatchConfig) -> List[dict]:
-        """Generate a batch of questions (not implemented yet)."""
+            for subtopic in topic.get("subtopics") or []:
+                subtopic_title = str(subtopic).strip()
+                if not subtopic_title:
+                    continue
+                if normalized_subtopics and subtopic_title.lower() not in normalized_subtopics:
+                    logger.debug(
+                        "Skipping subtopic '%s' under '%s' due to filter",
+                        subtopic_title,
+                        topic_title,
+                    )
+                    continue
+                generated = self._generate_for_subtopic(
+                    config=config,
+                    course=course,
+                    topic_title=topic_title,
+                    subtopic_title=subtopic_title,
+                )
+                results.extend(generated)
+        return results
 
-        raise NotImplementedError(
-            "Question generation batches are not implemented; integrate with the "
-            "Gemini batch routines when ready."
+    # ------------------------------------------------------------------
+    # Subtopic pipeline
+    # ------------------------------------------------------------------
+    def _generate_for_subtopic(
+        self,
+        *,
+        config: QuestionBatchConfig,
+        course: Dict[str, Any],
+        topic_title: str,
+        subtopic_title: str,
+    ) -> List[Question]:
+        cache = self._cache_for(config.cache_dir)
+        plan = config.request_plan()
+        rag_contexts = self._retrieve_rag_context(
+            course=course,
+            topic_title=topic_title,
+            subtopic_title=subtopic_title,
+            config=config,
         )
+
+        if not rag_contexts:
+            logger.warning(
+                "No RAG context found for %s - %s (%s); skipping",
+                course.get("code"),
+                topic_title,
+                subtopic_title,
+            )
+            meta = {
+                "course_code": course.get("code"),
+                "topic": topic_title,
+                "subtopic": subtopic_title,
+                "reason": "rag_empty",
+            }
+            for request in plan:
+                key = cache.make_key(course.get("code", ""), topic_title, subtopic_title, request.name)
+                cache.mark_skipped(key, reason="rag_empty", meta=meta)
+            return []
+
+        questions: List[Question] = []
+        for idx, request in enumerate(plan):
+            key = cache.make_key(
+                course.get("code", ""), topic_title, subtopic_title, request.name
+            )
+            meta = {
+                "course_code": course.get("code"),
+                "topic": topic_title,
+                "subtopic": subtopic_title,
+                "request": request.name,
+                "kind": request.kind,
+                "question_count": request.question_count,
+            }
+
+            if config.resume and cache.has_completed(key):
+                cached = cache.load(key)
+                if cached:
+                    restored = [Question.model_validate(item) for item in cached]
+                    questions.extend(restored)
+                    logger.info(
+                        "Loaded %d cached questions for %s - %s (%s)",
+                        len(restored),
+                        course.get("code"),
+                        topic_title,
+                        request.name,
+                    )
+                continue
+
+            context_text, rag_sources = self._format_context(
+                rag_contexts, limit=config.rag_context_limit, offset=idx * config.rag_context_limit
+            )
+            if not context_text or len(rag_sources) < 2:  # Require at least some meaningful context
+                logger.warning("Insufficient RAG context (%d sources) for %s; skipping", len(rag_sources), request.name)
+                cache.mark_skipped(key, reason="rag_insufficient", meta=meta)
+                continue
+
+            attempt = 0
+            generated: List[Question] = []
+            last_error: Optional[Exception] = None
+            while attempt < max(1, config.request_attempts):
+                try:
+                    generated = self._call_gemini(
+                        config=config,
+                        course=course,
+                        topic_title=topic_title,
+                        subtopic_title=subtopic_title,
+                        request=request,
+                        context_text=context_text,
+                        rag_sources=rag_sources,
+                    )
+                    break
+                except Exception as exc:  # pragma: no cover - network dependent
+                    last_error = exc
+                    attempt += 1
+                    if attempt >= config.request_attempts:
+                        break
+                    sleep_for = 1.5 * attempt
+                    logger.warning(
+                        "Retrying %s after error (%s); sleep %.1fs",
+                        request.name,
+                        exc,
+                        sleep_for,
+                    )
+                    time.sleep(sleep_for)
+
+            if not generated:
+                reason = "request_failed"
+                if last_error:
+                    logger.error(
+                        "Failed to generate questions for %s - %s (%s): %s",
+                        course.get("code"),
+                        topic_title,
+                        request.name,
+                        last_error,
+                    )
+                    reason = f"error:{last_error}"
+                cache.mark_skipped(key, reason=reason, meta=meta)
+                continue
+
+            cache.store(
+                key,
+                [q.model_dump() for q in generated],
+                meta={**meta, "rag_sources": rag_sources},
+            )
+            questions.extend(generated)
+            self._persist_to_firestore(generated, enable=config.store_firestore)
+            self._sleep_with_jitter(config.request_delay_s, config.delay_jitter)
+
+        return questions
+
+    # ------------------------------------------------------------------
+    # Core helpers
+    # ------------------------------------------------------------------
+    def _cache_for(self, cache_dir: Path) -> QuestionCache:
+        resolved = cache_dir.expanduser().resolve()
+        cache = self._cache_map.get(resolved)
+        if cache is None:
+            cache = QuestionCache(resolved)
+            self._cache_map[resolved] = cache
+        return cache
+
+    def _load_course(self, courses_path: Path, course_code: str) -> Dict[str, Any]:
+        resolved = courses_path.expanduser().resolve()
+        if resolved not in self._course_store:
+            data = json.loads(resolved.read_text(encoding="utf-8"))
+            if not isinstance(data, list):
+                raise ValueError("courses.json must be a list of course objects")
+            self._course_store[resolved] = data
+        for row in self._course_store[resolved]:
+            code = str(row.get("code") or "").strip().lower()
+            if code == course_code.strip().lower():
+                return row
+        raise ValueError(f"Course code '{course_code}' not found in {courses_path}")
+
+    def _retrieve_rag_context(
+        self,
+        *,
+        course: Dict[str, Any],
+        topic_title: str,
+        subtopic_title: str,
+        config: QuestionBatchConfig,
+    ) -> List[Dict[str, Any]]:
+        queries = [
+            f"{course.get('code', '')} {course.get('title', '')} {topic_title} {subtopic_title}",
+            f"{course.get('code', '')} {topic_title} {subtopic_title}",
+            f"{course.get('title', '')} {subtopic_title}",
+        ]
+
+        where_candidates: List[Any] = []
+        if config.rag_where:
+            where_candidates.append(config.rag_where)
+        course_code = str(course.get("code") or "").strip()
+        if course_code:
+            where_candidates.append({"COURSE_CODE": course_code})
+            where_candidates.append({"COURSE_FOLDER": course_code.replace(" ", "_")})
+        where_candidates.append(None)
+
+        for attempt in range(max(1, config.rag_attempts)):
+            for where in where_candidates:
+                metadata = MetaData.from_partial(where) if isinstance(where, dict) else where
+                for query in queries:
+                    try:
+                        results = self.rag.search_with_temperature(
+                            query,
+                            topk=config.rag_topk,
+                            final_k=config.rag_final_k,
+                            tau=config.rag_tau,
+                            min_sim=config.rag_min_similarity,
+                            where=metadata,
+                        )
+                    except Exception as exc:  # pragma: no cover - network dependent
+                        logger.warning("Chroma search failed for '%s': %s", query, exc)
+                        continue
+                    if results:
+                        return results
+            time.sleep(0.5 * (attempt + 1))
+        return []
+
+    def _format_context(
+        self,
+        contexts: List[Dict[str, Any]],
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[str, List[Dict[str, Any]]]:
+        if not contexts:
+            return "", []
+        ordered = list(contexts)
+        if limit <= 0 or limit > len(ordered):
+            subset = ordered
+        else:
+            start = offset % len(ordered) if ordered else 0
+            rotated = ordered[start:] + ordered[:start]
+            subset = rotated[:limit]
+
+        lines: List[str] = []
+        sources: List[Dict[str, Any]] = []
+        for idx, item in enumerate(subset, start=1):
+            meta = dict(item.get("meta") or {})
+            path = meta.get("path") or meta.get("FILENAME") or meta.get("COURSE_FOLDER") or ""
+            snippet = str(item.get("snippet") or meta.get("snippet") or "").strip()
+            score = float(item.get("score") or 0.0)
+            ref_id = f"ref-{idx}"
+            lines.append(
+                f"[{ref_id}] path={path} score={score:.2f} chunk={meta.get('chunk_index')}\n{snippet}"
+            )
+            sources.append(
+                {
+                    "ref_id": ref_id,
+                    "path": path,
+                    "chunk_index": meta.get("chunk_index"),
+                    "score": score,
+                    "snippet": snippet,
+                }
+            )
+        return "\n\n".join(lines), sources
+
+    def _call_gemini(
+        self,
+        *,
+        config: QuestionBatchConfig,
+        course: Dict[str, Any],
+        topic_title: str,
+        subtopic_title: str,
+        request: RequestPlan,
+        context_text: str,
+        rag_sources: List[Dict[str, Any]],
+    ) -> List[Question]:
+        prompt = self._build_prompt(
+            course=course,
+            topic_title=topic_title,
+            subtopic_title=subtopic_title,
+            request=request,
+            context_text=context_text,
+        )
+        gen_config = GeminiConfig(
+            temperature=config.gemini_temperature,
+            top_p=config.gemini_top_p,
+            max_output_tokens=config.gemini_max_output_tokens,
+        )
+
+        response = self.gemini.generate(
+            prompt,
+            model=config.gemini_model,
+            generation_config=gen_config,
+            response_model=GeminiQuestionBatch,
+        )
+        if isinstance(response, GeminiQuestionBatch):
+            batch = response
+        else:
+            batch = GeminiQuestionBatch.model_validate(response)
+
+        actual_count = len(batch.questions)
+        expected_count = request.question_count
+        if actual_count != expected_count:
+            raise QuestionGenerationError(
+                f"Expected {expected_count} questions for {request.name} but received {actual_count}"
+            )
+
+        return self._convert_to_questions(
+            batch.questions,
+            course=course,
+            topic_title=topic_title,
+            subtopic_title=subtopic_title,
+            request=request,
+            rag_sources=rag_sources,
+            wrap_latex=config.latex_wrap_steps,
+        )
+
+    def _convert_to_questions(
+        self,
+        llm_questions: Iterable[GeminiGeneratedQuestion],
+        *,
+        course: Dict[str, Any],
+        topic_title: str,
+        subtopic_title: str,
+        request: RequestPlan,
+        rag_sources: List[Dict[str, Any]],
+        wrap_latex: bool,
+    ) -> List[Question]:
+        if not rag_sources:
+            raise QuestionGenerationError("RAG sources are required for question generation")
+
+        questions: List[Question] = []
+        level = self._first(course.get("levels"))
+        semester = self._first(course.get("semesters"))
+        course_code = str(course.get("code") or "")
+        course_title = str(course.get("title") or "")
+
+        for idx, item in enumerate(llm_questions, start=1):
+            options = [str(opt).strip() for opt in item.options]
+            validate_options(options)
+
+            if any(not option for option in options):
+                raise QuestionGenerationError("Options must not be empty")
+
+            normalized_options = {option.lower() for option in options}
+            if len(normalized_options) != len(options):
+                raise QuestionGenerationError("Options must be unique")
+
+            answer_letter, answer_text = self._normalize_answer(
+                item.correct_answer,
+                item.correct_answer_text,
+                options,
+            )
+            validate_answer_in_options(answer_text, options)
+
+            question_text = str(item.question or "").strip()
+            if not question_text:
+                raise QuestionGenerationError("Question text is empty")
+
+            explanation = str(item.explanation or "").strip()
+            if not explanation:
+                raise QuestionGenerationError("Explanation is required")
+            steps = [str(step).strip() for step in (item.solution_steps or []) if str(step).strip()]
+            if request.kind == "calculation":
+                steps = self._ensure_latex_steps(steps, wrap_latex=wrap_latex)
+                if not steps:
+                    raise QuestionGenerationError("Calculation question missing solution steps")
+            else:
+                steps = steps[:8]
+
+            question = Question(
+                course_code=course_code,
+                course_name=course_title,
+                topic_name=topic_title,
+                subtopic_name=subtopic_title,
+                level=level,
+                semester=semester,
+                question_type=request.kind,
+                difficulty_ranking=request.difficulty_rank,
+                difficulty=self._difficulty_from_rank(request.difficulty_rank),
+                question=question_text,
+                options=options,
+                correct_answer=answer_letter,
+                correct_answer_text=answer_text,
+                explanation=explanation,
+                solution_steps=steps,
+                rag_sources=[dict(src) for src in rag_sources],
+                extra_metadata={
+                    "request_name": request.name,
+                    "question_index": idx,
+                    "generated_at": time.time(),
+                },
+            )
+            questions.append(question)
+        return questions
+
+    # ------------------------------------------------------------------
+    # Formatting helpers
+    # ------------------------------------------------------------------
+    def _difficulty_from_rank(self, rank: int) -> str:
+        if rank <= 3:
+            return "Easy"
+        if rank <= 6:
+            return "Medium"
+        return "Hard"
+
+    def _first(self, value: Any) -> Optional[str]:
+        if isinstance(value, list) and value:
+            return str(value[0])
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return None
+
+    def _normalize_answer(
+        self,
+        answer_value: Any,
+        answer_text_value: Optional[str],
+        options: List[str],
+    ) -> tuple[str, str]:
+        letters = ["A", "B", "C", "D"]
+        if answer_text_value:
+            text = answer_text_value.strip()
+            for idx, option in enumerate(options):
+                if text.lower() == option.lower():
+                    return letters[idx], option
+        if isinstance(answer_value, int):
+            idx = answer_value - 1
+            if 0 <= idx < len(options):
+                return letters[idx], options[idx]
+        if isinstance(answer_value, str):
+            cleaned = answer_value.strip().upper()
+            for idx, letter in enumerate(letters):
+                if cleaned in {letter, f"OPTION {letter}", f"{letter}.", f"{letter})"}:
+                    return letter, options[idx]
+            for idx, option in enumerate(options):
+                if cleaned.lower() == option.lower():
+                    return letters[idx], option
+        raise QuestionGenerationError("Unable to determine correct answer letter")
+
+    def _ensure_latex_steps(self, steps: List[str], *, wrap_latex: bool) -> List[str]:
+        if not steps:
+            return []
+        formatted: List[str] = []
+        for step in steps[:8]:
+            clean = step.strip()
+            if not clean:
+                continue
+            if not wrap_latex:
+                formatted.append(clean)
+                continue
+            if clean.startswith("$") or clean.startswith("\\("):
+                formatted.append(clean)
+            else:
+                formatted.append(f"\\({clean}\\)")
+        return formatted
+
+    def _build_prompt(
+        self,
+        *,
+        course: Dict[str, Any],
+        topic_title: str,
+        subtopic_title: str,
+        request: RequestPlan,
+        context_text: str,
+    ) -> str:
+        level = self._first(course.get("levels")) or "Unknown"
+        semester = self._first(course.get("semesters")) or "Unknown"
+        steps_note = "For theory questions, set 'solution_steps': []. For calculation questions, provide a list of 3-5 clear LaTeX-formatted solution steps." if request.kind == "calculation" else "For theory questions, set 'solution_steps': []. Do not include solution steps."
+        return (
+            "You are an expert university assessment designer. Use only the "
+            "reference extracts to craft rigorous, unambiguous multiple choice questions.\n"
+            f"Course: {course.get('title', '')} ({course.get('code', '')})\n"
+            f"Level: {level} | Semester: {semester}\n"
+            f"Topic: {topic_title}\nSubtopic: {subtopic_title}\n"
+            f"Question type: {request.kind}\n"
+            f"Questions required: {request.question_count}\n"
+            "Requirements:\n"
+            "- Each question must align strictly with the subtopic and reference extracts. If no relevant extracts, generate general but accurate questions based on subtopic.\n"
+            "- Provide exactly four unique options labelled A, B, C, D.\n"
+            "- 'correct_answer' must be the letter of the correct option (A/B/C/D).\n"
+            "- 'correct_answer_text' must exactly match the full text of the correct option.\n"
+            "- Explanations must cite ideas from the reference extracts where possible.\n"
+            f"- {steps_note}\n"
+            "- Avoid placeholders, ambiguities, or references outside the provided context.\n"
+            "- Ensure all fields are properly typed: solution_steps must be a JSON array ([]) even if empty.\n"
+            "Respond ONLY with valid JSON matching this exact schema: {{\"questions\": [{{ \"question\": str, \"options\": [str,str,str,str], \"correct_answer\": \"A/B/C/D\", \"correct_answer_text\": str, \"explanation\": str, \"solution_steps\": [str] or [] }} ] }}. No additional text.\n"
+            f"Reference extracts:\n{context_text}\n"
+        )
+
+    def _persist_to_firestore(self, questions: Iterable[Question], *, enable: bool) -> None:
+        if not enable or not questions:
+            return
+        store = self._resolve_firestore()
+        if store is None:
+            logger.debug("Firestore not configured; skipping persistence")
+            return
+        for question in questions:
+            try:
+                store.set_question(question)
+            except Exception as exc:  # pragma: no cover - network dependent
+                logger.warning("Failed to persist question for %s: %s", question.course_code, exc)
+
+    def _resolve_firestore(self) -> Optional[Any]:
+        if self._firestore is not None:
+            return self._firestore
+        if FireStore is None:
+            return None
+        try:
+            self._firestore = FireStore()
+            return self._firestore
+        except Exception as exc:  # pragma: no cover - optional dependency
+            logger.warning("Could not initialize Firestore: %s", exc)
+            self._firestore = None
+            return None
+
+    def _sleep_with_jitter(self, base: float, jitter: float) -> None:
+        if base <= 0:
+            return
+        span = abs(jitter)
+        low = max(0.0, base * (1 - span))
+        high = base * (1 + span)
+        time.sleep(random.uniform(low, high))
 
 
 class QuestionBatchRunner:
@@ -51,14 +721,218 @@ class QuestionBatchRunner:
     def __init__(self, generator: QuestionGenerator) -> None:
         self.generator = generator
 
-    def run(self, config: QuestionBatchConfig) -> List[dict]:
-        """Execute the configured batch run using the underlying generator."""
-
-        return self.generator.generate_batch(config)
+    def run(self, config: QuestionBatchConfig) -> List[Question]:
+        return self.generator.generate_course_questions(config)
 
 
-__all__ = [
-    "QuestionBatchConfig",
-    "QuestionGenerator",
-    "QuestionBatchRunner",
-]
+def _parse_optional_json(value: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not value:
+        return None
+    try:
+        parsed = json.loads(value)
+        if not isinstance(parsed, dict):
+            raise ValueError("RAG where filter must be a JSON object")
+        return parsed
+    except json.JSONDecodeError as exc:  # pragma: no cover - cli validation
+        raise argparse.ArgumentTypeError(f"Invalid JSON: {exc}") from exc
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Generate questions with Gemini + RAG")
+    parser.add_argument("--course-code", help="Course code e.g. EEE 301 (omit for all courses)")
+    parser.add_argument(
+        "--courses-json",
+        default=str(DEFAULT_COURSES_JSON),
+        help="Path to courses.json containing outlines",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        default=str(DEFAULT_CACHE_ROOT),
+        help="Directory for generation cache",
+    )
+    parser.add_argument("--rag-topk", type=int, default=30, help="Candidate retrieval pool size")
+    parser.add_argument("--rag-final-k", type=int, default=12, help="Context chunks passed to LLM")
+    parser.add_argument("--rag-tau", type=float, default=0.35, help="Sampling temperature for RAG")
+    parser.add_argument(
+        "--rag-min-sim",
+        type=float,
+        default=0.6,
+        help="Minimum similarity threshold for context filtering",
+    )
+    parser.add_argument(
+        "--rag-where",
+        type=_parse_optional_json,
+        default=None,
+        help="Additional metadata filter for Chroma search (JSON object)",
+    )
+    parser.add_argument(
+        "--theory-per-request",
+        type=int,
+        default=10,
+        help="Number of theory questions per Gemini request",
+    )
+    parser.add_argument(
+        "--calc-per-request",
+        type=int,
+        default=5,
+        help="Number of calculation questions per Gemini request",
+    )
+    parser.add_argument("--no-resume", action="store_true", help="Do not reuse cached generations")
+    parser.add_argument(
+        "--skip-firestore",
+        action="store_true",
+        help="Disable persistence to Firestore",
+    )
+    parser.add_argument(
+        "--topics",
+        nargs="*",
+        default=None,
+        help="Optional list of topics to include (case insensitive)",
+    )
+    parser.add_argument(
+        "--subtopics",
+        nargs="*",
+        default=None,
+        help="Optional list of subtopics to include (case insensitive)",
+    )
+    parser.add_argument("--output-jsonl", help="Path to save generated questions as JSONL")
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help="Gemini model name (e.g. gemini-2.5-flash)",
+    )
+    parser.add_argument("--temperature", type=float, default=0.25, help="Generation temperature")
+    parser.add_argument("--top-p", type=float, default=0.85, help="Top-p nucleus sampling value")
+    parser.add_argument(
+        "--max-output-tokens",
+        type=int,
+        default=6000,
+        help="Maximum tokens Gemini can return per request",
+    )
+    parser.add_argument(
+        "--request-delay",
+        type=float,
+        default=1.5,
+        help="Base delay between Gemini calls (seconds)",
+    )
+    parser.add_argument(
+        "--delay-jitter",
+        type=float,
+        default=0.25,
+        help="Random jitter fraction applied to delays",
+    )
+    parser.add_argument(
+        "--rag-attempts",
+        type=int,
+        default=2,
+        help="Number of attempts to retrieve RAG context before skipping",
+    )
+    parser.add_argument(
+        "--request-attempts",
+        type=int,
+        default=2,
+        help="Number of retries for Gemini generation",
+    )
+    parser.add_argument(
+        "--no-latex-wrap",
+        action="store_true",
+        help="Do not automatically wrap calculation steps with LaTeX delimiters",
+    )
+    return parser
+
+
+def _load_course_standalone(courses_path: Path, course_code: str) -> Dict[str, Any]:
+    """Standalone course loader (no class instance needed)."""
+    data = json.loads(courses_path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ValueError("courses.json must be a list of course objects")
+    for row in data:
+        code = str(row.get("code") or "").strip().lower()
+        if code == course_code.strip().lower():
+            return row
+    raise ValueError(f"Course code '{course_code}' not found in {courses_path}")
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+
+    courses_path = Path(args.courses_json)
+    if args.course_code:
+        course = _load_course_standalone(courses_path, args.course_code)
+        courses = [course]
+    else:
+        data = json.loads(courses_path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            raise ValueError("courses.json must be a list of course objects")
+        courses = [row for row in data if row.get("outline")]  # Only courses with outlines
+        if not courses:
+            logger.warning("No courses with outlines found in %s", courses_path)
+            return 0
+
+    all_questions = []
+    common_config = {
+        "courses_json_path": courses_path,
+        "cache_dir": Path(args.cache_dir),
+        "rag_topk": args.rag_topk,
+        "rag_final_k": args.rag_final_k,
+        "rag_tau": args.rag_tau,
+        "rag_min_similarity": args.rag_min_sim,
+        "rag_where": args.rag_where,
+        "theory_questions_per_request": args.theory_per_request,
+        "calc_questions_per_request": args.calc_per_request,
+        "resume": not args.no_resume,
+        "store_firestore": not args.skip_firestore,
+        "request_delay_s": args.request_delay,
+        "delay_jitter": args.delay_jitter,
+        "gemini_model": args.model,
+        "gemini_temperature": args.temperature,
+        "gemini_top_p": args.top_p,
+        "gemini_max_output_tokens": args.max_output_tokens,
+        "request_attempts": args.request_attempts,
+        "rag_attempts": args.rag_attempts,
+        "latex_wrap_steps": not args.no_latex_wrap,
+        "target_topics": args.topics,
+        "target_subtopics": args.subtopics,
+        "output_path": Path(args.output_jsonl) if args.output_jsonl else None,
+    }
+
+    generator = QuestionGenerator(
+        gemini_service=GeminiService(
+            model=args.model,
+            generation_config=GeminiConfig(
+                temperature=args.temperature,
+                top_p=args.top_p,
+                max_output_tokens=args.max_output_tokens,
+            ),
+        )
+    )
+    runner = QuestionBatchRunner(generator)
+
+    for course in courses:
+        course_code = course.get("code", "unknown")
+        config = QuestionBatchConfig(course_code=course_code, **common_config)
+
+        try:
+            questions = runner.run(config)
+            all_questions.extend(questions)
+            logger.info("Generated %d questions for %s", len(questions), course_code)
+        except ValidationError as exc:
+            logger.error("Validation failed for %s: %s", course_code, exc)
+            continue
+        except Exception as exc:
+            logger.error("Question generation failed for %s: %s", course_code, exc)
+            continue
+
+    output_path = common_config["output_path"]
+    if output_path:
+        write_jsonl(str(output_path), [q.model_dump() for q in all_questions])
+        logger.info("Saved %d total questions to %s", len(all_questions), output_path)
+    else:
+        logger.info("Generated %d total questions across %d courses", len(all_questions), len(courses))
+
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
+    raise SystemExit(main())

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  coursegen:
+    build: .
+    container_name: coursegen
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./OUTPUT_DATA2:/app/OUTPUT_DATA2
+      - ./enginneringhub_firebase_service.json:/app/enginneringhub_firebase_service.json:ro
+    env_file:
+      - .env
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    # For running commands: docker-compose run --rm coursegen python -m services.QuestionRag.gemini_question_gen --generate-questions --course-code EEE301

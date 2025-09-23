@@ -97,9 +97,31 @@ __all__ = [
 
 
 def main() -> None:
-    """Proxy CLI entry point for historical ``gemini_question_gen.py`` usage."""
+    """CLI entry point: outlines by default, or questions if flagged."""
+    import sys
+    import argparse
 
-    outline_main()
+    parser = argparse.ArgumentParser(description="Generate outlines or questions using Gemini and RAG.")
+    parser.add_argument("--generate-questions", action="store_true", help="Run question generation instead of outlines")
+    parser.add_argument("--difficulty", choices=["easy", "medium", "hard"], default="medium", help="Difficulty level for questions")
+    parser.add_argument("--dry-run", action="store_true", help="Dry run without API calls")
+    parser.add_argument("--department_from", help='For outlines: e.g. "EEE 315"')
+    # Add other outline args if needed, but pass unknown to outline_main
+    args, unknown = parser.parse_known_args()
+
+    if args.generate_questions:
+        if QuestionBatchRunner is None:
+            print("Question generation not implemented yet. Run without --generate-questions for outlines.")
+            sys.exit(1)
+        else:
+            from .pipelines.question_generator import main as question_main
+            # Ignore --difficulty as it's not supported; pass remaining args
+            sys.argv = [sys.argv[0]] + unknown
+            question_main()
+    else:
+        # Call outline_main with remaining args
+        sys.argv = [sys.argv[0]] + unknown
+        outline_main()
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI convenience

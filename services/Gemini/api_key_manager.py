@@ -1,9 +1,30 @@
 import datetime
+import json
 import time
-from typing import List
 from pathlib import Path
+from typing import List
 
-from COURSEGEN.utils.Caching.cache import Cache
+try:  # pragma: no cover - optional dependency
+    from COURSEGEN.utils.Caching.cache import Cache  # type: ignore
+except Exception:  # pragma: no cover - fallback for tests
+    try:
+        from utils.Caching.cache import Cache  # type: ignore
+    except Exception:  # pragma: no cover - lightweight fallback
+        class Cache:  # type: ignore[override]
+            def __init__(self, cache_file: str) -> None:
+                self.path = Path(cache_file)
+
+            def read_cache(self) -> dict:
+                try:
+                    return json.loads(self.path.read_text(encoding="utf-8"))
+                except FileNotFoundError:
+                    return {}
+                except Exception:
+                    return {}
+
+            def write_cache(self, data: dict) -> None:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 from .rate_limit_data import RATE_LIMITS
 from .gemini_api_keys import GeminiApiKeys
 

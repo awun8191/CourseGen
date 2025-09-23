@@ -8,7 +8,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_ROOT_USER_ACTION=ignore
+    PIP_ROOT_USER_ACTION=ignore \
+    COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json \
+    COURSEGEN_CACHE_DIR=/app/.cache/coursegen \
+    CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings \
+    PYTHONPATH=/app
 
 RUN set -eux \
     && apt-get update \
@@ -53,8 +57,9 @@ RUN set -eux \
     && python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir -r requirements.txt
 
+RUN mkdir -p /app/chromadb_storage /app/.cache/coursegen
+
 COPY . .
 
-ENV PYTHONPATH=/app
-
-CMD ["bash"]
+ENTRYPOINT ["python", "-m", "services.QuestionRag.pipelines.question_generator"]
+CMD ["--help"]

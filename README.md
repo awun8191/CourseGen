@@ -25,6 +25,22 @@ The project is organized into `services/` (core pipelines), `data_models/` (Pyda
 - `specs/` and `steering/`: Design documents and high-level architecture.
 - `tests/`: Unit/integration tests.
 
+## Docker Setup
+Use `docker-compose.yml` for containerized runs. It mounts code, data, cache (OUTPUT_DATA2), and Firebase credentials.
+
+Build and run:
+```
+docker-compose build
+docker-compose run --rm coursegen bash  # Interactive shell
+```
+
+For question generation:
+```
+docker-compose run --rm coursegen python -m services.QuestionRag.gemini_question_gen --generate-questions --course-code EEE301
+```
+
+Ensure `.env` has API keys, and OUTPUT_DATA2/chroma exists (embeddings).
+
 ## Quick Start
 1. **Setup Environment**:
    ```
@@ -50,10 +66,15 @@ The project is organized into `services/` (core pipelines), `data_models/` (Pyda
    python -m services.QuestionRag.pipelines.course_outline_generator --course-code EEE471 --collection pdfs_bge_m3_cloudflare --persist-dir chromadb_storage --output-dir utils/course_outline
    ```
 
-5. **Generate Questions**:
-   ```
-   python -m services.QuestionRag.question_generator --input-outline utils/course_outline/course_outline_EEE471.md --num-questions 20 --output data/questions_EEE471.jsonl
-   ```
+5. **Generate Questions** (30/subtopic: 20 theory + 10 calc, RAG-required, Firestore-persisted):
+    ```
+    python -m services.QuestionRag.gemini_question_gen --generate-questions --course-code EEE471  # Single
+    python -m services.QuestionRag.gemini_question_gen --generate-questions  # All courses
+    ```
+    - Skips subtopics without docs; only courses with outlines.
+    - Resumes from cache (OUTPUT_DATA2/cache).
+    - LaTeX for calc steps.
+    - Full CLI: `--theory-per-request 10 --calc-per-request 5 --no-resume --skip-firestore` etc.
 
 6. **Run Tests**:
    ```
