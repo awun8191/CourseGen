@@ -13,6 +13,7 @@ NC='\033[0m' # No Color
 IMAGE_NAME="888429341445.dkr.ecr.us-east-1.amazonaws.com/rag"
 IMAGE_TAG="latest"
 FULL_IMAGE_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
+HAS_BUILDX=false
 
 # Function to print colored output
 print_status() {
@@ -45,6 +46,17 @@ check_prerequisites() {
     if ! docker info &> /dev/null; then
         print_error "Docker daemon is not running. Please start Docker."
         exit 1
+    fi
+
+    # Check if Docker Buildx is available and configure BuildKit accordingly
+    if docker buildx version &> /dev/null; then
+        HAS_BUILDX=true
+        export DOCKER_BUILDKIT=1
+        print_status "Docker Buildx detected - BuildKit enabled"
+    else
+        HAS_BUILDX=false
+        export DOCKER_BUILDKIT=0
+        print_warning "Docker Buildx plugin not found. Falling back to legacy builder"
     fi
 
     # Check if AWS CLI is available for ECR authentication
@@ -110,8 +122,11 @@ build_image() {
     BUILD_ARGS=(
         --tag "${FULL_IMAGE_NAME}"
         --build-arg BUILDKIT_INLINE_CACHE=1
-        --progress=plain
     )
+
+    if [[ "$HAS_BUILDX" == "true" ]]; then
+        BUILD_ARGS+=(--progress=plain)
+    fi
 
     # Add cache from previous builds if available
     if docker image inspect "${FULL_IMAGE_NAME}" &> /dev/null; then
@@ -126,8 +141,11 @@ build_image() {
             BUILD_ARGS_MINIMAL=(
                 --tag "${FULL_IMAGE_NAME}"
                 --file "Dockerfile.minimal"
-                --progress=plain
             )
+
+            if [[ "$HAS_BUILDX" == "true" ]]; then
+                BUILD_ARGS_MINIMAL+=(--progress=plain)
+            fi
 
             if docker build "${BUILD_ARGS_MINIMAL[@]}" . 2>&1 | tee /tmp/docker_build.log; then
                 print_success "Minimal Docker build completed successfully!"
@@ -166,8 +184,11 @@ build_image() {
                 BUILD_ARGS_MINIMAL=(
                     --tag "${FULL_IMAGE_NAME}"
                     --file "Dockerfile.minimal"
-                    --progress=plain
                 )
+
+                if [[ "$HAS_BUILDX" == "true" ]]; then
+                    BUILD_ARGS_MINIMAL+=(--progress=plain)
+                fi
 
                 if docker build "${BUILD_ARGS_MINIMAL[@]}" . 2>&1 | tee /tmp/docker_build_minimal.log; then
                     print_success "Minimal Docker build completed successfully!"
@@ -213,6 +234,9 @@ show_build_results() {
 # Function to show usage examples
 show_usage_examples() {
     print_status "Usage Examples:"
+    echo ""
+    echo "  # ONE COMMAND: Update embeddings in volume, rebuild image, and deploy to AWS:"
+    echo "  ./build.sh --update-embeddings"
     echo ""
     echo "  # Fix Docker credential issues:"
     echo "  ./build.sh --fix-credentials"
@@ -352,6 +376,63 @@ fix_docker_credentials() {
     print_status "You can now try ECR authentication again"
 }
 
+# Function to update embeddings in persistent volume and rebuild image
+update_embeddings_and_rebuild() {
+    print_status "Starting complete embeddings update workflow..."
+    echo "=================================================="
+
+    # Check if image exists locally first
+    if ! docker image inspect "${FULL_IMAGE_NAME}" &> /dev/null; then
+        print_error "Docker image '${FULL_IMAGE_NAME}' not found locally"
+        print_status "Building image first..."
+        if ! build_image; then
+            print_error "Failed to build Docker image"
+            return 1
+        fi
+    fi
+
+    # Step 1: Update embeddings in persistent volume
+    print_status "Step 1: Updating embeddings in persistent volume..."
+    if docker run --rm \
+        --entrypoint python \
+        -v "$(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2" \
+        -v "$(pwd)/data:/app/data" \
+        -e PYTHONPATH=/app \
+        "${FULL_IMAGE_NAME}" \
+        -m services.RAG.convert_to_embeddings \
+        -i data/textbooks/COMPILATION/EEE \
+        --with-chroma \
+        -c pdfs_bge_m3_cloudflare \
+        --workers 4 \
+        --resume 2>&1; then
+        print_success "Embeddings updated in persistent volume"
+    else
+        print_error "Failed to update embeddings in persistent volume"
+        return 1
+    fi
+
+    # Step 2: Rebuild the image with updated embeddings
+    print_status "Step 2: Rebuilding Docker image with updated embeddings..."
+    CLEANUP=true  # Force cleanup for fresh build
+    if build_image; then
+        print_success "Docker image rebuilt with updated embeddings"
+    else
+        print_error "Failed to rebuild Docker image"
+        return 1
+    fi
+
+    # Step 3: Deploy to AWS ECR
+    print_status "Step 3: Deploying updated image to AWS ECR..."
+    if push_to_ecr; then
+        print_success "Updated image deployed to AWS ECR successfully!"
+        print_status "Complete workflow finished!"
+        return 0
+    else
+        print_error "Failed to deploy to AWS ECR"
+        return 1
+    fi
+}
+
 # Function to debug build issues
 debug_build_issues() {
     print_status "Debugging build issues..."
@@ -421,6 +502,7 @@ main() {
     DEBUG=false
     DEPLOY=false
     FIX_CREDENTIALS=false
+    UPDATE_EMBEDDINGS=false
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -456,6 +538,10 @@ main() {
                 FIX_CREDENTIALS=true
                 shift
                 ;;
+            --update-embeddings)
+                UPDATE_EMBEDDINGS=true
+                shift
+                ;;
             --help|-h)
                 echo "Usage: $0 [OPTIONS]"
                 echo "Options:"
@@ -467,6 +553,7 @@ main() {
                 echo "  --debug          Show system information and debug build issues"
                 echo "  --deploy         Build and push image to AWS ECR"
                 echo "  --fix-credentials Fix Docker credential helper configuration"
+                echo "  --update-embeddings Update embeddings in volume, rebuild image, and deploy"
                 echo "  --help, -h       Show this help message"
                 exit 0
                 ;;
@@ -492,6 +579,18 @@ main() {
     if [[ "$FIX_CREDENTIALS" == "true" ]]; then
         fix_docker_credentials
         exit 0
+    fi
+
+    if [[ "$UPDATE_EMBEDDINGS" == "true" ]]; then
+        check_prerequisites
+        if update_embeddings_and_rebuild; then
+            show_usage_examples
+            print_success "Complete embeddings update workflow completed successfully!"
+            exit 0
+        else
+            print_error "Embeddings update workflow failed!"
+            exit 1
+        fi
     fi
 
     check_prerequisites
@@ -542,4 +641,3 @@ main() {
 
 # Run main function with all arguments
 main "$@"
-

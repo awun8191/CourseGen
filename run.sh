@@ -110,6 +110,20 @@ check_prerequisites() {
     print_success "Prerequisites check passed"
 }
 
+ensure_volume_permissions() {
+    local paths=("OUTPUT_DATA2" ".cache" "data")
+    for dir in "${paths[@]}"; do
+        if [[ ! -d "$dir" ]]; then
+            mkdir -p "$dir"
+        fi
+        print_status "Ensuring write access on $dir for container user"
+        if ! chmod -R a+rwX "$dir" 2>/dev/null; then
+            print_warning "Could not update permissions on $dir (non-writable entries may remain)."
+            print_warning "If container writes still fail, run 'sudo chown -R 1001:1001 $dir' or adjust manually."
+        fi
+    done
+}
+
 # Function to build docker run command
 build_docker_command() {
     local docker_args=(
@@ -204,6 +218,8 @@ run_container() {
 
     print_status "Starting CourseGen container..."
     print_status "Command: ${docker_cmd} ${run_args[*]}"
+
+    ensure_volume_permissions
 
     # Execute the docker run command
     $docker_cmd "${run_args[@]}"

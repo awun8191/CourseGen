@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict
 import json
-from log_utils import get_logger
+from services.RAG.log_utils import get_logger
 from chromadb.config import Settings
 import chromadb
 

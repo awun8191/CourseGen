@@ -559,11 +559,15 @@ class QuestionGenerator:
             max_output_tokens=config.gemini_max_output_tokens,
         )
 
+        # Request structured output directly from Gemini when possible
+        gen_config.response_schema = GeminiQuestionBatch
+
         # Generate without response_model to get raw response, then parse manually
         response = self.gemini.generate(
             prompt,
             model=config.gemini_model,
             generation_config=gen_config,
+            response_model=GeminiQuestionBatch,
         )
 
         # Debug: print the raw response before validation (only in verbose mode)
@@ -584,22 +588,21 @@ class QuestionGenerator:
         else:
             # Handle case where response has 'result' key with raw JSON
             if isinstance(response, dict) and 'result' in response:
-                import json
+                raw_result = response['result']
                 try:
-                    parsed_response = json.loads(response['result'])
+                    parsed_response = json.loads(raw_result)
                     batch = GeminiQuestionBatch.model_validate(parsed_response)
                 except json.JSONDecodeError:
-                    # If JSON parsing fails, try to extract JSON from the text
-                    import re
-                    json_match = re.search(r'```json\s*(\{.*?\})\s*```', response['result'], re.DOTALL)
-                    if json_match:
-                        try:
-                            parsed_response = json.loads(json_match.group(1))
-                            batch = GeminiQuestionBatch.model_validate(parsed_response)
-                        except (json.JSONDecodeError, KeyError):
-                            raise ValueError(f"Could not parse JSON from response: {response['result'][:200]}...")
-                    else:
-                        raise ValueError(f"No JSON found in response: {response['result'][:200]}...")
+                    json_payload = self._extract_json_payload(raw_result)
+                    if json_payload is None:
+                        raise ValueError(f"No JSON found in response: {raw_result[:200]}...")
+                    try:
+                        parsed_response = json.loads(json_payload)
+                        batch = GeminiQuestionBatch.model_validate(parsed_response)
+                    except (json.JSONDecodeError, KeyError) as exc:
+                        raise ValueError(
+                            f"Could not parse JSON from response: {raw_result[:200]}..."
+                        ) from exc
             else:
                 batch = GeminiQuestionBatch.model_validate(response)
 
@@ -619,6 +622,25 @@ class QuestionGenerator:
             rag_sources=rag_sources,
             wrap_latex=config.latex_wrap_steps,
         )
+
+    @staticmethod
+    def _extract_json_payload(text: str) -> Optional[str]:
+        if not text:
+            return None
+
+        code_block = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text, re.DOTALL)
+        if code_block:
+            candidate = code_block.group(1).strip()
+            if candidate:
+                return candidate
+
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            candidate = text[start : end + 1].strip()
+            if candidate:
+                return candidate
+        return None
 
     def _convert_to_questions(
         self,

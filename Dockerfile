@@ -60,10 +60,9 @@ RUN set -eux \
 
 WORKDIR /app
 
-# Copy and install Python dependencies with better caching
+# Copy and install Python dependencies
 COPY requirements*.txt ./
-RUN --mount=type=cache,target=/root/.cache/pip \
-  set -eux \
+RUN set -eux \
   && python -m pip install --upgrade pip setuptools wheel \
   && pip install --timeout=300 --prefer-binary -r requirements.txt
 

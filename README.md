@@ -11,6 +11,8 @@ CourseGen is a comprehensive, modular pipeline for processing educational materi
 - **Observability**: Detailed logging, progress tracking, billing ledgers, and resumability.
 - **Modularity**: Separate services for RAG, Question Generation, providers (Gemini/Cloudflare/Ollama/Firestore), and utilities.
 - **Scalability**: Parallel processing, batching, and caching for large datasets (e.g., university course libraries).
+- **Docker Integration**: Full containerization with persistent volumes and AWS ECR deployment.
+- **Production Ready**: Optimized for deployment to AWS ECS, EKS, or other container platforms.
 
 The project is organized into `services/` (core pipelines), `data_models/` (Pydantic schemas), `utils/` (helpers), `data/` (inputs/outputs, gitignored), and `tests/` (PyTest suite).
 
@@ -46,11 +48,88 @@ docker-compose run --rm coursegen --theory-per-request 10 --calc-per-request 10
 docker-compose run --rm coursegen --course-code "AAE 101" --theory-per-request 10 --calc-per-request 10
 ```
 
+### ☁️ AWS ECR Deployment
+Deploy your CourseGen application to AWS Elastic Container Registry for production use:
+
+```bash
+# Fix Docker credential issues (if needed)
+./build.sh --fix-credentials
+
+# Build and deploy to AWS ECR
+./build.sh --deploy
+
+# Run from ECR with persistent volumes
+./run.sh --course-code "EEE 315"
+
+# Manual ECR authentication (if needed)
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com
+```
+
+**ECR Repository**: `888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest`
+
 ### 📁 Persistent Data Directories
 Your data persists across container rebuilds in these locations:
 - `./OUTPUT_DATA2/emdeddings/` - ChromaDB vector embeddings
 - `./.cache/coursegen/` - Question generation caches
 - `./data/` - Course data and configurations
+
+### 🔄 Updating Embeddings Only
+To update just the embeddings without rebuilding the entire container:
+
+#### Method 1: Update Both Local Volume AND AWS Image (Complete Workflow)
+```bash
+# Step 1: Update local persistent volume embeddings
+docker-compose run --rm coursegen \
+  python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/COMPILATION/EEE \
+  --with-chroma \
+  -c pdfs_bge_m3_cloudflare \
+  --workers 4 \
+  --resume
+
+# Step 2: Rebuild image with updated embeddings
+./build.sh --cleanup
+
+# Step 3: Deploy updated image to AWS ECR
+./build.sh --deploy
+```
+
+#### Method 2: Using Docker with Volume Mounts (Local Volume Only)
+```bash
+# Run embeddings generation with persistent volumes
+docker run --rm -it \
+  -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
+  -v $(pwd)/data:/app/data \
+  888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest \
+  python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/COMPILATION/EEE \
+  --with-chroma \
+  -c pdfs_bge_m3_cloudflare \
+  --workers 4 \
+  --resume
+```
+
+#### Method 3: Using Docker Compose (Local Volume Only)
+```bash
+# Update embeddings using docker-compose
+docker-compose run --rm coursegen \
+  python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/COMPILATION/EEE \
+  --with-chroma \
+  -c pdfs_bge_m3_cloudflare \
+  --workers 4 \
+  --resume
+```
+
+#### Method 4: Manual Directory Replacement (Local Volume Only)
+```bash
+# Backup current embeddings
+cp -r OUTPUT_DATA2/emdeddings OUTPUT_DATA2/emdeddings.backup.$(date +%s)
+
+# Replace with new embeddings directory
+rm -rf OUTPUT_DATA2/emdeddings
+cp -r /path/to/new/emdeddings OUTPUT_DATA2/
+```
 
 ### 🔧 Advanced Usage
 ```bash
@@ -95,7 +174,24 @@ grep '"code"' data/textbooks/courses.json | head -10
 - **Volume permission errors**: Ensure host directories have proper permissions (775 recommended)
 - **Firestore errors**: Check Firebase credentials and network connectivity
 
+### Docker & AWS ECR Troubleshooting
+- **"Error saving credentials"**: Run `./build.sh --fix-credentials` to resolve credential helper issues
+- **ECR authentication failed**: Check AWS CLI configuration and permissions
+- **Image not found locally**: The run script will automatically pull from ECR if available
+- **Permission denied on volumes**: Ensure host directories have proper permissions (775 recommended)
+- **Build fails with "invalid tag"**: Use the fixed build script with correct ECR URI format
+- **AWS CLI not found**: Install AWS CLI or authenticate manually with `aws ecr get-login-password`
+
+### Embeddings-Specific Troubleshooting
+- **"No RAG context found"**: Embeddings directory may be empty or corrupted
+- **"ChromaDB connection failed"**: Check if `OUTPUT_DATA2/emdeddings/` exists and has content
+- **"Permission denied on embeddings"**: Ensure proper ownership: `sudo chown -R $USER:$USER OUTPUT_DATA2/`
+- **"Embeddings outdated"**: Regenerate using the embeddings update commands above
+- **"Disk space full"**: Embeddings can be large; check available space with `df -h`
+- **"ChromaDB locked"**: Stop all containers and try again: `docker-compose down`
+
 ### 🚀 Recent Improvements
+- ✅ **AWS ECR Deployment**: Full integration with AWS Elastic Container Registry
 - ✅ **Persistent Volumes**: Embeddings and caches now survive container rebuilds
 - ✅ **Enhanced Reliability**: Added retry logic for network failures during build
 - ✅ **Fixed Dependencies**: Resolved numpy/albumentations version conflicts
@@ -103,7 +199,11 @@ grep '"code"' data/textbooks/courses.json | head -10
 - ✅ **Path Consistency**: Fixed typos and ensured consistent directory paths
 - ✅ **Improved Health Checks**: Container now verifies ChromaDB embeddings directory exists
 - ✅ **Optimized Docker Compose**: Cleaner configuration with better defaults
-- ✅ **Comprehensive Documentation**: See [Docker README](DOCKER_README.md) for detailed troubleshooting
+- ✅ **Docker Credential Helper Fix**: Automatic resolution of credential helper issues
+- ✅ **Question Generation Fix**: Resolved "missing solution steps" error for calculation questions
+- ✅ **Enhanced Scripts**: Added deployment, credential fixing, and debugging options
+- ✅ **Automated Embeddings Update**: One-command workflow for updating embeddings in both local volume and AWS image
+- ✅ **Comprehensive Documentation**: Complete guide for all features and troubleshooting
 
 ### Build Script Features
 The `./build.sh` script now includes:
@@ -112,6 +212,10 @@ The `./build.sh` script now includes:
 - **Debug Mode**: Provides detailed system information for troubleshooting
 - **Cleanup Options**: Removes old images and containers to free space
 - **Verbose Logging**: Shows detailed build progress and error information
+- **AWS ECR Deployment**: Automated push to AWS Elastic Container Registry
+- **Credential Helper Fix**: Resolves Docker credential helper configuration issues
+- **Multiple Build Targets**: Support for full and minimal Dockerfiles
+- **Health Verification**: Validates built images can run successfully
 
 ### Dockerfile Optimizations
 - **Multi-layer Caching**: Optimized layer structure for faster rebuilds
@@ -122,6 +226,15 @@ The `./build.sh` script now includes:
 - **Persistent Volume Support**: Proper permissions and ownership for mounted directories
 - **Directory Structure**: Ensures all required directories exist with correct permissions
 
+### Run Script Features
+The `./run.sh` script provides enhanced container execution with:
+- **AWS ECR Integration**: Automatic authentication and image pulling from ECR
+- **Persistent Volume Management**: Automatic mounting of data directories
+- **Flexible Configuration**: Support for custom environment files and parameters
+- **Interactive/Background Modes**: Choose between interactive and detached execution
+- **Smart Prerequisites**: Validates Docker image availability and pulls from ECR if needed
+- **Error Recovery**: Graceful handling of authentication and network issues
+
 ### 📋 Prerequisites
 - **API Keys**: Ensure `.env` has valid API keys for Gemini, Cloudflare, and Firestore
 - **Persistent Data**: Your embeddings and caches are preserved in:
@@ -129,6 +242,165 @@ The `./build.sh` script now includes:
   - `.cache/coursegen/` (Generation caches)
   - `data/` (Course data and configurations)
 - **Course Data**: Verify `data/textbooks/courses.json` contains your course outlines
+- **AWS ECR (Optional)**: For deployment, ensure AWS CLI is configured with proper permissions
+
+### Enhanced Script Usage
+The enhanced build and run scripts provide powerful deployment and management features:
+
+#### Build Script (`./build.sh`)
+```bash
+# ONE COMMAND: Update embeddings in volume, rebuild image, and deploy to AWS
+./build.sh --update-embeddings
+
+# Basic build
+./build.sh
+
+# Build with cleanup
+./build.sh --cleanup
+
+# Build and deploy to AWS ECR
+./build.sh --deploy
+
+# Fix Docker credential issues
+./build.sh --fix-credentials
+
+# Debug build issues
+./build.sh --debug
+
+# Build minimal version
+./build.sh --minimal
+
+# Show all options
+./build.sh --help
+```
+
+#### Run Script (`./run.sh`)
+```bash
+# Basic usage
+./run.sh
+
+# Run specific course
+./run.sh --course-code "EEE 315"
+
+# Custom question counts
+./run.sh --theory-per-request 5 --calc-per-request 3
+
+# Interactive mode
+./run.sh -i --course-code "AAE 101"
+
+# Background mode
+./run.sh -b --course-code "EEE 315"
+
+# Debug mode
+./run.sh --debug --course-code "AAE 101"
+
+# Custom environment file
+./run.sh --env-file .env.production --course-code "EEE 471"
+
+# Show all options
+./run.sh --help
+```
+
+#### Docker Compose Commands
+```bash
+# Start all services
+docker-compose up
+
+# Run question generation
+docker-compose run --rm coursegen --course-code "EEE 315"
+
+# Update embeddings (with proper command override)
+docker-compose run --rm \
+  -e PYTHONPATH=/app \
+  coursegen \
+  python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/COMPILATION/EEE \
+  --with-chroma \
+  -c pdfs_bge_m3_cloudflare \
+  --workers 4 \
+  --resume
+
+# Run tests
+docker-compose run --rm coursegen pytest tests/ -v
+```
+
+### Embeddings Management
+Manage ChromaDB embeddings independently of the main application:
+
+#### Complete Workflow: Update Both Local Volume AND AWS Image
+```bash
+# ONE COMMAND: Update embeddings, rebuild image, and deploy to AWS
+./build.sh --update-embeddings
+
+# OR manually (3-step process):
+# Step 1: Update local persistent volume embeddings
+docker run --rm \
+  -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
+  -v $(pwd)/data:/app/data \
+  888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest \
+  python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/COMPILATION/EEE \
+  --with-chroma \
+  -c pdfs_bge_m3_cloudflare \
+  --workers 4 \
+  --resume
+
+# Step 2: Rebuild image with updated embeddings
+./build.sh --cleanup
+
+# Step 3: Deploy updated image to AWS ECR
+./build.sh --deploy
+```
+
+#### Generate/Update Embeddings (Local Volume Only)
+```bash
+# Using docker run with persistent volumes (recommended)
+docker run --rm \
+  -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
+  -v $(pwd)/data:/app/data \
+  888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest \
+  python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/COMPILATION/EEE \
+  --with-chroma \
+  -c pdfs_bge_m3_cloudflare \
+  --workers 4 \
+  --resume
+
+# Using docker-compose (alternative)
+docker-compose run --rm \
+  -e PYTHONPATH=/app \
+  coursegen \
+  python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/COMPILATION/EEE \
+  --with-chroma \
+  -c pdfs_bge_m3_cloudflare \
+  --workers 4 \
+  --resume
+```
+
+#### Verify Embeddings
+```bash
+# Check embeddings directory exists and has content
+ls -la OUTPUT_DATA2/emdeddings/
+
+# Verify ChromaDB is accessible
+docker-compose run --rm coursegen \
+  python -c "from services.RAG.chroma_store import ChromaStore; print('ChromaDB accessible')"
+```
+
+#### Backup/Restore Embeddings
+```bash
+# Create backup
+tar -czf embeddings_backup_$(date +%Y%m%d_%H%M%S).tar.gz OUTPUT_DATA2/emdeddings/
+
+# Restore from backup
+tar -xzf embeddings_backup_20250101_120000.tar.gz
+```
+
+#### Understanding Persistent vs Image Embeddings
+- **Persistent Volume** (`OUTPUT_DATA2/emdeddings/`): Survives container rebuilds, used for development
+- **Image Embeddings**: Baked into the Docker image, used for production deployments
+- **AWS ECR Image**: Contains embeddings that are deployed to AWS services
 
 ## Quick Start
 
@@ -177,9 +449,28 @@ The `./build.sh` script now includes:
       --course-code "EEE 315" \
       --theory-per-request 10 \
       --calc-per-request 10
+
+    # Or use the enhanced run script
+    ./run.sh --course-code "EEE 315"
     ```
 
-5. **Run Tests**:
+5. **Deploy to AWS ECR**:
+    ```bash
+    # ONE COMMAND: Update embeddings and deploy to AWS ECR
+    ./build.sh --update-embeddings
+
+    # OR manually:
+    # Fix credential issues (if needed)
+    ./build.sh --fix-credentials
+
+    # Build and deploy to AWS ECR
+    ./build.sh --deploy
+
+    # Run from ECR
+    ./run.sh --course-code "EEE 315"
+    ```
+
+6. **Run Tests**:
     ```bash
     docker-compose run --rm coursegen pytest tests/ -v
     ```
@@ -238,6 +529,23 @@ For in-depth guides:
 - `CF_EMBED_MAX_BATCH`: Embedding batch size (≤100).
 - `BILLING_ENABLED`: Track costs (1/0).
 - `CF_PRICE_PER_M_TOKENS`: Cloudflare pricing (default 0.02 USD/M tokens).
+
+## Project Status
+This CourseGen project is **production-ready** with comprehensive Docker integration and AWS ECR deployment capabilities. All major components have been implemented and tested:
+
+### ✅ Completed Features
+- **Full Docker Integration**: Containerized application with persistent volumes
+- **AWS ECR Deployment**: Automated deployment to AWS Elastic Container Registry
+- **Embeddings Management**: Complete workflow for updating ChromaDB embeddings
+- **Question Generation**: Fixed all known issues including solution steps validation
+- **Error Handling**: Comprehensive error recovery and troubleshooting
+- **Documentation**: Complete guides for all features and use cases
+
+### 🚀 Ready for Production
+- Deploy to AWS ECS, EKS, or other container platforms
+- Scale horizontally with multiple container instances
+- Use in CI/CD pipelines for automated updates
+- Monitor and manage through Docker and AWS tools
 
 ## Contributing
 - Follow PEP 8; add tests for new features.

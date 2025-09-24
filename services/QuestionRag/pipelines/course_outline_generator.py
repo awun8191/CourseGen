@@ -236,32 +236,35 @@ def _prompt_outline(rag_block: str, source_ids: List[str], course_title: str, de
     return f"""
 {rag_block}
 
-You are to produce a short course description and an 8-topic outline using ONLY the context above.
+You are to produce a comprehensive course description and a detailed 8-12 topic outline using ALL available context.
 Return a single JSON OBJECT and nothing else.
 
 REQUIREMENTS:
 - Course: "{course_title}" | Department: "{department_str}" | Level: "{level}"
-- "description": 2–3 sentences grounded in the context.
-- "topics": EXACTLY 8 items, each:
-  - "title": short and precise
-  - "subtopics": EXACTLY 5 focused phrases (no numbering/markdown)
-  - "sources": at least 1 valid ID from: {", ".join(source_ids)}
+- "description": 3-4 sentences that thoroughly describe the course content, objectives, and scope based on all available context.
+- "topics": 8-12 comprehensive topics that cover ALL major areas of the course, each:
+- "title": specific and descriptive topic title
+- "subtopics": EXACTLY 5 detailed learning objectives or key concepts (be specific and comprehensive)
+- "sources": at least 1 valid ID from: {", ".join(source_ids)} (use multiple if different sources cover different aspects)
 
 SCHEMA:
 {{
-  "description": "string",
-  "topics": [
-    {{
-      "title": "string",
-      "subtopics": ["string","string","string","string","string"],
-      "sources": ["S1","S3"]
-    }}
-  ]
+"description": "string covering course overview, objectives, and scope",
+"topics": [
+{{
+  "title": "specific topic name",
+  "subtopics": ["detailed learning objective 1","detailed learning objective 2","detailed learning objective 3","detailed learning objective 4","detailed learning objective 5"],
+  "sources": ["S1","S3"]
+}}
+]
 }}
 
 VALIDATION:
 - No prose outside the JSON object.
 - Every "sources" entry must be a valid ID from the list above.
+- Topics should cover the ENTIRE course comprehensively.
+- Subtopics should be specific learning objectives or key concepts, not just phrases.
+- Use 8-12 topics to ensure complete coverage of all course material.
 """.strip()
 
 
@@ -296,7 +299,7 @@ class GeminiQuestionGen:
         hits_dept: List[Dict[str, Any]] = []
         hits_course: List[Dict[str, Any]] = []
 
-        # Stage 1: Course-specific queries (default)
+        # Stage 1: Course-specific queries (comprehensive retrieval)
         # IMPORTANT: In our metadata, COURSE_CODE holds only the department code (e.g., "EEE"),
         # while COURSE_FOLDER is the full course identifier (e.g., "EEE 315").
         # Filtering by COURSE_CODE=course_code ("EEE 315") would never match.
@@ -304,10 +307,11 @@ class GeminiQuestionGen:
         where_course = MetaData(DEPARTMENT=department_code, COURSE_FOLDER=course_code).to_where()
         for i, q in enumerate(queries):
             try:
+                # Get more comprehensive results for outline generation
                 if variation and (i % 2 == 1):
-                    res = cq.search_with_temperature(q, topk=RAG_TOPK_PER_QUERY, final_k=10, tau=RAG_TAU, min_sim=RAG_MIN_SIM, where=where_course, show_snippet=True)
+                    res = cq.search_with_temperature(q, topk=max(RAG_TOPK_PER_QUERY, 20), final_k=20, tau=RAG_TAU, min_sim=RAG_MIN_SIM, where=where_course, show_snippet=True)
                 else:
-                    res = cq.search(q, k=RAG_TOPK_PER_QUERY, where=where_course, show_snippet=True)
+                    res = cq.search(q, k=max(RAG_TOPK_PER_QUERY, 20), where=where_course, show_snippet=True)
                 hits_course.extend(res or [])
             except Exception as e:
                 logger.warning("[RAG course] %s", e)
@@ -371,8 +375,8 @@ class GeminiQuestionGen:
                 if variation and (i % 2 == 0):
                     res = self._cq.search_with_temperature(
                         q,
-                        topk=max(SUB_RAG_TOPK_PER_QUERY, 8),
-                        final_k=SUB_RAG_FINAL_K,
+                        topk=max(SUB_RAG_TOPK_PER_QUERY, 12),
+                        final_k=max(SUB_RAG_FINAL_K, 12),
                         tau=SUB_RAG_TAU,
                         min_sim=SUB_RAG_MIN_SIM,
                         where=where_course,
@@ -381,7 +385,7 @@ class GeminiQuestionGen:
                 else:
                     res = self._cq.search(
                         q,
-                        k=max(SUB_RAG_TOPK_PER_QUERY, 8),
+                        k=max(SUB_RAG_TOPK_PER_QUERY, 12),
                         where=where_course,
                         show_snippet=True,
                     )
@@ -404,17 +408,23 @@ class GeminiQuestionGen:
                 continue
             seen.add(k)
             merged.append(it)
-        # keep a compact context
-        return merged[:SUB_RAG_FINAL_K]
+        # keep comprehensive context for detailed learning objectives
+        return merged[:max(SUB_RAG_FINAL_K, 12)]
 
     def _prompt_subtopics(self, rag_block: str, topic_title: str, course_title: str, level: str) -> str:
         return f"""
 {rag_block}
 
-Using ONLY the study material snippets above, produce 5 precise subtopics for the topic:
+Using ALL the study material snippets above, produce 5 comprehensive learning objectives for the topic:
 Topic: "{topic_title}" (Course: "{course_title}" | Level: "{level}")
 
-Return a single JSON ARRAY of EXACTLY 5 short strings. No numbering, no markdown, no extra text.
+Each learning objective should be:
+- Specific and measurable
+- Related to the course content
+- At the appropriate academic level
+- Action-oriented (use verbs like: analyze, design, implement, evaluate, etc.)
+
+Return a single JSON ARRAY of EXACTLY 5 detailed learning objective strings. No numbering, no markdown, no extra text.
 """.strip()
 
     def _format_topic_rag(self, hits: List[Dict[str, Any]]) -> str:
@@ -461,17 +471,30 @@ Return a single JSON ARRAY of EXACTLY 5 short strings. No numbering, no markdown
                 prompt = self._prompt_subtopics(rag_block, title, course_title, level)
                 cand = self.mc.generate_json(prompt)
                 if isinstance(cand, list):
-                    # Coerce to 5 strings
+                    # Coerce to 5 detailed learning objectives
                     out = []
                     for x in cand:
                         s = str(x or "").strip()
-                        if s:
+                        if s and len(s) > 10:  # Ensure meaningful length
                             out.append(s)
                         if len(out) >= 5:
                             break
                     if out:
-                        t["subtopics"] = (out[:5] + ["TBD"] * 5)[:5]
-                        logger.info("[Subtopic RAG] Refined '%s' → %d items", title, len(out))
+                        # Ensure we have exactly 5 comprehensive learning objectives
+                        while len(out) < 5:
+                            out.append(f"Analyze and apply {title} concepts in practical scenarios")
+                        t["subtopics"] = out[:5]
+                        logger.info("[Subtopic RAG] Refined '%s' → %d comprehensive learning objectives", title, len(out))
+                    else:
+                        # Fallback: generate comprehensive learning objectives
+                        t["subtopics"] = [
+                            f"Understand and explain the fundamental concepts of {title}",
+                            f"Apply {title} principles to solve practical problems",
+                            f"Analyze different approaches and methodologies in {title}",
+                            f"Evaluate the effectiveness of various {title} techniques",
+                            f"Design and implement solutions using {title} knowledge"
+                        ]
+                        logger.info("[Subtopic RAG] Used fallback learning objectives for '%s'", title)
             except Exception as e:
                 logger.warning("[Subtopic RAG] '%s' — %s", title, e)
             finally:
@@ -520,13 +543,13 @@ Return a single JSON ARRAY of EXACTLY 5 short strings. No numbering, no markdown
             logger.warning("[Outline] Missing fields for %s", course_code)
             return None
 
-        # Ensure 8 topics, 5 subs each, keep sources as-is
-        topics = topics[:8] + []
-        while len(topics) < 8:
-            topics.append({"title": "TBD", "subtopics": ["TBD"] * 5, "sources": source_ids[:1]})
+        # Ensure 8-12 topics, 5 comprehensive learning objectives each, keep sources as-is
+        topics = topics[:12] + []  # Allow up to 12 topics
+        while len(topics) < 8:  # Minimum 8 topics
+            topics.append({"title": "Additional Course Topic", "subtopics": ["Analyze course concepts and applications", "Apply theoretical knowledge to practical problems", "Evaluate different approaches and methodologies", "Design solutions using course principles", "Synthesize information from multiple sources"] * 5, "sources": source_ids[:1]})
         for t in topics:
             subs = t.get("subtopics") or []
-            t["subtopics"] = (subs[:5] + ["TBD"] * 5)[:5]
+            t["subtopics"] = (subs[:5] + ["Learning objective TBD"] * 5)[:5]
             if not t.get("sources"):
                 t["sources"] = source_ids[:1]
 
@@ -927,10 +950,11 @@ class ChromaCoursesRunner:
     Outputs per-course JSON files under CHROMA_OUT_DIR and tracks resume state via ChromaCourseProgress.
     Also attempts to update courses.json when a matching code exists.
     """
-    def __init__(self, courses_json: Path | None = None, is_thinking: bool = False):
+    def __init__(self, courses_json: Path | None = None, is_thinking: bool = False, force_regenerate: bool = False):
         self.store = CourseStore(courses_json) if (courses_json and Path(courses_json).exists()) else None
         self.gen = GeminiQuestionGen(is_thinking=is_thinking)
         self._chroma = ChromaQuery()
+        self._force_regenerate = force_regenerate
 
     def _flatten_metas(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         try:
@@ -983,6 +1007,33 @@ class ChromaCoursesRunner:
             groups.setdefault(cf, []).append(m)
         return groups
 
+    def _course_has_comprehensive_outline(self, course_folder: str, courses_json: Path) -> bool:
+        """Check if a course already has a comprehensive outline with 8+ topics and detailed learning objectives."""
+        try:
+            if not courses_json.exists():
+                return False
+            with courses_json.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            for course in data:
+                if str(course.get("code", "")).strip() == course_folder:
+                    outline = course.get("outline", [])
+                    description = course.get("description", "")
+                    # Check if it has comprehensive outline (8+ topics with detailed subtopics)
+                    if (outline and len(outline) >= 8 and
+                        description and len(description) > 50):
+                        # Check if subtopics are comprehensive (not just "TBD" and meaningful length)
+                        has_comprehensive = True
+                        for topic in outline[:5]:  # Check first 5 topics
+                            subtopics = topic.get("subtopics", [])
+                            if not subtopics or all("TBD" in str(s) or len(str(s)) < 20 for s in subtopics):
+                                has_comprehensive = False
+                                break
+                        if has_comprehensive:
+                            return True
+        except Exception as e:
+            logger.warning("[Comprehensive check] Error checking %s: %s", course_folder, e)
+        return False
+
     def build_outlines_for_all_courses(
         self,
         *,
@@ -1003,6 +1054,13 @@ class ChromaCoursesRunner:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         for course_folder, mlist in groups.items():
+            # Check if course already has comprehensive outline (unless force regenerating)
+            if (self.store and self._course_has_comprehensive_outline(course_folder, self.store.path) and
+                not getattr(self, '_force_regenerate', False)):
+                logger.info("[Skip existing] %s — already has comprehensive outline with 8+ topics", course_folder)
+                skipped += 1
+                continue
+
             # Signature and resume check
             sig = self._signature_for_course(mlist)
             if skip_up_to_date and prog.up_to_date(course_folder, sig):
@@ -1098,7 +1156,7 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate course outlines first, update courses.json, cache embedding presence.")
+    parser = argparse.ArgumentParser(description="Generate comprehensive course outlines with detailed topics and learning objectives for ALL courses in ChromaDB collection.")
     parser.add_argument("--department_from", required=False, help='Any course code string from the department, e.g. "EEE 315" → uses "EEE"')
     parser.add_argument("--courses_json", default=str(COURSES_JSON), help="Path to courses.json")
     parser.add_argument("--skip_existing", action="store_true", default=True, help="Skip courses that already have outline + description")
@@ -1111,7 +1169,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser.add_argument("--only_missing", action="store_true", default=False, help="Process only courses currently marked as missing (honors TTL)")
     parser.add_argument("--dry_run", action="store_true", default=False, help="Do not generate or write outlines; just log hit availability")
     parser.add_argument("--thinking", action="store_true", default=False, help="Use thinking model mode")
-    parser.add_argument("--scan_chroma_all", action="store_true", default=True, help="Enumerate all COURSE_FOLDER in Chroma and generate outlines")
+    parser.add_argument("--scan_chroma_all", action="store_true", default=True, help="Generate comprehensive outlines for ALL courses in ChromaDB collection (default: enabled)")
+    parser.add_argument("--department_only", action="store_true", default=False, help="Generate outlines for a specific department only (requires --department_from)")
+    parser.add_argument("--force_regenerate", action="store_true", default=False, help="Force regeneration of all outlines, even those that already exist")
     parser.add_argument("--output_dir", default=str(CHROMA_OUT_DIR), help="Output directory for per-course JSON when scanning Chroma")
     args = parser.parse_args(argv)
 
@@ -1128,22 +1188,24 @@ def main(argv: Optional[List[str]] = None) -> None:
         logger.warning("Chroma connection check failed: %s", e)
 
     if args.scan_chroma_all:
-        runner = ChromaCoursesRunner(courses_json=Path(args.courses_json), is_thinking=args.thinking)
+        logger.info("Generating comprehensive outlines for ALL courses in ChromaDB collection...")
+        runner = ChromaCoursesRunner(courses_json=Path(args.courses_json), is_thinking=args.thinking, force_regenerate=args.force_regenerate)
         runner.build_outlines_for_all_courses(
-            skip_up_to_date=args.skip_existing,
+            skip_up_to_date=not args.force_regenerate,  # Skip existing unless force regenerate
             variation=args.variation,
             save_each_write=args.save_each_write,
             allow_dept_fallback=args.allow_dept_fallback,
             dry_run=args.dry_run,
             output_dir=Path(args.output_dir),
         )
-    else:
+    elif args.department_only:
         if not args.department_from:
-            parser.error("--department_from is required when not using --scan_chroma_all")
+            parser.error("--department_from is required when using --department_only")
+        logger.info("Generating outlines for department: %s", args.department_from)
         runner = DepartmentRunner(courses_json=Path(args.courses_json), is_thinking=args.thinking)
         runner.build_outlines_for_department(
             args.department_from,
-            skip_existing=args.skip_existing,
+            skip_existing=False,  # Process all courses in department
             variation=args.variation,
             save_each_write=args.save_each_write,
             ignore_missing_cache=args.ignore_missing_cache,
@@ -1151,6 +1213,18 @@ def main(argv: Optional[List[str]] = None) -> None:
             missing_ttl_hours=args.missing_ttl_hours,
             only_missing=args.only_missing,
             dry_run=args.dry_run,
+        )
+    else:
+        # Default behavior: scan all courses
+        logger.info("Default mode: Generating comprehensive outlines for ALL courses in ChromaDB collection...")
+        runner = ChromaCoursesRunner(courses_json=Path(args.courses_json), is_thinking=args.thinking)
+        runner.build_outlines_for_all_courses(
+            skip_up_to_date=False,  # Process all courses
+            variation=args.variation,
+            save_each_write=args.save_each_write,
+            allow_dept_fallback=args.allow_dept_fallback,
+            dry_run=args.dry_run,
+            output_dir=Path(args.output_dir),
         )
 
 
