@@ -862,17 +862,13 @@ class QuestionGenerator:
 
                     store.update_generation_progress(
                         course_code=course_code,
-                        topic=topic_title,
-                        subtopic=subtopic_title,
+                        course_title=course.get("title", ""),
+                        department=course.get("department", "Unknown"),
                         status=status,
+                        total_topics=1,  # This subtopic
+                        completed_topics=1 if status == "completed" else 0,
                         total_questions=total_questions,
                         completed_questions=completed_questions,
-                        metadata={
-                            "batch_name": request.name,
-                            "batch_type": request.kind,
-                            "batch_questions": completed_count,
-                            "difficulty_rank": request.difficulty_rank,
-                        }
                     )
             except Exception as exc:
                 logger.warning("Failed to update Firestore progress: %s", exc)
