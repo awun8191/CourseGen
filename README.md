@@ -26,39 +26,55 @@ The project is organized into `services/` (core pipelines), `data_models/` (Pyda
 - `tests/`: Unit/integration tests.
 
 ## Docker Setup
-Use `docker-compose.yml` for containerized runs. It mounts code, data, cache (OUTPUT_DATA2), and Firebase credentials.
+Use `docker-compose.yml` for containerized runs with **persistent volumes** that survive container rebuilds. The setup mounts embeddings, caches, and data directories to preserve your work across updates.
 
-### Quick Start
+### 🚀 Quick Start with Persistent Volumes
 ```bash
-# Build the optimized Docker image
+# Build the optimized Docker image with persistent volume support
 ./build.sh
 
-# Run with default help
-./run.sh
+# Start with persistent volumes (recommended)
+docker-compose up
 
-# Generate questions for all courses (requires .env with API keys)
-./run.sh --theory-per-request 5 --calc-per-request 3
+# Or run specific service with volumes
+docker-compose up coursegen-questions
+
+# Generate questions for all courses (20 per subtopic: 10 theory + 10 calculation)
+docker-compose run --rm coursegen --theory-per-request 10 --calc-per-request 10
 
 # Generate questions for specific course
-./run.sh --course-code "AAE 101" --theory-per-request 2 --calc-per-request 1
-
-# Generate questions with custom settings
-./run.sh --course-code "AAE 101" --theory-per-request 10 --calc-per-request 5 --no-resume --model gemini-2.5-flash
+docker-compose run --rm coursegen --course-code "AAE 101" --theory-per-request 10 --calc-per-request 10
 ```
 
-### Advanced Usage
+### 📁 Persistent Data Directories
+Your data persists across container rebuilds in these locations:
+- `./OUTPUT_DATA2/emdeddings/` - ChromaDB vector embeddings
+- `./.cache/coursegen/` - Question generation caches
+- `./data/` - Course data and configurations
+
+### 🔧 Advanced Usage
 ```bash
-# Interactive shell
+# Interactive shell with persistent volumes
 docker-compose run --rm coursegen bash
 
-# Custom environment file
-./run.sh --env-file .env.production --course-code "AAE 101" --theory-per-request 5
+# Custom environment file with volumes
+docker-compose --env-file .env.production up
 
-# Mount local data directories
-./run.sh -m --course-code "AAE 101" --theory-per-request 3 --calc-per-request 2
+# Run with specific settings (volumes automatically mounted)
+docker-compose run --rm coursegen \
+  --course-code "AAE 101" \
+  --theory-per-request 10 \
+  --calc-per-request 10 \
+  --request-delay 2 \
+  --temperature 0.7
 
 # Debug mode with verbose output
-./run.sh --course-code "AAE 101" --theory-per-request 1 --calc-per-request 1 --no-resume --request-delay 2
+docker-compose run --rm coursegen \
+  --course-code "AAE 101" \
+  --theory-per-request 5 \
+  --calc-per-request 5 \
+  --no-resume \
+  --request-delay 2
 ```
 
 ### Available Courses
@@ -76,13 +92,17 @@ grep '"code"' data/textbooks/courses.json | head -10
 - **API errors**: Verify API keys in `.env` file are valid and have sufficient quota
 - **0 questions generated**: Course may not have sufficient RAG context or outlines
 - **Memory issues**: Reduce `--theory-per-request` and `--calc-per-request` values
-- **Interactive mode issues**: Use `./run.sh` without `-i` flag for non-interactive environments
+- **Volume permission errors**: Ensure host directories have proper permissions (775 recommended)
+- **Firestore errors**: Check Firebase credentials and network connectivity
 
-### Recent Improvements
+### 🚀 Recent Improvements
+- ✅ **Persistent Volumes**: Embeddings and caches now survive container rebuilds
 - ✅ **Enhanced Reliability**: Added retry logic for network failures during build
 - ✅ **Fixed Dependencies**: Resolved numpy/albumentations version conflicts
 - ✅ **Better Error Handling**: Improved build script with debugging capabilities
 - ✅ **Path Consistency**: Fixed typos and ensured consistent directory paths
+- ✅ **Improved Health Checks**: Container now verifies ChromaDB embeddings directory exists
+- ✅ **Optimized Docker Compose**: Cleaner configuration with better defaults
 - ✅ **Comprehensive Documentation**: See [Docker README](DOCKER_README.md) for detailed troubleshooting
 
 ### Build Script Features
@@ -99,48 +119,109 @@ The `./build.sh` script now includes:
 - **Security**: Non-root user with proper permissions
 - **Health Checks**: Built-in monitoring and health verification
 - **Resource Optimization**: Configured for optimal memory and CPU usage
+- **Persistent Volume Support**: Proper permissions and ownership for mounted directories
+- **Directory Structure**: Ensures all required directories exist with correct permissions
 
-Ensure `.env` has API keys, and OUTPUT_DATA2/emdeddings exists (ChromaDB embeddings).
+### 📋 Prerequisites
+- **API Keys**: Ensure `.env` has valid API keys for Gemini, Cloudflare, and Firestore
+- **Persistent Data**: Your embeddings and caches are preserved in:
+  - `OUTPUT_DATA2/emdeddings/` (ChromaDB embeddings)
+  - `.cache/coursegen/` (Generation caches)
+  - `data/` (Course data and configurations)
+- **Course Data**: Verify `data/textbooks/courses.json` contains your course outlines
 
 ## Quick Start
-1. **Setup Environment**:
-   ```
-   python -m venv .venv
-   source .venv/bin/activate  # Linux/macOS
-   # or .venv\Scripts\activate  # Windows
-   pip install -r requirements.txt
-   ```
-   Install Tesseract OCR and set `TESSDATA_PREFIX` env var (e.g., `/usr/share/tesseract-ocr/4.00/tessdata` on Linux).
+
+### 🐳 Docker Setup (Recommended - with Persistent Volumes)
+1. **Build and Start**:
+    ```bash
+    # Build the optimized Docker image
+    ./build.sh
+
+    # Start with persistent volumes (data survives rebuilds)
+    docker-compose up
+    ```
 
 2. **Configure Secrets**:
-   - Gemini: `GOOGLE_API_KEY` or multiple keys in `data/gemini_cache/api_key_cache.json`.
-   - Cloudflare: `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
-   - Enable billing: `BILLING_ENABLED=1`.
+    ```bash
+    # Copy and edit environment file
+    cp .env.example .env
+    # Edit .env with your API keys:
+    # - GOOGLE_API_KEY (Gemini)
+    # - CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN
+    # - TESSDATA_PREFIX (Tesseract OCR path)
+    ```
+
+3. **Generate Embeddings** (one-time setup):
+    ```bash
+    # Process PDFs with persistent storage
+    docker-compose run --rm coursegen \
+      python -m services.RAG.convert_to_embeddings \
+      -i data/textbooks/COMPILATION/EEE \
+      --with-chroma \
+      -c pdfs_bge_m3_cloudflare \
+      --workers 4 \
+      --resume
+    ```
+
+4. **Generate Questions** (20 per subtopic: 10 theory + 10 calculation):
+    ```bash
+    # Generate for all courses
+    docker-compose run --rm coursegen \
+      --theory-per-request 10 \
+      --calc-per-request 10 \
+      --request-delay 2
+
+    # Or for specific course
+    docker-compose run --rm coursegen \
+      --course-code "EEE 315" \
+      --theory-per-request 10 \
+      --calc-per-request 10
+    ```
+
+5. **Run Tests**:
+    ```bash
+    docker-compose run --rm coursegen pytest tests/ -v
+    ```
+
+### 💻 Local Development Setup
+1. **Setup Environment**:
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate  # Linux/macOS
+    # or .venv\Scripts\activate  # Windows
+    pip install -r requirements.txt
+    ```
+    Install Tesseract OCR and set `TESSDATA_PREFIX` env var.
+
+2. **Configure Secrets**: Same as Docker setup above.
 
 3. **Process PDFs** (Embeddings):
-   ```
-   python -m services.RAG.convert_to_embeddings -i data/textbooks/COMPILATION/EEE --export-dir data/exported_data --cache-dir data/ocr_cache --with-chroma -c pdfs_bge_m3_cloudflare -p chromadb_storage --workers 4 --resume --ocr-dpi 450
-   ```
-
-4. **Generate Outlines**:
-   ```
-   python -m services.QuestionRag.pipelines.course_outline_generator --course-code EEE471 --collection pdfs_bge_m3_cloudflare --persist-dir chromadb_storage --output-dir utils/course_outline
-   ```
-
-5. **Generate Questions** (30/subtopic: 20 theory + 10 calc, RAG-required, Firestore-persisted):
+    ```bash
+    python -m services.RAG.convert_to_embeddings \
+      -i data/textbooks/COMPILATION/EEE \
+      --export-dir data/exported_data \
+      --cache-dir data/ocr_cache \
+      --with-chroma \
+      -c pdfs_bge_m3_cloudflare \
+      -p chromadb_storage \
+      --workers 4 \
+      --resume \
+      --ocr-dpi 450
     ```
-    python -m services.QuestionRag.gemini_question_gen --generate-questions --course-code EEE471  # Single
-    python -m services.QuestionRag.gemini_question_gen --generate-questions  # All courses
-    ```
-    - Skips subtopics without docs; only courses with outlines.
-    - Resumes from cache (OUTPUT_DATA2/cache).
-    - LaTeX for calc steps.
-    - Full CLI: `--theory-per-request 10 --calc-per-request 5 --no-resume --skip-firestore` etc.
 
-6. **Run Tests**:
-   ```
-   pytest tests/ -v
-   ```
+4. **Generate Questions**:
+    ```bash
+    python -m services.QuestionRag.pipelines.question_generator \
+      --theory-per-request 10 \
+      --calc-per-request 10 \
+      --request-delay 2
+    ```
+
+5. **Run Tests**:
+    ```bash
+    pytest tests/ -v
+    ```
 
 ## Detailed Documentation
 For in-depth guides:

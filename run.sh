@@ -1,3 +1,281 @@
 #!/usr/bin/env bash
 
-docker run --rm coursegen:fixed --theory-per-request 10 --calc-per-request 10 --request-delay 2 --temperature 0.7
+set -euo pipefail  # Exit on error, undefined vars, pipe failures
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+IMAGE_NAME="coursegen"
+IMAGE_TAG="latest"
+FULL_IMAGE_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
+DEFAULT_THEORY_COUNT=10
+DEFAULT_CALC_COUNT=10
+DEFAULT_REQUEST_DELAY=2
+
+# Function to print colored output
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to check prerequisites
+check_prerequisites() {
+    print_status "Checking prerequisites..."
+
+    # Check if Docker is installed and running
+    if ! command -v docker &> /dev/null; then
+        print_error "Docker is not installed or not in PATH"
+        exit 1
+    fi
+
+    # Check if Docker daemon is running
+    if ! docker info &> /dev/null; then
+        print_error "Docker daemon is not running. Please start Docker."
+        exit 1
+    fi
+
+    # Check if image exists
+    if ! docker image inspect "${FULL_IMAGE_NAME}" &> /dev/null; then
+        print_error "Docker image '${FULL_IMAGE_NAME}' not found"
+        print_status "Build the image first:"
+        echo "  ./build.sh"
+        exit 1
+    fi
+
+    # Check for persistent data directories
+    if [[ -d "OUTPUT_DATA2/emdeddings" ]]; then
+        print_status "Found existing embeddings data - will be preserved"
+    else
+        print_warning "No embeddings data found. Container will start with empty embeddings."
+    fi
+
+    print_success "Prerequisites check passed"
+}
+
+# Function to build docker run command
+build_docker_command() {
+    local docker_args=(
+        "docker" "run"
+        "--rm"
+        "-v" "$(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2"
+        "-v" "$(pwd)/.cache:/app/.cache"
+        "-v" "$(pwd)/data:/app/data"
+    )
+
+    # Add environment file if it exists
+    if [[ -f ".env" ]]; then
+        docker_args+=("--env-file" ".env")
+    fi
+
+    # Add custom environment file if specified
+    if [[ -n "$ENV_FILE" ]]; then
+        docker_args+=("--env-file" "$ENV_FILE")
+    fi
+
+    # Add interactive flags if requested
+    if [[ "$INTERACTIVE" == "true" ]]; then
+        docker_args+=("-it")
+    fi
+
+    # Add image name
+    docker_args+=("${FULL_IMAGE_NAME}")
+
+    echo "${docker_args[@]}"
+}
+
+# Function to show usage examples
+show_usage_examples() {
+    print_status "Usage Examples:"
+    echo ""
+    echo "  # Generate questions for all courses (default):"
+    echo "  ./run.sh"
+    echo ""
+    echo "  # Generate questions for specific course:"
+    echo "  ./run.sh --course-code 'EEE 315'"
+    echo ""
+    echo "  # Custom question counts:"
+    echo "  ./run.sh --theory-per-request 5 --calc-per-request 3"
+    echo ""
+    echo "  # Interactive mode:"
+    echo "  ./run.sh -i --course-code 'AAE 101'"
+    echo ""
+    echo "  # With custom environment file:"
+    echo "  ./run.sh --env-file .env.production --course-code 'EEE 471'"
+    echo ""
+    echo "  # Debug mode (no resume, verbose):"
+    echo "  ./run.sh --no-resume --request-delay 1 --course-code 'AAE 101'"
+    echo ""
+    echo "  # Background mode (no interactive):"
+    echo "  ./run.sh -b --course-code 'EEE 315'"
+    echo ""
+    echo "  # Help:"
+    echo "  ./run.sh --help"
+    echo ""
+}
+
+# Function to run container
+run_container() {
+    local docker_cmd
+    docker_cmd=$(build_docker_command)
+
+    local run_args=()
+
+    # Add course code if specified
+    if [[ -n "$COURSE_CODE" ]]; then
+        run_args+=("--course-code" "$COURSE_CODE")
+    fi
+
+    # Add question generation parameters
+    run_args+=("--theory-per-request" "$THEORY_COUNT")
+    run_args+=("--calc-per-request" "$CALC_COUNT")
+    run_args+=("--request-delay" "$REQUEST_DELAY")
+
+    # Add optional flags
+    if [[ "$NO_RESUME" == "true" ]]; then
+        run_args+=("--no-resume")
+    fi
+
+    if [[ "$SKIP_FIRESTORE" == "true" ]]; then
+        run_args+=("--skip-firestore")
+    fi
+
+    if [[ "$DEBUG" == "true" ]]; then
+        run_args+=("--temperature" "0.1")
+        run_args+=("--request-delay" "1")
+    fi
+
+    print_status "Starting CourseGen container..."
+    print_status "Command: ${docker_cmd} ${run_args[*]}"
+
+    # Execute the docker run command
+    $docker_cmd "${run_args[@]}"
+}
+
+# Main execution
+main() {
+    # Default values
+    COURSE_CODE=""
+    THEORY_COUNT="$DEFAULT_THEORY_COUNT"
+    CALC_COUNT="$DEFAULT_CALC_COUNT"
+    REQUEST_DELAY="$DEFAULT_REQUEST_DELAY"
+    INTERACTIVE=true
+    NO_RESUME=false
+    SKIP_FIRESTORE=false
+    DEBUG=false
+    ENV_FILE=""
+
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -i|--interactive)
+                INTERACTIVE=true
+                shift
+                ;;
+            -b|--background)
+                INTERACTIVE=false
+                shift
+                ;;
+            --course-code)
+                COURSE_CODE="$2"
+                shift 2
+                ;;
+            --theory-per-request)
+                THEORY_COUNT="$2"
+                shift 2
+                ;;
+            --calc-per-request)
+                CALC_COUNT="$2"
+                shift 2
+                ;;
+            --request-delay)
+                REQUEST_DELAY="$2"
+                shift 2
+                ;;
+            --no-resume)
+                NO_RESUME=true
+                shift
+                ;;
+            --skip-firestore)
+                SKIP_FIRESTORE=true
+                shift
+                ;;
+            --debug)
+                DEBUG=true
+                shift
+                ;;
+            --env-file)
+                ENV_FILE="$2"
+                shift 2
+                ;;
+            -h|--help)
+                echo "CourseGen Run Script with Persistent Volumes"
+                echo ""
+                echo "Usage: $0 [OPTIONS]"
+                echo ""
+                echo "Options:"
+                echo "  -i, --interactive     Run in interactive mode (default)"
+                echo "  -b, --background      Run in background mode (no TTY)"
+                echo "  --course-code CODE    Generate questions for specific course"
+                echo "  --theory-per-request N    Number of theory questions per request (default: $DEFAULT_THEORY_COUNT)"
+                echo "  --calc-per-request N     Number of calculation questions per request (default: $DEFAULT_CALC_COUNT)"
+                echo "  --request-delay SECS     Delay between API calls in seconds (default: $DEFAULT_REQUEST_DELAY)"
+                echo "  --no-resume           Do not reuse cached generations"
+                echo "  --skip-firestore      Disable persistence to Firestore"
+                echo "  --debug               Enable debug mode (lower temp, faster requests)"
+                echo "  --env-file FILE       Use custom environment file"
+                echo "  -h, --help            Show this help message"
+                echo ""
+                show_usage_examples
+                exit 0
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+    done
+
+    print_status "CourseGen Container Runner with Persistent Volumes"
+    echo "=================================================="
+
+    check_prerequisites
+
+    print_status "Configuration:"
+    echo "  Course Code: ${COURSE_CODE:-All courses}"
+    echo "  Theory Questions per Request: $THEORY_COUNT"
+    echo "  Calculation Questions per Request: $CALC_COUNT"
+    echo "  Request Delay: ${REQUEST_DELAY}s"
+    echo "  Interactive Mode: $INTERACTIVE"
+    echo "  Resume Enabled: $([ "$NO_RESUME" == "false" ] && echo "Yes" || echo "No")"
+    echo "  Firestore Enabled: $([ "$SKIP_FIRESTORE" == "false" ] && echo "Yes" || echo "No")"
+    echo "  Debug Mode: $DEBUG"
+    echo ""
+
+    if [[ "$INTERACTIVE" == "false" ]]; then
+        print_warning "Running in background mode. Use Ctrl+C to stop."
+    fi
+
+    run_container
+
+    print_success "Container execution completed!"
+}
+
+# Run main function with all arguments
+main "$@"

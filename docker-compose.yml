@@ -16,7 +16,7 @@ services:
       - COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json
       - COURSEGEN_CACHE_DIR=/app/.cache/coursegen
       - CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings
-      - OMP_NUM_THREADS=4
+      - OMP_NUM_THREADS=2
       # Add your API keys here or use .env file
       # - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       # - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
@@ -26,15 +26,14 @@ services:
     env_file:
       - .env
     
-    # Volume mounts for data persistence (optional)
+    # Volume mounts for data persistence
     volumes:
-      # Uncomment these if you want to persist data outside the container
-      # - ./OUTPUT_DATA2:/app/OUTPUT_DATA2
-      # - ./.cache:/app/.cache
-      # - ./data:/app/data
-      
-      # Mount for configuration files (if you want to modify them externally)
-      - ./data/textbooks/courses.json:/app/data/textbooks/courses.json:ro
+      # Persistent storage for ChromaDB embeddings (survives container rebuilds)
+      - ./OUTPUT_DATA2:/app/OUTPUT_DATA2
+      # Persistent storage for generation caches (survives container rebuilds)
+      - ./.cache:/app/.cache
+      # Persistent storage for data directories
+      - ./data:/app/data
     
     # Resource limits
     deploy:
@@ -46,16 +45,16 @@ services:
           memory: 1G
           cpus: '0.5'
     
-    # Health check
+    # Health check - verify ChromaDB embeddings directory exists
     healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      test: ["CMD", "test", "-d", "/app/OUTPUT_DATA2/emdeddings"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    
-    # Default command (can be overridden)
-    command: ["--help"]
+
+    # Default command - run question generation (can be overridden)
+    command: ["--theory-per-request", "10", "--calc-per-request", "10", "--request-delay", "2"]
     
     # Interactive mode
     stdin_open: true
@@ -85,12 +84,3 @@ networks:
   default:
     name: coursegen-network
     driver: bridge
-
-# Optional: Define volumes for data persistence
-volumes:
-  coursegen_data:
-    driver: local
-  coursegen_cache:
-    driver: local
-  coursegen_output:
-    driver: local

@@ -79,6 +79,12 @@ RUN set -eux \
   && chown -R appuser:appuser /app \
   && chmod -R g+w /tmp
 
+# Ensure mounted directories have correct permissions (for persistent volumes)
+RUN set -eux \
+  && mkdir -p /app/OUTPUT_DATA2/emdeddings /app/.cache/coursegen /app/data \
+  && chmod -R 775 /app/OUTPUT_DATA2 /app/.cache /app/data \
+  && chown -R appuser:appuser /app/OUTPUT_DATA2 /app/.cache /app/data
+
 USER appuser
 
 # Health check with better error handling
