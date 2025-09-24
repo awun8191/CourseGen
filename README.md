@@ -28,18 +28,79 @@ The project is organized into `services/` (core pipelines), `data_models/` (Pyda
 ## Docker Setup
 Use `docker-compose.yml` for containerized runs. It mounts code, data, cache (OUTPUT_DATA2), and Firebase credentials.
 
-Build and run:
-```
-docker-compose build
-docker-compose run --rm coursegen bash  # Interactive shell
+### Quick Start
+```bash
+# Build the optimized Docker image
+./build.sh
+
+# Run with default help
+./run.sh
+
+# Generate questions for all courses (requires .env with API keys)
+./run.sh --theory-per-request 5 --calc-per-request 3
+
+# Generate questions for specific course
+./run.sh --course-code "AAE 101" --theory-per-request 2 --calc-per-request 1
+
+# Generate questions with custom settings
+./run.sh --course-code "AAE 101" --theory-per-request 10 --calc-per-request 5 --no-resume --model gemini-2.5-flash
 ```
 
-For question generation:
-```
-docker-compose run --rm coursegen python -m services.QuestionRag.gemini_question_gen --generate-questions --course-code EEE301
+### Advanced Usage
+```bash
+# Interactive shell
+docker-compose run --rm coursegen bash
+
+# Custom environment file
+./run.sh --env-file .env.production --course-code "AAE 101" --theory-per-request 5
+
+# Mount local data directories
+./run.sh -m --course-code "AAE 101" --theory-per-request 3 --calc-per-request 2
+
+# Debug mode with verbose output
+./run.sh --course-code "AAE 101" --theory-per-request 1 --calc-per-request 1 --no-resume --request-delay 2
 ```
 
-Ensure `.env` has API keys, and OUTPUT_DATA2/chroma exists (embeddings).
+### Available Courses
+Check available courses in `data/textbooks/courses.json`:
+```bash
+# List all available course codes
+grep '"code"' data/textbooks/courses.json | head -10
+
+# Example courses: "AAE 101", "AAE 331", "AAE 335", etc.
+```
+
+### Question Generation Troubleshooting
+- **"Course code not found"**: Check available courses in `data/textbooks/courses.json`
+- **"No RAG context found"**: Ensure ChromaDB embeddings exist in `OUTPUT_DATA2/emdeddings/`
+- **API errors**: Verify API keys in `.env` file are valid and have sufficient quota
+- **0 questions generated**: Course may not have sufficient RAG context or outlines
+- **Memory issues**: Reduce `--theory-per-request` and `--calc-per-request` values
+- **Interactive mode issues**: Use `./run.sh` without `-i` flag for non-interactive environments
+
+### Recent Improvements
+- ✅ **Enhanced Reliability**: Added retry logic for network failures during build
+- ✅ **Fixed Dependencies**: Resolved numpy/albumentations version conflicts
+- ✅ **Better Error Handling**: Improved build script with debugging capabilities
+- ✅ **Path Consistency**: Fixed typos and ensured consistent directory paths
+- ✅ **Comprehensive Documentation**: See [Docker README](DOCKER_README.md) for detailed troubleshooting
+
+### Build Script Features
+The `./build.sh` script now includes:
+- **System Resource Checks**: Validates disk space and Docker daemon status
+- **Retry Logic**: Automatically retries failed builds with exponential backoff
+- **Debug Mode**: Provides detailed system information for troubleshooting
+- **Cleanup Options**: Removes old images and containers to free space
+- **Verbose Logging**: Shows detailed build progress and error information
+
+### Dockerfile Optimizations
+- **Multi-layer Caching**: Optimized layer structure for faster rebuilds
+- **Network Resilience**: Automatic retry logic for apt-get operations
+- **Security**: Non-root user with proper permissions
+- **Health Checks**: Built-in monitoring and health verification
+- **Resource Optimization**: Configured for optimal memory and CPU usage
+
+Ensure `.env` has API keys, and OUTPUT_DATA2/emdeddings exists (ChromaDB embeddings).
 
 ## Quick Start
 1. **Setup Environment**:

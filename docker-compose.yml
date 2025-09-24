@@ -2,16 +2,95 @@ version: '3.8'
 
 services:
   coursegen:
-    build: .
-    container_name: coursegen
-    volumes:
-      - .:/app
-      - ./data:/app/data
-      - ./OUTPUT_DATA2:/app/OUTPUT_DATA2
-      - ./enginneringhub_firebase_service.json:/app/enginneringhub_firebase_service.json:ro
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: coursegen:latest
+    container_name: coursegen-app
+    
+    # Environment variables
+    environment:
+      - PYTHONUNBUFFERED=1
+      - COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json
+      - COURSEGEN_CACHE_DIR=/app/.cache/coursegen
+      - CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings
+      - OMP_NUM_THREADS=4
+      # Add your API keys here or use .env file
+      # - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
+      # - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    
+    # Optional: Load environment from .env file
     env_file:
       - .env
-    working_dir: /app
+    
+    # Volume mounts for data persistence (optional)
+    volumes:
+      # Uncomment these if you want to persist data outside the container
+      # - ./OUTPUT_DATA2:/app/OUTPUT_DATA2
+      # - ./.cache:/app/.cache
+      # - ./data:/app/data
+      
+      # Mount for configuration files (if you want to modify them externally)
+      - ./data/textbooks/courses.json:/app/data/textbooks/courses.json:ro
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Default command (can be overridden)
+    command: ["--help"]
+    
+    # Interactive mode
     stdin_open: true
     tty: true
-    # For running commands: docker-compose run --rm coursegen python -m services.QuestionRag.gemini_question_gen --generate-questions --course-code EEE301
+    
+    # Restart policy
+    restart: unless-stopped
+
+  # Optional: Add a service for question generation with specific configuration
+  coursegen-questions:
+    extends: coursegen
+    container_name: coursegen-questions
+    command: ["--generate-questions"]
+    profiles:
+      - questions
+    
+  # Optional: Add a service for outline generation
+  coursegen-outlines:
+    extends: coursegen
+    container_name: coursegen-outlines
+    command: ["--department_from", "EEE 315"]
+    profiles:
+      - outlines
+
+# Optional: Define networks
+networks:
+  default:
+    name: coursegen-network
+    driver: bridge
+
+# Optional: Define volumes for data persistence
+volumes:
+  coursegen_data:
+    driver: local
+  coursegen_cache:
+    driver: local
+  coursegen_output:
+    driver: local

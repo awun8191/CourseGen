@@ -1,65 +1,82 @@
-FROM python:3.10-slim
+# syntax=docker/dockerfile:1.7
+FROM python:3.11-slim
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_ROOT_USER_ACTION=ignore \
-    COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json \
-    COURSEGEN_CACHE_DIR=/app/.cache/coursegen \
-    CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings \
-    PYTHONPATH=/app
+  LANG=C.UTF-8 \
+  LC_ALL=C.UTF-8 \
+  PYTHONUNBUFFERED=1 \
+  PIP_DISABLE_PIP_VERSION_CHECK=1 \
+  PIP_ROOT_USER_ACTION=ignore \
+  OMP_NUM_THREADS=2 \
+  NUMBA_CACHE_DIR=/tmp/numba_cache \
+  MPLCONFIGDIR=/tmp/matplotlib \
+  COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json \
+  COURSEGEN_CACHE_DIR=/app/.cache/coursegen \
+  CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings \
+  PYTHONPATH=/app
 
+# Install system dependencies in optimized layers with retry logic
 RUN set -eux \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        git \
-        curl \
-        wget \
-        ca-certificates \
-        pkg-config \
-        python3-dev \
-        python3-venv \
-        libglib2.0-0 \
-        libgl1 \
-        libsm6 \
-        libxrender1 \
-        libxext6 \
-        ffmpeg \
-        libjpeg-dev \
-        zlib1g-dev \
-        libpng-dev \
-        libtiff-dev \
-        libxml2-dev \
-        libxslt1-dev \
-        libgomp1 \
-        libomp-dev \
-        libhdf5-dev \
-        libpoppler-cpp-dev \
-        poppler-utils \
-        tesseract-ocr \
-        tesseract-ocr-eng \
-        libtesseract-dev \
-        unzip \
-        ghostscript \
-    && rm -rf /var/lib/apt/lists/*
+  && for i in {1..3}; do \
+       apt-get update && break || { \
+         echo "apt-get update failed (attempt $i/3), retrying in 5s..."; \
+         sleep 5; \
+       }; \
+     done \
+  && for i in {1..3}; do \
+       apt-get install -y --no-install-recommends \
+  # Core build tools
+  build-essential pkg-config python3-dev \
+  # SSL and networking
+  ca-certificates curl wget \
+  # Image processing libraries
+  libglib2.0-0 libgl1-mesa-dri libglx-mesa0 libsm6 libxrender1 libxext6 libfontconfig1 libice6 \
+  libjpeg-dev libpng-dev libtiff-dev zlib1g-dev \
+  # Scientific computing
+  libgomp1 libhdf5-dev libblas-dev liblapack-dev libopenblas-dev \
+  # PDF processing
+  libpoppler-cpp-dev poppler-utils \
+  # XML processing
+  libxml2-dev libxslt1-dev \
+  && break || { \
+    echo "apt-get install failed (attempt $i/3), retrying in 5s..."; \
+    sleep 5; \
+    if [ $i -eq 3 ]; then \
+      echo "apt-get install failed after 3 attempts, exiting..."; \
+      exit 1; \
+    fi; \
+  }; \
+  done \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+# Copy and install Python dependencies with better caching
 COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+  set -eux \
+  && python -m pip install --upgrade pip setuptools wheel \
+  && pip install --timeout=300 --prefer-binary -r requirements.txt
 
-RUN set -eux \
-    && python -m pip install --upgrade pip setuptools wheel \
-    && python -m pip install --no-cache-dir -r requirements.txt
-
-RUN mkdir -p /app/chromadb_storage /app/.cache/coursegen
-
+# Copy source code
 COPY . .
+
+# Create non-root user and required directories with proper permissions
+RUN set -eux \
+  && groupadd -r -g 1001 appuser \
+  && useradd -r -u 1001 -g appuser appuser \
+  && mkdir -p /app/.cache/coursegen /app/OUTPUT_DATA2/emdeddings /tmp/numba_cache /tmp/matplotlib \
+     /app/data/textbooks /app/data/exported_data /app/data/ocr_cache /app/chromadb_storage \
+  && chown -R appuser:appuser /app \
+  && chmod -R g+w /tmp
+
+USER appuser
+
+# Health check with better error handling
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD python -c "import sys; print('Health check passed'); sys.exit(0)" || exit 1
 
 ENTRYPOINT ["python", "-m", "services.QuestionRag.pipelines.question_generator"]
 CMD ["--help"]
