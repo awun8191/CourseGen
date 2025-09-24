@@ -92,7 +92,18 @@ class ApiKeyManager:
 
         key = self.api_keys[self.current_key_index]
         if not self.is_key_available(key, model):
-            return self.rotate_key(model)
+            # Try rotating to next key for the same model
+            try:
+                return self.rotate_key(model)
+            except ValueError:
+                # If all keys are exhausted for this model, try other models
+                for alt_model in ["lite", "flash", "pro"]:
+                    if alt_model != model:
+                        try:
+                            return self.rotate_key(alt_model)
+                        except ValueError:
+                            continue
+                raise ValueError(f"All API keys exhausted for all models including {model}")
 
         return key
 
@@ -138,17 +149,24 @@ class ApiKeyManager:
         self.cache.write_cache(self.cache_data)
 
     def rotate_key(self, model: str = "flash") -> str:
-        """Rotate to the next available API key."""
+        """Rotate to the next available API key for the specified model."""
         start_index = self.current_key_index
-        while True:
+        max_attempts = len(self.api_keys) * 2  # Allow trying each key twice
+        attempts = 0
+
+        while attempts < max_attempts:
             self.current_key_index = (
                 (self.current_key_index + 1) % len(self.api_keys)
             )
-            if self.current_key_index == start_index:
-                raise ValueError("All API keys are over their limits.")
+            attempts += 1
+
+            if self.current_key_index == start_index and attempts >= len(self.api_keys):
+                raise ValueError(f"All API keys are over their limits for model {model}.")
 
             key = self.api_keys[self.current_key_index]
             if self.is_key_available(key, model):
                 self.cache_data["current_key_index"] = self.current_key_index
                 self.cache.write_cache(self.cache_data)
                 return key
+
+        raise ValueError(f"All API keys are over their limits for model {model}.")

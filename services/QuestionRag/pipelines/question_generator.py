@@ -52,7 +52,7 @@ DEFAULT_CACHE_ROOT = Path(
 ).expanduser()
 DEFAULT_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
 
-DEFAULT_MODEL = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash")
+DEFAULT_MODEL = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash-lite")
 
 
 class QuestionGenerationError(RuntimeError):
@@ -113,30 +113,19 @@ class QuestionBatchConfig:
     def request_plan(self) -> List[RequestPlan]:
         if self.custom_plan is not None:
             return list(self.custom_plan)
+        # Generate exactly 20 questions per subtopic: 10 theory + 10 calculation
         return [
             RequestPlan(
                 name="theory-1",
                 kind="theory",
-                question_count=self.theory_questions_per_request,
+                question_count=10,  # Exactly 10 theory questions per request
                 difficulty_rank=4,
-            ),
-            RequestPlan(
-                name="theory-2",
-                kind="theory",
-                question_count=self.theory_questions_per_request,
-                difficulty_rank=7,
             ),
             RequestPlan(
                 name="calculation-1",
                 kind="calculation",
-                question_count=self.calc_questions_per_request,
+                question_count=10,  # Exactly 10 calculation questions per request
                 difficulty_rank=6,
-            ),
-            RequestPlan(
-                name="calculation-2",
-                kind="calculation",
-                question_count=self.calc_questions_per_request,
-                difficulty_rank=8,
             ),
         ]
 
@@ -179,7 +168,19 @@ class QuestionGenerator:
         rag_client: Optional[ChromaQuery] = None,
         firestore: Optional[Any] = None,
     ) -> None:
-        self.gemini = gemini_service or GeminiService()
+        # Initialize Gemini service with explicit API keys to avoid env var fallback
+        if gemini_service is None:
+            from services.Gemini.gemini_api_keys import GeminiApiKeys
+            from services.Gemini.api_key_manager import ApiKeyManager
+
+            gemini_keys = GeminiApiKeys()
+            api_keys = gemini_keys.get_keys()
+            api_key_manager = ApiKeyManager(api_keys)
+
+            self.gemini = GeminiService(api_key_manager=api_key_manager)
+        else:
+            self.gemini = gemini_service
+
         self.rag = rag_client or ChromaQuery()
         self._firestore = firestore
         self._cache_map: Dict[Path, QuestionCache] = {}
@@ -189,7 +190,48 @@ class QuestionGenerator:
     # Public orchestrators
     # ------------------------------------------------------------------
     def generate_course_questions(self, config: QuestionBatchConfig) -> List[Question]:
+        # If no course code specified, process all courses from courses.json
+        if not config.course_code or config.course_code.lower() == "all":
+            return self._generate_all_courses_questions(config)
+
+        # Single course mode
         course = self._load_course(config.courses_json_path, config.course_code)
+        return self._generate_single_course_questions(config, course)
+
+    def _generate_all_courses_questions(self, config: QuestionBatchConfig) -> List[Question]:
+        """Generate questions for all courses in courses.json."""
+        logger.info("Generating questions for all courses in courses.json")
+
+        courses_path = config.courses_json_path
+        if not courses_path.exists():
+            raise ValueError(f"Courses file not found: {courses_path}")
+
+        # Load all courses
+        data = json.loads(courses_path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            raise ValueError("courses.json must be a list of course objects")
+
+        courses = [row for row in data if row.get("outline")]  # Only courses with outlines
+        if not courses:
+            logger.warning("No courses with outlines found in %s", courses_path)
+            return []
+
+        logger.info(f"Found {len(courses)} courses with outlines")
+
+        all_results: List[Question] = []
+        for course in courses:
+            try:
+                course_results = self._generate_single_course_questions(config, course)
+                all_results.extend(course_results)
+                logger.info(f"Generated {len(course_results)} questions for {course.get('code', 'unknown')}")
+            except Exception as exc:
+                logger.error(f"Failed to generate questions for course {course.get('code', 'unknown')}: {exc}")
+                continue
+
+        return all_results
+
+    def _generate_single_course_questions(self, config: QuestionBatchConfig, course: Dict[str, Any]) -> List[Question]:
+        """Generate questions for a single course."""
         outline = course.get("outline") or []
         normalized_topics = config.normalized_topics()
         normalized_subtopics = config.normalized_subtopics()
@@ -334,7 +376,13 @@ class QuestionGenerator:
                         request.name,
                         last_error,
                     )
-                    reason = f"error:{last_error}"
+                    # Handle API key errors more gracefully
+                    error_str = str(last_error)
+                    if "API_KEY" in error_str or "REDACTED_API_KEY" in error_str or "authentication" in error_str.lower():
+                        reason = "api_key_error"
+                        logger.error("API key authentication failed. Please check your Gemini API key configuration.")
+                    else:
+                        reason = f"error:{last_error}"
                 cache.mark_skipped(key, reason=reason, meta=meta)
                 continue
 
@@ -345,6 +393,17 @@ class QuestionGenerator:
             )
             questions.extend(generated)
             self._persist_to_firestore(generated, enable=config.store_firestore)
+
+            # Update progress after each batch completion
+            self._update_progress_after_batch(
+                config=config,
+                course=course,
+                topic_title=topic_title,
+                subtopic_title=subtopic_title,
+                request=request,
+                completed_count=len(generated)
+            )
+
             self._sleep_with_jitter(config.request_delay_s, config.delay_jitter)
 
         return questions
@@ -392,8 +451,8 @@ class QuestionGenerator:
             where_candidates.append(config.rag_where)
         course_code = str(course.get("code") or "").strip()
         if course_code:
-            where_candidates.append({"COURSE_CODE": course_code})
-            where_candidates.append({"COURSE_FOLDER": course_code.replace(" ", "_")})
+            where_candidates.append({"COURSE_FOLDER": course_code})
+            where_candidates.append({"COURSE_CODE": course_code.split()[0] if " " in course_code else course_code})
         where_candidates.append(None)
 
         for attempt in range(max(1, config.rag_attempts)):
@@ -414,6 +473,26 @@ class QuestionGenerator:
                         continue
                     if results:
                         return results
+
+                # If no results found with metadata filter, try without filter
+                if where is not None:
+                    for query in queries:
+                        try:
+                            results = self.rag.search_with_temperature(
+                                query,
+                                topk=config.rag_topk,
+                                final_k=config.rag_final_k,
+                                tau=config.rag_tau,
+                                min_sim=0.3,  # Lower minimum similarity for fallback
+                                where=None,  # No metadata filter
+                            )
+                        except Exception as exc:  # pragma: no cover - network dependent
+                            logger.warning("Chroma fallback search failed for '%s': %s", query, exc)
+                            continue
+                        if results:
+                            logger.info("Using fallback search results for '%s'", query)
+                            return results
+
             time.sleep(0.5 * (attempt + 1))
         return []
 
@@ -480,16 +559,49 @@ class QuestionGenerator:
             max_output_tokens=config.gemini_max_output_tokens,
         )
 
+        # Generate without response_model to get raw response, then parse manually
         response = self.gemini.generate(
             prompt,
             model=config.gemini_model,
             generation_config=gen_config,
-            response_model=GeminiQuestionBatch,
         )
+
+        # Debug: print the raw response before validation (only in verbose mode)
+        if os.environ.get("COURSEGEN_DEBUG", "").lower() == "true":
+            print(f"DEBUG: Raw response type: {type(response)}")
+            if isinstance(response, dict):
+                print(f"DEBUG: Response keys: {response.keys()}")
+                if 'result' in response:
+                    print(f"DEBUG: Result content: {response['result'][:200]}...")
+                if 'questions' in response:
+                    print(f"DEBUG: First question keys: {response['questions'][0].keys() if response['questions'] else 'No questions'}")
+                    if response['questions'] and 'solution_steps' in response['questions'][0]:
+                        print(f"DEBUG: First question solution_steps: {repr(response['questions'][0]['solution_steps'])} (type: {type(response['questions'][0]['solution_steps'])})")
+
+        # Convert to GeminiQuestionBatch
         if isinstance(response, GeminiQuestionBatch):
             batch = response
         else:
-            batch = GeminiQuestionBatch.model_validate(response)
+            # Handle case where response has 'result' key with raw JSON
+            if isinstance(response, dict) and 'result' in response:
+                import json
+                try:
+                    parsed_response = json.loads(response['result'])
+                    batch = GeminiQuestionBatch.model_validate(parsed_response)
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, try to extract JSON from the text
+                    import re
+                    json_match = re.search(r'```json\s*(\{.*?\})\s*```', response['result'], re.DOTALL)
+                    if json_match:
+                        try:
+                            parsed_response = json.loads(json_match.group(1))
+                            batch = GeminiQuestionBatch.model_validate(parsed_response)
+                        except (json.JSONDecodeError, KeyError):
+                            raise ValueError(f"Could not parse JSON from response: {response['result'][:200]}...")
+                    else:
+                        raise ValueError(f"No JSON found in response: {response['result'][:200]}...")
+            else:
+                batch = GeminiQuestionBatch.model_validate(response)
 
         actual_count = len(batch.questions)
         expected_count = request.question_count
@@ -559,7 +671,8 @@ class QuestionGenerator:
                 if not steps:
                     raise QuestionGenerationError("Calculation question missing solution steps")
             else:
-                steps = steps[:8]
+                # For theory questions, ensure solution_steps is an empty list, not an empty string
+                steps = []
 
             question = Question(
                 course_code=course_code,
@@ -658,26 +771,30 @@ class QuestionGenerator:
     ) -> str:
         level = self._first(course.get("levels")) or "Unknown"
         semester = self._first(course.get("semesters")) or "Unknown"
-        steps_note = "For theory questions, set 'solution_steps': []. For calculation questions, provide a list of 3-5 clear LaTeX-formatted solution steps." if request.kind == "calculation" else "For theory questions, set 'solution_steps': []. Do not include solution steps."
+        steps_note = "For theory questions, set 'solution_steps' to an empty array []. For calculation questions, provide a list of 3-5 clear LaTeX-formatted solution steps." if request.kind == "calculation" else "For theory questions, set 'solution_steps' to an empty array []. Do not include solution steps."
         return (
-            "You are an expert university assessment designer. Use only the "
-            "reference extracts to craft rigorous, unambiguous multiple choice questions.\n"
+            "You are an expert university assessment designer. Create original, rigorous, "
+            "unambiguous multiple choice questions based on the topic and subtopic provided.\n"
             f"Course: {course.get('title', '')} ({course.get('code', '')})\n"
             f"Level: {level} | Semester: {semester}\n"
             f"Topic: {topic_title}\nSubtopic: {subtopic_title}\n"
             f"Question type: {request.kind}\n"
             f"Questions required: {request.question_count}\n"
             "Requirements:\n"
-            "- Each question must align strictly with the subtopic and reference extracts. If no relevant extracts, generate general but accurate questions based on subtopic.\n"
+            "- Create ORIGINAL questions that test understanding of the subtopic concepts.\n"
+            "- DO NOT reference or cite the provided extracts in questions, answers, or explanations.\n"
             "- Provide exactly four unique options labelled A, B, C, D.\n"
             "- 'correct_answer' must be the letter of the correct option (A/B/C/D).\n"
             "- 'correct_answer_text' must exactly match the full text of the correct option.\n"
-            "- Explanations must cite ideas from the reference extracts where possible.\n"
+            "- Explanations should explain the reasoning without referencing study materials.\n"
+            "- Questions should be self-contained and not require external knowledge.\n"
             f"- {steps_note}\n"
-            "- Avoid placeholders, ambiguities, or references outside the provided context.\n"
+            "- CRITICAL: For theory questions, 'solution_steps' MUST be an empty array [] (not a string, not null, not empty string).\n"
+            "- CRITICAL: For calculation questions, 'solution_steps' MUST be an array of strings with 3-5 solution steps.\n"
+            "- IMPORTANT: Questions, answers, and explanations must be ORIGINAL and not reference any study materials.\n"
             "- Ensure all fields are properly typed: solution_steps must be a JSON array ([]) even if empty.\n"
             "Respond ONLY with valid JSON matching this exact schema: {{\"questions\": [{{ \"question\": str, \"options\": [str,str,str,str], \"correct_answer\": \"A/B/C/D\", \"correct_answer_text\": str, \"explanation\": str, \"solution_steps\": [str] or [] }} ] }}. No additional text.\n"
-            f"Reference extracts:\n{context_text}\n"
+            f"Reference extracts (for context only - do not reference in output):\n{context_text}\n"
         )
 
     def _persist_to_firestore(self, questions: Iterable[Question], *, enable: bool) -> None:
@@ -705,6 +822,60 @@ class QuestionGenerator:
             logger.warning("Could not initialize Firestore: %s", exc)
             self._firestore = None
             return None
+
+    def _update_progress_after_batch(
+        self,
+        *,
+        config: QuestionBatchConfig,
+        course: Dict[str, Any],
+        topic_title: str,
+        subtopic_title: str,
+        request: RequestPlan,
+        completed_count: int,
+    ) -> None:
+        """Update progress tracking after a batch is completed."""
+        cache = self._cache_for(config.cache_dir)
+        course_code = str(course.get("code", ""))
+
+        # Update cache.json with batch completion
+        cache.mark_batch_completed(course_code, topic_title, subtopic_title, request.name)
+
+        # Update Firestore GenerationProgress collection
+        if config.store_firestore:
+            try:
+                store = self._resolve_firestore()
+                if store:
+                    # Calculate total questions for this subtopic (20: 10 theory + 10 calculation)
+                    total_questions = 20
+                    completed_questions = completed_count
+
+                    # Get current progress to accumulate
+                    try:
+                        existing_progress = store.db.collection("GenerationProgress").document(f"{course_code}-{topic_title}-{subtopic_title}").get()
+                        if existing_progress.exists:
+                            data = existing_progress.to_dict()
+                            completed_questions += data.get("completed_questions", 0)
+                    except Exception:
+                        pass  # Continue with current batch count if unable to fetch existing
+
+                    status = "completed" if completed_questions >= total_questions else "in_progress"
+
+                    store.update_generation_progress(
+                        course_code=course_code,
+                        topic=topic_title,
+                        subtopic=subtopic_title,
+                        status=status,
+                        total_questions=total_questions,
+                        completed_questions=completed_questions,
+                        metadata={
+                            "batch_name": request.name,
+                            "batch_type": request.kind,
+                            "batch_questions": completed_count,
+                            "difficulty_rank": request.difficulty_rank,
+                        }
+                    )
+            except Exception as exc:
+                logger.warning("Failed to update Firestore progress: %s", exc)
 
     def _sleep_with_jitter(self, base: float, jitter: float) -> None:
         if base <= 0:
@@ -739,7 +910,7 @@ def _parse_optional_json(value: Optional[str]) -> Optional[Dict[str, Any]]:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate questions with Gemini + RAG")
-    parser.add_argument("--course-code", help="Course code e.g. EEE 301 (omit for all courses)")
+    parser.add_argument("--course-code", default="all", help="Course code e.g. EEE 301 (default: all courses)")
     parser.add_argument(
         "--courses-json",
         default=str(DEFAULT_COURSES_JSON),
@@ -858,8 +1029,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     courses_path = Path(args.courses_json)
-    if args.course_code:
-        course = _load_course_standalone(courses_path, args.course_code)
+    course_code = args.course_code or "all"
+
+    if course_code.lower() != "all":
+        course = _load_course_standalone(courses_path, course_code)
         courses = [course]
     else:
         data = json.loads(courses_path.read_text(encoding="utf-8"))
@@ -897,16 +1070,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "output_path": Path(args.output_jsonl) if args.output_jsonl else None,
     }
 
-    generator = QuestionGenerator(
-        gemini_service=GeminiService(
-            model=args.model,
-            generation_config=GeminiConfig(
-                temperature=args.temperature,
-                top_p=args.top_p,
-                max_output_tokens=args.max_output_tokens,
-            ),
-        )
+    # Initialize Gemini service with explicit API keys to avoid env var fallback
+    from services.Gemini.gemini_api_keys import GeminiApiKeys
+    from services.Gemini.api_key_manager import ApiKeyManager
+
+    gemini_keys = GeminiApiKeys()
+    api_keys = gemini_keys.get_keys()
+    api_key_manager = ApiKeyManager(api_keys)
+
+    gemini_service = GeminiService(
+        api_key_manager=api_key_manager,
+        model=args.model,
+        generation_config=GeminiConfig(
+            temperature=args.temperature,
+            top_p=args.top_p,
+            max_output_tokens=args.max_output_tokens,
+        ),
     )
+
+    generator = QuestionGenerator(gemini_service=gemini_service)
     runner = QuestionBatchRunner(generator)
 
     for course in courses:

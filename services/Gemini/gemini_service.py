@@ -27,9 +27,14 @@ if project_root not in sys.path:
 
 from data_models.gemini_config import GeminiConfig  # noqa: E402
 
-from google import genai  # noqa: E402
-from google.genai import types as gtypes  # noqa: E402
-from google.genai import errors as genai_errors  # noqa: E402
+try:
+    from google import genai  # noqa: E402
+    from google.genai import types as gtypes  # noqa: E402
+    from google.genai import errors as genai_errors  # noqa: E402
+except ImportError:
+    genai = None  # type: ignore
+    gtypes = None  # type: ignore
+    genai_errors = None  # type: ignore
 import httpx  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
@@ -53,7 +58,7 @@ except Exception:
 
 T = TypeVar("T", bound=BaseModel)
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 EMBEDDING_MODEL = "gemini-embedding-001"
 IMAGE_TOKEN_COST = 1000
 
@@ -102,6 +107,9 @@ class GeminiService:
 
     def _configure_genai(self, model: str = "flash") -> None:
         """(Re)configure google-genai Client using the current API key for a model family."""
+        if genai is None:
+            raise ImportError("google-genai package is not installed. Install with: pip install google-genai")
+
         # family is 'flash'|'lite'|'pro'|'embedding'
         family = self._get_model_name(model)
         api_key = self.api_key_manager.get_key(family)
@@ -326,6 +334,36 @@ class GeminiService:
                 if cleaned_text.endswith("```"):
                     cleaned_text = cleaned_text[:-3]
                 cleaned_text = cleaned_text.strip()
+
+                # Fix common issue where Gemini returns string representations of arrays
+                # Convert "[]" to [] and empty strings to [] for solution_steps and other array fields
+                import ast
+                def fix_string_arrays(text: str) -> str:
+                    try:
+                        # Try to parse as JSON first
+                        parsed = json.loads(text)
+                        # If parsing succeeded, check for string arrays and fix them
+                        if isinstance(parsed, dict):
+                            for key, value in parsed.items():
+                                if isinstance(value, str):
+                                    # Handle empty strings and string representations of empty arrays
+                                    if value.strip() in ['', '[]', '[\"\"]', '[""]']:
+                                        parsed[key] = []
+                                    elif value.strip().startswith('[') and value.strip().endswith(']'):
+                                        try:
+                                            # Try to evaluate the string as a Python literal
+                                            parsed[key] = ast.literal_eval(value)
+                                        except (ValueError, SyntaxError):
+                                            pass  # Keep original value if can't parse
+                        return json.dumps(parsed)
+                    except json.JSONDecodeError:
+                        # If JSON parsing fails, try regex approach as fallback
+                        import re
+                        text = re.sub(r'("solution_steps"\s*:\s*)"(\[\s*\])"', r'\1\2', text)
+                        text = re.sub(r'("solution_steps"\s*:\s*)"\"\"', r'\1[]', text)
+                        return text
+
+                cleaned_text = fix_string_arrays(cleaned_text)
 
                 try:
                     data = json.loads(cleaned_text)

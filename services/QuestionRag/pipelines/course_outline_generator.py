@@ -18,8 +18,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    genai = None
+    types = None
 
 # Local deps
 from ..utils.chromadb_query import (
@@ -179,6 +183,8 @@ def _sleep_with_jitter(base_s: float, jitter_frac: float = DELAY_JITTER_FRAC):
 # =========================
 class ModelClient:
     def __init__(self, is_thinking: bool = True):
+        if genai is None:
+            raise ImportError("google-genai package is not installed. Install with: pip install google-genai")
         key = os.environ.get("GOOGLE_API_KEY")
         if not key:
             raise EnvironmentError("GOOGLE_API_KEY is not set")

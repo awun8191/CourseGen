@@ -41,9 +41,9 @@ class CacheKey:
 
 
 class QuestionCache:
-    """Simple JSON backed cache for question generation."""
+    """Sophisticated JSON backed cache for question generation with fine-grained progress tracking."""
 
-    INDEX_FILE = "index.json"
+    INDEX_FILE = "cache.json"
 
     def __init__(self, cache_dir: str | Path, namespace: str = "question_gen") -> None:
         self.cache_dir = Path(cache_dir).expanduser().resolve() / namespace
@@ -156,6 +156,78 @@ class QuestionCache:
             entry = self._entry_for(key)
             states[req_name] = (entry or {}).get("status", "missing")
         return states
+
+    def get_course_progress(self, course_code: str) -> Dict[str, Any]:
+        """Get progress for a specific course from the cache."""
+        return self._index.get(course_code, {})
+
+    def update_subtopic_progress(
+        self,
+        course_code: str,
+        topic: str,
+        subtopic: str,
+        theory_batches: List[str],
+        calc_batches: List[str],
+    ) -> None:
+        """Update progress for a specific subtopic in the cache."""
+        if course_code not in self._index:
+            self._index[course_code] = {}
+
+        if topic not in self._index[course_code]:
+            self._index[course_code][topic] = {}
+
+        self._index[course_code][topic][subtopic] = {
+            "theory_batches": theory_batches,
+            "calc_batches": calc_batches,
+            "updated_at": time.time(),
+        }
+        self._save_index()
+
+    def get_pending_batches(self, course_code: str, topic: str, subtopic: str) -> List[str]:
+        """Get list of pending batch names for a subtopic."""
+        course_progress = self.get_course_progress(course_code)
+        topic_progress = course_progress.get(topic, {})
+        subtopic_progress = topic_progress.get(subtopic, {})
+
+        pending = []
+        theory_batches = subtopic_progress.get("theory_batches", [])
+        calc_batches = subtopic_progress.get("calc_batches", [])
+
+        # Check theory batches
+        for batch in theory_batches:
+            if batch == "pending":
+                pending.append(f"theory-{len(pending) + 1}")
+
+        # Check calculation batches
+        for batch in calc_batches:
+            if batch == "pending":
+                pending.append(f"calculation-{len(pending) + 1}")
+
+        return pending
+
+    def mark_batch_completed(self, course_code: str, topic: str, subtopic: str, batch_name: str) -> None:
+        """Mark a specific batch as completed."""
+        course_progress = self.get_course_progress(course_code)
+        topic_progress = course_progress.get(topic, {})
+        subtopic_progress = topic_progress.get(subtopic, {})
+
+        theory_batches = subtopic_progress.get("theory_batches", [])
+        calc_batches = subtopic_progress.get("calc_batches", [])
+
+        if batch_name.startswith("theory"):
+            # Find and update the theory batch
+            for i, batch in enumerate(theory_batches):
+                if batch == "pending":
+                    theory_batches[i] = "completed"
+                    break
+        elif batch_name.startswith("calculation"):
+            # Find and update the calculation batch
+            for i, batch in enumerate(calc_batches):
+                if batch == "pending":
+                    calc_batches[i] = "completed"
+                    break
+
+        self.update_subtopic_progress(course_code, topic, subtopic, theory_batches, calc_batches)
 
     def prune(self, older_than: float | None = None) -> None:
         if older_than is None:

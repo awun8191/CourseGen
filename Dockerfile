@@ -40,6 +40,13 @@ RUN set -eux \
   libpoppler-cpp-dev poppler-utils \
   # XML processing
   libxml2-dev libxslt1-dev \
+  # Additional dependencies for opencv, scikit-image, etc.
+  libgtk-3-dev libgirepository1.0-dev libcairo-gobject2 libpango-1.0-0 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libatspi2.0-0 \
+  libxss1 libasound2 libxrandr2 libxcomposite1 libxdamage1 libgbm1 \
+  # Tesseract OCR
+  tesseract-ocr tesseract-ocr-eng \
+  # Additional image processing
+  libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
   && break || { \
     echo "apt-get install failed (attempt $i/3), retrying in 5s..."; \
     sleep 5; \
@@ -54,7 +61,7 @@ RUN set -eux \
 WORKDIR /app
 
 # Copy and install Python dependencies with better caching
-COPY requirements.txt .
+COPY requirements*.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
   set -eux \
   && python -m pip install --upgrade pip setuptools wheel \

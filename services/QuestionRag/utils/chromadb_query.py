@@ -24,6 +24,14 @@ import time
 from chromadb import PersistentClient
 from pathlib import Path
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # python-dotenv not available, environment variables must be set manually
+    pass
+
 # =========================
 # Logging
 # =========================
