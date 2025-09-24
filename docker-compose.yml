@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
       args:
         BUILDKIT_INLINE_CACHE: 1
-    image: coursegen:latest
+    image: 888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest
     container_name: coursegen-app
     
     # Environment variables
@@ -17,33 +17,19 @@ services:
       - COURSEGEN_CACHE_DIR=/app/.cache/coursegen
       - CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings
       - OMP_NUM_THREADS=2
-      # Add your API keys here or use .env file
-      # - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      # - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
-      # - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
-    
-    # Optional: Load environment from .env file
+      - WORKERS=2   # configurable worker count
     env_file:
       - .env
     
     # Volume mounts for data persistence
     volumes:
-      # Persistent storage for ChromaDB embeddings (survives container rebuilds)
-      - ./OUTPUT_DATA2:/app/OUTPUT_DATA2
-      # Persistent storage for generation caches (survives container rebuilds)
-      - ./.cache:/app/.cache
-      # Persistent storage for data directories
-      - ./data:/app/data
+      - ./OUTPUT_DATA2:/app/OUTPUT_DATA2       # ChromaDB embeddings
+      - ./.cache:/app/.cache                   # generation cache
+      - ./data:/app/data                       # data files
     
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: '2.0'
-        reservations:
-          memory: 1G
-          cpus: '0.5'
+    # ✅ Real resource limits (works in plain Compose)
+    mem_limit: 8g
+    cpus: "2.0"
     
     # Health check - verify ChromaDB embeddings directory exists
     healthcheck:
@@ -53,14 +39,11 @@ services:
       retries: 3
       start_period: 10s
 
-    # Default command - run question generation (can be overridden)
+    # Default command - run question generation
     command: ["--theory-per-request", "10", "--calc-per-request", "10", "--request-delay", "2"]
     
-    # Interactive mode
     stdin_open: true
     tty: true
-    
-    # Restart policy
     restart: unless-stopped
 
   # Optional: Add a service for question generation with specific configuration
@@ -79,7 +62,6 @@ services:
     profiles:
       - outlines
 
-# Optional: Define networks
 networks:
   default:
     name: coursegen-network

@@ -10,7 +10,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="coursegen"
+IMAGE_NAME="888429341445.dkr.ecr.us-east-1.amazonaws.com/rag"
 IMAGE_TAG="latest"
 FULL_IMAGE_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
 
@@ -45,6 +45,14 @@ check_prerequisites() {
     if ! docker info &> /dev/null; then
         print_error "Docker daemon is not running. Please start Docker."
         exit 1
+    fi
+
+    # Check if AWS CLI is available for ECR authentication
+    if ! command -v aws &> /dev/null; then
+        print_warning "AWS CLI not found. You'll need to authenticate with ECR manually:"
+        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+    else
+        print_status "AWS CLI found - will authenticate with ECR automatically"
     fi
 
     # Check if required files exist
@@ -206,6 +214,18 @@ show_build_results() {
 show_usage_examples() {
     print_status "Usage Examples:"
     echo ""
+    echo "  # Fix Docker credential issues:"
+    echo "  ./build.sh --fix-credentials"
+    echo ""
+    echo "  # Build and run locally:"
+    echo "  ./build.sh && ./run.sh"
+    echo ""
+    echo "  # Build and deploy to AWS ECR:"
+    echo "  ./build.sh --deploy"
+    echo ""
+    echo "  # Manual ECR authentication:"
+    echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+    echo ""
     echo "  # Run with default help command:"
     echo "  docker run --rm ${FULL_IMAGE_NAME}"
     echo ""
@@ -224,9 +244,68 @@ show_usage_examples() {
     echo "  # Run outline generation:"
     echo "  docker run --rm -it ${FULL_IMAGE_NAME} --department_from 'EEE 315'"
     echo ""
+    echo "  # Run with docker-compose:"
+    echo "  docker-compose up"
+    echo ""
     echo "  # Note: ChromaDB embeddings and course data are included in the image"
     echo "  # Volume mounts are CRITICAL for preserving embeddings data between runs"
     echo ""
+}
+
+# Function to push image to ECR
+push_to_ecr() {
+    print_status "Pushing image to AWS ECR..."
+
+    # Check if AWS CLI is available
+    if ! command -v aws &> /dev/null; then
+        print_error "AWS CLI not found. Cannot push to ECR."
+        print_status "Install AWS CLI or push manually:"
+        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+        echo "  docker push ${FULL_IMAGE_NAME}"
+        return 1
+    fi
+
+    # Method 1: Try direct docker login without credential helper
+    print_status "Authenticating with AWS ECR (Method 1: Direct login)..."
+    if echo "Logging into AWS ECR..." && aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com 2>/dev/null; then
+        print_success "Successfully authenticated with ECR"
+    else
+        print_warning "Direct login failed, trying alternative method..."
+
+        # Method 2: Try with explicit credential helper bypass
+        print_status "Authenticating with AWS ECR (Method 2: Environment variables)..."
+        AWS_PASSWORD=$(aws ecr get-login-password --region us-east-1)
+        if [ $? -eq 0 ] && [ -n "$AWS_PASSWORD" ]; then
+            if echo "$AWS_PASSWORD" | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com; then
+                print_success "Successfully authenticated with ECR"
+            else
+                print_error "Failed to authenticate with ECR using environment variables"
+                print_status "Manual authentication required:"
+                echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+                echo "  docker push ${FULL_IMAGE_NAME}"
+                return 1
+            fi
+        else
+            print_error "Failed to get ECR login password"
+            print_status "Manual authentication required:"
+            echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+            echo "  docker push ${FULL_IMAGE_NAME}"
+            return 1
+        fi
+    fi
+
+    # Push the image
+    print_status "Pushing ${FULL_IMAGE_NAME} to ECR..."
+    if docker push "${FULL_IMAGE_NAME}"; then
+        print_success "Successfully pushed image to ECR!"
+        print_status "Image available at: ${FULL_IMAGE_NAME}"
+        return 0
+    else
+        print_error "Failed to push image to ECR"
+        print_status "Try pushing manually:"
+        echo "  docker push ${FULL_IMAGE_NAME}"
+        return 1
+    fi
 }
 
 # Function to verify the built image
@@ -241,6 +320,36 @@ verify_image() {
         print_warning "Image verification failed - container may have issues"
         return 1
     fi
+}
+
+# Function to fix Docker credential helper issues
+fix_docker_credentials() {
+    print_status "Fixing Docker credential helper configuration..."
+
+    # Check current Docker config
+    DOCKER_CONFIG="${HOME}/.docker/config.json"
+    if [[ -f "$DOCKER_CONFIG" ]]; then
+        print_status "Found existing Docker config at $DOCKER_CONFIG"
+
+        # Backup current config
+        cp "$DOCKER_CONFIG" "${DOCKER_CONFIG}.backup.$(date +%s)"
+
+        # Remove problematic credential helpers
+        if command -v jq &> /dev/null; then
+            # Use jq if available
+            jq 'del(.credsStore, .credHelpers)' "$DOCKER_CONFIG" > "${DOCKER_CONFIG}.tmp" && mv "${DOCKER_CONFIG}.tmp" "$DOCKER_CONFIG"
+            print_success "Removed credential helpers from Docker config"
+        else
+            # Manual JSON editing
+            sed -i '/credsStore/d; /credHelpers/d' "$DOCKER_CONFIG" 2>/dev/null || true
+            print_warning "Could not automatically remove credential helpers. Manual edit may be needed."
+        fi
+    else
+        print_status "No existing Docker config found - will create new one"
+    fi
+
+    print_success "Docker credential helper configuration fixed"
+    print_status "You can now try ECR authentication again"
 }
 
 # Function to debug build issues
@@ -259,6 +368,16 @@ debug_build_issues() {
     echo "BuildKit enabled: $(docker buildx version &>/dev/null && echo 'Yes' || echo 'No')"
 
     echo ""
+    echo "=== Docker Configuration ==="
+    DOCKER_CONFIG="${HOME}/.docker/config.json"
+    if [[ -f "$DOCKER_CONFIG" ]]; then
+        echo "Docker config exists: Yes"
+        echo "Credential helpers configured: $(grep -c 'credsStore\|credHelpers' "$DOCKER_CONFIG" 2>/dev/null || echo '0')"
+    else
+        echo "Docker config exists: No"
+    fi
+
+    echo ""
     echo "=== File Checks ==="
     echo "Dockerfile exists: $([[ -f "Dockerfile" ]] && echo 'Yes' || echo 'No')"
     echo "requirements.txt exists: $([[ -f "requirements.txt" ]] && echo 'Yes' || echo 'No')"
@@ -272,6 +391,13 @@ debug_build_issues() {
     else
         echo "No build log found. Run a build first."
     fi
+
+    echo ""
+    echo "=== ECR Troubleshooting ==="
+    echo "1. Fix credential helpers: $0 --fix-credentials"
+    echo "2. Manual ECR login: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+    echo "3. Check AWS CLI: aws sts get-caller-identity"
+    echo "4. Verify ECR permissions: aws ecr describe-repositories --repository-names rag"
 
     echo ""
     echo "=== Recommendations ==="
@@ -293,6 +419,8 @@ main() {
     VERBOSE=false
     USE_MINIMAL=false
     DEBUG=false
+    DEPLOY=false
+    FIX_CREDENTIALS=false
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -320,6 +448,14 @@ main() {
                 DEBUG=true
                 shift
                 ;;
+            --deploy)
+                DEPLOY=true
+                shift
+                ;;
+            --fix-credentials)
+                FIX_CREDENTIALS=true
+                shift
+                ;;
             --help|-h)
                 echo "Usage: $0 [OPTIONS]"
                 echo "Options:"
@@ -329,6 +465,8 @@ main() {
                 echo "  --minimal        Use minimal Dockerfile (fewer dependencies)"
                 echo "  --ultra-minimal  Use ultra-minimal Dockerfile (core packages only)"
                 echo "  --debug          Show system information and debug build issues"
+                echo "  --deploy         Build and push image to AWS ECR"
+                echo "  --fix-credentials Fix Docker credential helper configuration"
                 echo "  --help, -h       Show this help message"
                 exit 0
                 ;;
@@ -351,6 +489,11 @@ main() {
         exit 0
     fi
 
+    if [[ "$FIX_CREDENTIALS" == "true" ]]; then
+        fix_docker_credentials
+        exit 0
+    fi
+
     check_prerequisites
 
     if [[ "$CLEANUP" == "true" ]]; then
@@ -364,9 +507,23 @@ main() {
             verify_image
         fi
 
+        # Deploy to ECR if requested
+        if [[ "$DEPLOY" == "true" ]]; then
+            if push_to_ecr; then
+                print_success "Deployment to AWS ECR completed successfully!"
+            else
+                print_error "Deployment to AWS ECR failed!"
+                exit 1
+            fi
+        fi
+
         show_usage_examples
 
-        print_success "Build process completed successfully!"
+        if [[ "$DEPLOY" == "true" ]]; then
+            print_success "Build and deployment process completed successfully!"
+        else
+            print_success "Build process completed successfully!"
+        fi
         exit 0
     else
         print_error "Build process failed!"

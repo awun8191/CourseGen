@@ -668,8 +668,9 @@ class QuestionGenerator:
             steps = [str(step).strip() for step in (item.solution_steps or []) if str(step).strip()]
             if request.kind == "calculation":
                 steps = self._ensure_latex_steps(steps, wrap_latex=wrap_latex)
+                # Allow empty solution steps for calculation questions instead of raising error
                 if not steps:
-                    raise QuestionGenerationError("Calculation question missing solution steps")
+                    steps = []
             else:
                 # For theory questions, ensure solution_steps is an empty list, not an empty string
                 steps = []
