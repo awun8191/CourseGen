@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import logging
 import os
 import random
+import textwrap
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -167,6 +169,7 @@ class QuestionGenerator:
         gemini_service: Optional[GeminiService] = None,
         rag_client: Optional[ChromaQuery] = None,
         firestore: Optional[Any] = None,
+        use_structured: Optional[bool] = None,
     ) -> None:
         # Initialize Gemini service with explicit API keys to avoid env var fallback
         if gemini_service is None:
@@ -185,6 +188,10 @@ class QuestionGenerator:
         self._firestore = firestore
         self._cache_map: Dict[Path, QuestionCache] = {}
         self._course_store: Dict[Path, List[Dict[str, Any]]] = {}
+        if use_structured is None:
+            env_flag = os.environ.get("COURSEGEN_USE_STRUCTURED", "0").lower()
+            use_structured = env_flag in ("1", "true", "yes")
+        self.use_structured = bool(use_structured)
 
     # ------------------------------------------------------------------
     # Public orchestrators
@@ -315,6 +322,20 @@ class QuestionGenerator:
                 "question_count": request.question_count,
             }
 
+            status = cache.get_status(key)
+            if status in {"failed", "skipped"}:
+                entry = cache.get_entry(key) or {}
+                reason = str(entry.get("reason", ""))
+                if status == "failed" or reason.startswith("error:"):
+                    logger.info(
+                        "Clearing failed cache entry for %s - %s (%s) to retry",
+                        course.get("code"),
+                        topic_title,
+                        request.name,
+                    )
+                    cache.clear(key)
+                    status = None
+
             if config.resume and cache.has_completed(key):
                 cached = cache.load(key)
                 if cached:
@@ -383,7 +404,7 @@ class QuestionGenerator:
                         logger.error("API key authentication failed. Please check your Gemini API key configuration.")
                     else:
                         reason = f"error:{last_error}"
-                cache.mark_skipped(key, reason=reason, meta=meta)
+                cache.mark_failed(key, reason=reason, meta=meta)
                 continue
 
             cache.store(
@@ -559,16 +580,37 @@ class QuestionGenerator:
             max_output_tokens=config.gemini_max_output_tokens,
         )
 
-        # Request structured output directly from Gemini when possible
-        gen_config.response_schema = GeminiQuestionBatch
+        if self.use_structured:
+            # Request structured output directly from Gemini when possible
+            gen_config.response_schema = GeminiQuestionBatch
 
-        # Generate without response_model to get raw response, then parse manually
-        response = self.gemini.generate(
-            prompt,
-            model=config.gemini_model,
-            generation_config=gen_config,
-            response_model=GeminiQuestionBatch,
-        )
+            # Ask Gemini for structured output when supported; otherwise fall back to manual parsing
+            try:
+                response = self.gemini.generate(
+                    prompt,
+                    model=config.gemini_model,
+                    generation_config=gen_config,
+                    response_model=GeminiQuestionBatch,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Gemini structured output failed (%s). Falling back to raw JSON parsing",
+                    exc,
+                )
+                gen_config.response_schema = None
+                response = self.gemini.generate(
+                    prompt,
+                    model=config.gemini_model,
+                    generation_config=gen_config,
+                )
+        else:
+            # Bypass structured output entirely when disabled
+            gen_config.response_schema = None
+            response = self.gemini.generate(
+                prompt,
+                model=config.gemini_model,
+                generation_config=gen_config,
+            )
 
         # Debug: print the raw response before validation (only in verbose mode)
         if os.environ.get("COURSEGEN_DEBUG", "").lower() == "true":
@@ -590,19 +632,12 @@ class QuestionGenerator:
             if isinstance(response, dict) and 'result' in response:
                 raw_result = response['result']
                 try:
-                    parsed_response = json.loads(raw_result)
-                    batch = GeminiQuestionBatch.model_validate(parsed_response)
-                except json.JSONDecodeError:
-                    json_payload = self._extract_json_payload(raw_result)
-                    if json_payload is None:
-                        raise ValueError(f"No JSON found in response: {raw_result[:200]}...")
-                    try:
-                        parsed_response = json.loads(json_payload)
-                        batch = GeminiQuestionBatch.model_validate(parsed_response)
-                    except (json.JSONDecodeError, KeyError) as exc:
-                        raise ValueError(
-                            f"Could not parse JSON from response: {raw_result[:200]}..."
-                        ) from exc
+                    batch = self._parse_batch_from_raw(raw_result)
+                except (ValueError, KeyError) as exc:
+                    self._dump_failed_payload(raw_result)
+                    raise ValueError(
+                        f"Could not parse JSON from response: {raw_result[:200]}..."
+                    ) from exc
             else:
                 batch = GeminiQuestionBatch.model_validate(response)
 
@@ -641,6 +676,246 @@ class QuestionGenerator:
             if candidate:
                 return candidate
         return None
+
+    def _parse_batch_from_raw(self, raw_result: str) -> GeminiQuestionBatch:
+        parsed_response = self._extract_json_content(raw_result)
+        normalized = self._normalize_question_payload(parsed_response)
+        return GeminiQuestionBatch.model_validate(normalized)
+
+    def _dump_failed_payload(self, raw_result: str) -> None:
+        try:
+            dump_root = Path(os.environ.get("COURSEGEN_DEBUG_DUMP_DIR", str(DEFAULT_CACHE_ROOT / "failed_responses")))
+            dump_root.mkdir(parents=True, exist_ok=True)
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            random_suffix = f"{random.randint(0, 9999):04d}"
+            path = dump_root / f"failed_payload_{timestamp}_{random_suffix}.json"
+            path.write_text(raw_result, encoding="utf-8")
+            logger.debug("Wrote failing payload to %s", path)
+        except Exception as exc:
+            logger.debug("Failed to write debug payload: %s", exc)
+
+    @staticmethod
+    def _strip_trailing_commas(text: str) -> str:
+        if not text:
+            return text
+
+        result: list[str] = []
+        in_string = False
+        escaped = False
+        length = len(text)
+        i = 0
+        while i < length:
+            ch = text[i]
+            if in_string:
+                result.append(ch)
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                i += 1
+                continue
+            if ch == '"':
+                in_string = True
+                result.append(ch)
+                i += 1
+                continue
+            if ch == ',':
+                j = i + 1
+                while j < length and text[j] in " \t\r\n":
+                    j += 1
+                if j < length and text[j] in '}]':
+                    i += 1
+                    continue
+            result.append(ch)
+            i += 1
+        return "".join(result)
+
+    @staticmethod
+    def _repair_truncated_json(text: str) -> Optional[str]:
+        if not text:
+            return None
+
+        start = None
+        for idx, ch in enumerate(text):
+            if ch in "[{":
+                start = idx
+                break
+        if start is None:
+            return None
+
+        in_string = False
+        escaped = False
+        stack: list[str] = []
+        for ch in text[start:]:
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+                continue
+            if ch in "[{":
+                stack.append(ch)
+            elif ch in "]}":
+                if stack:
+                    opener = stack[-1]
+                    if (opener == "[" and ch == "]") or (opener == "{" and ch == "}"):
+                        stack.pop()
+
+        repaired = text[start:]
+        if in_string:
+            repaired += '"'
+        for opener in reversed(stack):
+            repaired += ']' if opener == '[' else '}'
+        return repaired
+
+    @staticmethod
+    def _simple_json_load(content: str) -> Any:
+        if not content:
+            raise ValueError("Empty JSON payload")
+        if not isinstance(content, str):
+            content = str(content)
+
+        # Enhanced LaTeX escaping for JSON compatibility
+        def _escape_latex_for_json(text: str) -> str:
+            # Handle LaTeX math expressions: \(...\), \[...\], \(...\)
+            text = re.sub(r'\\\(', '\\\\(', text)  # \( -> \(
+            text = re.sub(r'\\\)', '\\\\)', text)  # \) -> \)
+            text = re.sub(r'\\\[', '\\\\[', text)  # \[ -> \[
+            text = re.sub(r'\\\]', '\\\\]', text)  # \] -> \]
+
+            # Handle common LaTeX commands and symbols
+            text = re.sub(r'\\(?![\\/bfnrt\"u\\\\])', r'\\\\', text)
+
+            return text
+
+        def _attempt_load(candidate: str) -> Optional[Any]:
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                return None
+
+        def _add_candidate(candidates: list[str], value: Optional[str]) -> None:
+            if not value:
+                return
+            if value not in candidates:
+                candidates.append(value)
+
+        candidates: list[str] = []
+        _add_candidate(candidates, content)
+        _add_candidate(candidates, QuestionGenerator._strip_trailing_commas(content))
+
+        sanitized = _escape_latex_for_json(content)
+        _add_candidate(candidates, sanitized)
+        _add_candidate(candidates, QuestionGenerator._strip_trailing_commas(sanitized))
+
+        doubled = sanitized.replace("\\", "\\\\")
+        _add_candidate(candidates, doubled)
+        _add_candidate(candidates, QuestionGenerator._strip_trailing_commas(doubled))
+
+        for candidate in candidates:
+            result = _attempt_load(candidate)
+            if result is not None:
+                return result
+
+        for candidate in candidates:
+            repaired = QuestionGenerator._repair_truncated_json(candidate)
+            if not repaired or repaired == candidate:
+                continue
+            result = _attempt_load(repaired)
+            if result is not None:
+                return result
+
+        raise ValueError("Failed to parse JSON content")
+
+    def _extract_json_content(self, text: str) -> Any:
+        if not text:
+            raise ValueError("No JSON content in empty response")
+
+        # Prefer fenced code blocks
+        match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
+        if match:
+            snippet = match.group(1).strip()
+            if snippet:
+                return self._simple_json_load(snippet)
+
+        # Try raw payload
+        trimmed = text.strip()
+        try:
+            return json.loads(trimmed)
+        except json.JSONDecodeError:
+            pass
+
+        # Fallback to the first JSON-looking object
+        brace_match = re.search(r"\{[\s\S]*\}", text)
+        if brace_match:
+            snippet = brace_match.group(0).strip()
+            return self._simple_json_load(snippet)
+
+        raise ValueError(f"No JSON found in response: {text[:200]}...")
+
+    @staticmethod
+    def _normalize_solution_steps(value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(step).strip() for step in value if str(step).strip()]
+        if isinstance(value, tuple):
+            return [str(step).strip() for step in value if str(step).strip()]
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return []
+            if text.startswith("[") and text.endswith("]"):
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, list):
+                        return [str(step).strip() for step in parsed if str(step).strip()]
+                except json.JSONDecodeError:
+                    pass
+            return [text]
+        # Fallback: wrap anything else in a list
+        return [str(value).strip()]
+
+    def _normalize_question_payload(self, payload: Any) -> Dict[str, Any]:
+        if isinstance(payload, list):
+            normalized = []
+            for item in payload:
+                if isinstance(item, dict):
+                    item["solution_steps"] = self._normalize_solution_steps(
+                        item.get("solution_steps")
+                    )
+                    normalized.append(item)
+            return {"questions": normalized}
+
+        if not isinstance(payload, dict):
+            return {"questions": []}
+
+        questions = payload.get("questions")
+        if isinstance(questions, list):
+            for question in questions:
+                if not isinstance(question, dict):
+                    continue
+                question["solution_steps"] = self._normalize_solution_steps(
+                    question.get("solution_steps")
+                )
+            return payload
+
+        # Handle single-question payloads
+        if isinstance(payload, dict) and "question" in payload:
+            normalized_question = dict(payload)
+            normalized_question["solution_steps"] = self._normalize_solution_steps(
+                normalized_question.get("solution_steps")
+            )
+            return {"questions": [normalized_question]}
+
+        return payload
 
     def _convert_to_questions(
         self,
@@ -783,6 +1058,27 @@ class QuestionGenerator:
                 formatted.append(f"\\({clean}\\)")
         return formatted
 
+    @staticmethod
+    def _format_latex_for_display(latex_text: str) -> str:
+        """Format LaTeX text for proper display, handling escaped backslashes."""
+        if not latex_text:
+            return latex_text
+
+        # Convert escaped backslashes back to single backslashes for display
+        # This handles cases where JSON had \\( -> \( for display
+        text = latex_text.replace("\\\\", "\\")
+
+        # Ensure proper LaTeX delimiters for display
+        if "\\(" in text and not text.startswith("\\("):
+            # If contains inline math but not wrapped, wrap it
+            text = f"\\({text}\\)"
+
+        return text
+
+
+
+        
+
     def _build_prompt(
         self,
         *,
@@ -794,31 +1090,147 @@ class QuestionGenerator:
     ) -> str:
         level = self._first(course.get("levels")) or "Unknown"
         semester = self._first(course.get("semesters")) or "Unknown"
-        steps_note = "For theory questions, set 'solution_steps' to an empty array []. For calculation questions, provide a list of 3-5 clear LaTeX-formatted solution steps." if request.kind == "calculation" else "For theory questions, set 'solution_steps' to an empty array []. Do not include solution steps."
-        return (
-            "You are an expert university assessment designer. Create original, rigorous, "
-            "unambiguous multiple choice questions based on the topic and subtopic provided.\n"
-            f"Course: {course.get('title', '')} ({course.get('code', '')})\n"
-            f"Level: {level} | Semester: {semester}\n"
-            f"Topic: {topic_title}\nSubtopic: {subtopic_title}\n"
-            f"Question type: {request.kind}\n"
-            f"Questions required: {request.question_count}\n"
-            "Requirements:\n"
-            "- Create ORIGINAL questions that test understanding of the subtopic concepts.\n"
-            "- DO NOT reference or cite the provided extracts in questions, answers, or explanations.\n"
-            "- Provide exactly four unique options labelled A, B, C, D.\n"
-            "- 'correct_answer' must be the letter of the correct option (A/B/C/D).\n"
-            "- 'correct_answer_text' must exactly match the full text of the correct option.\n"
-            "- Explanations should explain the reasoning without referencing study materials.\n"
-            "- Questions should be self-contained and not require external knowledge.\n"
-            f"- {steps_note}\n"
-            "- CRITICAL: For theory questions, 'solution_steps' MUST be an empty array [] (not a string, not null, not empty string).\n"
-            "- CRITICAL: For calculation questions, 'solution_steps' MUST be an array of strings with 3-5 solution steps.\n"
-            "- IMPORTANT: Questions, answers, and explanations must be ORIGINAL and not reference any study materials.\n"
-            "- Ensure all fields are properly typed: solution_steps must be a JSON array ([]) even if empty.\n"
-            "Respond ONLY with valid JSON matching this exact schema: {{\"questions\": [{{ \"question\": str, \"options\": [str,str,str,str], \"correct_answer\": \"A/B/C/D\", \"correct_answer_text\": str, \"explanation\": str, \"solution_steps\": [str] or [] }} ] }}. No additional text.\n"
-            f"Reference extracts (for context only - do not reference in output):\n{context_text}\n"
-        )
+
+        base_guidance = textwrap.dedent("""
+        - Questions must be original, unambiguous, and self-contained.
+        - Provide exactly four distinct options labelled A, B, C, D.
+        - 'correct_answer' must be one of "A", "B", "C", or "D" and match 'correct_answer_text'.
+        - Explanations should help students understand why the answer is correct and reference key formulas when relevant.
+        - Wrap every formula or symbol in `$...$` with double-escaped commands (e.g., `$\\omega = 2\\pi f$`).
+        """).strip()
+
+
+        latex_guidance = textwrap.dedent("""
+        - Use LaTeX for every mathematical expression.
+        - Wrap inline math with `$...$` and multi-line math with `$$...$$` so the renderer treats it correctly.
+        - Because the output is JSON, ESCAPE every backslash twice (e.g., write `\\frac{a}{b}` to render `$\frac{a}{b}$`).
+        - Example inline: `$\\frac{12}{4} = 3 \\text{Ohms}$`.
+        - Example integral: `$\\int_{0}^{1} x^2 \\, dx$`.
+        - Ensure explanations and solution steps follow the same `$`-delimited, double-escaped format.
+        """).strip()
+
+
+        if request.kind == "calculation":
+            steps_guidance = textwrap.dedent("""
+            - Treat every question as calculation-focused with appropriate numeric work.
+            - 'solution_steps' must be a JSON array containing 3–7 concise steps.
+            - Steps should include formula selection, substitution, computation, and conclusion.
+            """).strip()
+        else:
+            steps_guidance = textwrap.dedent("""
+            - Emphasize conceptual understanding and qualitative reasoning.
+            - 'solution_steps' must be an empty JSON array []. Do not place text, null, or placeholders there.
+            """).strip()
+
+        prompt = textwrap.dedent(f"""
+Generate {request.question_count} unique, curriculum-aligned multiple-choice questions (MCQs) for the course "{course.get('title','')}" ({course.get('code','')}) on the topic "{topic_title}" (subtopic: "{subtopic_title}"). Use ONLY the provided extracts for grounding; do not quote them verbatim. Keep each question self-contained and original.
+
+### REQUIRED OUTPUT (VALID JSON ONLY)
+- Return a single JSON object and nothing else. No markdown, no comments, no surrounding prose.
+- Top-level format:
+  {{
+    "questions": [
+      {{
+        "question": "<string>",
+        "options": ["<string>", "<string>", "<string>", "<string>"],
+        "correct_answer": "A" | "B" | "C" | "D",
+        "correct_answer_text": "<string>",
+        "explanation": "<string>",
+        "solution_steps": ["<step1>", "<step2>", "..."]
+      }}
+    ]
+  }}
+- The JSON MUST parse as-is. Do not include extra keys or null placeholders.
+
+### OPTIONS / ANSWER RULES
+- Provide exactly **four** option *strings* in `options`. **Do not** prefix option strings with "A)", "B)", etc — options should be raw option text.
+- `correct_answer` must be one of "A"|"B"|"C"|"D".
+- `correct_answer_text` must be exactly equal to the corresponding element of `options`.
+- All option texts must be distinct and plausible. Avoid distractors that are obviously wrong (e.g., unit mismatch, off by factor of 1000).
+- For numeric options, include units in the option text (e.g., "29.8 MPa").
+
+### CONSISTENCY & NO-BACKTRACKING RULES
+- Never alter the problem data to fit an answer. If a mismatch is detected, DISCARD that question and generate a new one that is internally consistent.
+- Do not “work backwards from options.” Compute the correct result first, then compose options (1 correct + 3 plausible distractors).
+- Absolutely forbid meta-reasoning or self-correction in `solution_steps` (e.g., “recalculating”, “let’s assume”, “there seems to be a discrepancy”, “work backwards”, “typo”).
+- `solution_steps` style for calculation items:
+  - Exactly 3–5 short lines, each starting with one of: “Formula:”, “Convert:”, “Substitute:”, “Compute:”, “Final:”.
+  - No extra sentences or commentary; each line ≤ 25 words.
+  - The **Final** line must repeat the numeric answer with units and rounding.
+- For concept items, `solution_steps` must be `[]` (empty).
+- Options policy:
+  - Generate options AFTER computing the answer.
+  - Ensure `correct_answer_text` equals the selected element in `options` (A=0, B=1, C=2, D=3).
+  - For numeric questions, every option includes units; distractors reflect realistic slips (rounding, factor-of-10, omitted factor of 2), not nonsense.
+  - Keep steps **minimal**: no repeating the same calculation in different units.
+  - If SI units are already consistent, do not add conversions. Only convert when units are mismatched.
+  - Do not restate or re-check the same formula more than once.
+
+
+### SOLUTION STEPS RULES
+- If `request.kind == "calculation"`:
+  - `solution_steps` must be an array of **3–7** concise steps (strings).
+  - Steps should include: formula selection, unit conversions, substitution (show numbers using double-escaped LaTeX where relevant), a short arithmetic line, and one concluding line that states the final numeric value with units and rounding.
+  - Round intermediate and final numeric results sensibly (2–4 significant figures) and state the rounding rule used.
+- If `request.kind != "calculation"`:
+  - `solution_steps` must be an empty JSON array [].
+- Never put long prose in `solution_steps` — keep them terse, ordered, and actionable.
+
+### MATHEMATICAL / LATEX FORMATTING
+- Use LaTeX for all math. Wrap inline math with `$...$` and display math with `$$...$$`.
+- Because the output is JSON, **escape every backslash twice** so a LaTeX fraction looks like `"\\frac{{a}}{{b}}"` in the JSON string (which renders as `$\\frac{{a}}{{b}}$` when unescaped).
+- Example inline in a JSON string: `"$\\frac{{12}}{{4}} = 3\\ \\text{{Ohms}}$"`.
+- Ensure every LaTeX expression appears inside `$...$` or `$$...$$` and that backslashes are doubled.
+- Use exactly two backslashes for every LaTeX command in JSON (e.g., "\\\\frac", "\\\\int", "\\\\text").
+- Never triple-escape backslashes (avoid \\\\\\int).
+- Do not expand algebra more than once; keep expressions in their simplest readable LaTeX form.
+- Write units as "\\\\text{{...}}" immediately after the number, with a single space if needed (e.g., "$333.3\\\\,\\\\text{{kN}}$").
+
+
+### CONTENT & PEDAGOGICAL GUIDELINES
+- Align difficulty with Level **{level}** and Semester **{semester}**.
+- Questions must be: original, unambiguous, self-contained, and solvable using the provided context + common engineering formulas.
+- For calculation questions, always include units and show unit conversions in `solution_steps`.
+- Distractors:
+  - For calculations: include 3 plausible distractors (e.g., common algebraic slips, rounding variants, unit conversion mistakes).
+  - For concept questions: include 3 plausible conceptual distractors that test common misunderstandings.
+- Avoid excessive edge cases, trick wording, or ambiguous qualifiers (e.g., "usually", "often", "may").
+- If the grounding context lacks enough data to compute a value, either:
+  - create a self-contained numeric assumption and state it in the question (and in the steps), **or**
+  - do NOT generate the question — prefer safe, answerable items.
+
+### QUALITY & SANITY CHECKS (do these before returning JSON)
+1. Confirm `options` contains exactly 4 items and `correct_answer_text` matches one of them exactly.
+2. Confirm no option duplicates.
+3. For numeric answers, re-calculate the result and ensure the value in `correct_answer_text` matches the `solution_steps` final line.
+4. Confirm all LaTeX backslashes are double-escaped.
+5. Validate that the full output is legal JSON (single parseable object).
+
+
+### Numerical Consistency
+- The numeric value in the "Final" solution step **must exactly match** the 'correct_answer_text'.
+- Never produce mismatched results (e.g., steps yielding 5625 but correct_answer_text = 1125).
+- If rounding is required, round consistently across steps, final answer, and correct_answer_text.
+- Do not exaggerate or miscompute values; ensure units are realistic (e.g., MPa range for stresses, not GPa unless physically correct).
+
+
+### TERMINATION
+- After the final numeric result is given, stop generating steps.
+- Do not continue with alternative derivations, assumptions, or repeated formulas.
+
+
+### REFERENCE CONTEXT (grounding only)
+Use these extracts strictly for background/context. Do not copy text verbatim; rephrase and use them to ensure curriculum alignment:
+{context_text}
+
+### FINAL INSTRUCTIONS
+- Return exactly {request.question_count} questions that satisfy every rule above.
+- Keep `explanation` concise — one paragraph (1–3 sentences) that teaches why the correct answer is right and calls out the key formula(s) in `$...$` form.
+- If any constraint cannot be satisfied for a candidate question (e.g., missing numbers in context), skip that question and generate another that is fully answerable.
+""").strip()
+
+
+        return prompt
 
     def _persist_to_firestore(self, questions: Iterable[Question], *, enable: bool) -> None:
         if not enable or not questions:
@@ -1028,6 +1440,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not automatically wrap calculation steps with LaTeX delimiters",
     )
+    structured_group = parser.add_mutually_exclusive_group()
+    structured_group.add_argument(
+        "--structured-output",
+        dest="structured_output",
+        action="store_true",
+        help="Enable Gemini structured output schema",
+    )
+    structured_group.add_argument(
+        "--no-structured-output",
+        dest="structured_output",
+        action="store_false",
+        help="Disable Gemini structured output schema (default)",
+    )
+    parser.set_defaults(structured_output=None)
     return parser
 
 
@@ -1107,7 +1533,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ),
     )
 
-    generator = QuestionGenerator(gemini_service=gemini_service)
+    generator = QuestionGenerator(
+        gemini_service=gemini_service,
+        use_structured=args.structured_output,
+    )
     runner = QuestionBatchRunner(generator)
 
     for course in courses:

@@ -79,6 +79,9 @@ class QuestionCache:
     def _entry_for(self, key: CacheKey) -> Optional[Dict[str, Any]]:
         return self._index.get(key.to_string())
 
+    def get_entry(self, key: CacheKey) -> Optional[Dict[str, Any]]:
+        return self._entry_for(key)
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -133,6 +136,21 @@ class QuestionCache:
         }
         self._save_index()
 
+    def mark_failed(
+        self,
+        key: CacheKey,
+        *,
+        reason: str,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self._index[key.to_string()] = {
+            "status": "failed",
+            "reason": reason,
+            "meta": meta or {},
+            "updated_at": time.time(),
+        }
+        self._save_index()
+
     def has_completed(self, key: CacheKey) -> bool:
         entry = self._entry_for(key)
         if not entry:
@@ -143,6 +161,26 @@ class QuestionCache:
         if not file_name:
             return False
         return (self.cache_dir / file_name).exists()
+
+    def get_status(self, key: CacheKey) -> Optional[str]:
+        entry = self._entry_for(key)
+        if not entry:
+            return None
+        return entry.get("status")
+
+    def clear(self, key: CacheKey) -> None:
+        entry = self._entry_for(key)
+        if entry:
+            file_name = entry.get("file")
+            if file_name:
+                path = self.cache_dir / file_name
+                if path.exists():
+                    try:
+                        path.unlink()
+                    except OSError:
+                        logger.debug("Failed to delete cache file %s", path)
+            self._index.pop(key.to_string(), None)
+            self._save_index()
 
     def subtopic_request_states(self, key_prefix: CacheKey, request_names: Iterable[str]) -> Dict[str, str]:
         states: Dict[str, str] = {}
@@ -250,4 +288,3 @@ class QuestionCache:
 
 
 __all__ = ["CacheKey", "QuestionCache"]
-

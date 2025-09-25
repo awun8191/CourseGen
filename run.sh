@@ -101,17 +101,11 @@ check_prerequisites() {
     fi
 
     # Check for persistent data directories
-    if [[ -d "OUTPUT_DATA2/emdeddings" ]]; then
-        print_status "Found existing embeddings data - will be preserved"
-    else
-        print_warning "No embeddings data found. Container will start with empty embeddings."
-    fi
-
     print_success "Prerequisites check passed"
 }
 
 ensure_volume_permissions() {
-    local paths=("OUTPUT_DATA2" ".cache" "data")
+    local paths=("OUTPUT_DATA2" "OUTPUT_DATA2/cache" "data")
     for dir in "${paths[@]}"; do
         if [[ ! -d "$dir" ]]; then
             mkdir -p "$dir"
@@ -129,8 +123,7 @@ build_docker_command() {
     local docker_args=(
         "docker" "run"
         "--rm"
-        "-v" "$(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2"
-        "-v" "$(pwd)/.cache:/app/.cache"
+        "-v" "$(pwd)/OUTPUT_DATA2/cache:/app/OUTPUT_DATA2/cache"
         "-v" "$(pwd)/data:/app/data"
     )
 
@@ -216,6 +209,10 @@ run_container() {
         run_args+=("--request-delay" "1")
     fi
 
+    if [[ -n "$STRUCTURED_FLAG" ]]; then
+        run_args+=("$STRUCTURED_FLAG")
+    fi
+
     print_status "Starting CourseGen container..."
     print_status "Command: ${docker_cmd} ${run_args[*]}"
 
@@ -237,6 +234,7 @@ main() {
     SKIP_FIRESTORE=false
     DEBUG=false
     ENV_FILE=""
+    STRUCTURED_FLAG=""
 
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
@@ -281,6 +279,14 @@ main() {
                 ENV_FILE="$2"
                 shift 2
                 ;;
+            --structured-output)
+                STRUCTURED_FLAG="--structured-output"
+                shift
+                ;;
+            --no-structured-output)
+                STRUCTURED_FLAG="--no-structured-output"
+                shift
+                ;;
             -h|--help)
                 echo "CourseGen Run Script with Persistent Volumes"
                 echo ""
@@ -296,6 +302,8 @@ main() {
                 echo "  --no-resume           Do not reuse cached generations"
                 echo "  --skip-firestore      Disable persistence to Firestore"
                 echo "  --debug               Enable debug mode (lower temp, faster requests)"
+                echo "  --structured-output   Enable Gemini structured output schema"
+                echo "  --no-structured-output Disable Gemini structured output schema"
                 echo "  --env-file FILE       Use custom environment file"
                 echo "  -h, --help            Show this help message"
                 echo ""

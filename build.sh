@@ -78,9 +78,9 @@ check_prerequisites() {
         exit 1
     fi
 
-    # Check for embeddings data (IMPORTANT: embeddings must be preserved)
+    # Check for embeddings data (baked into the image during build)
     if [[ -d "OUTPUT_DATA2/emdeddings" ]]; then
-        print_status "Found existing embeddings data - will be preserved in container"
+        print_status "Found embeddings bundle - will be baked into the image"
     else
         print_warning "No embeddings data found. Container will start with empty embeddings."
     fi
@@ -103,6 +103,19 @@ cleanup_old_images() {
     if [[ -n "$OLD_IMAGES" ]]; then
         echo "$OLD_IMAGES" | xargs -r docker rmi 2>/dev/null || true
         print_success "Removed old image versions"
+    fi
+
+    # Remove current tagged image to avoid cache reuse when requested
+    if docker image inspect "${FULL_IMAGE_NAME}" &> /dev/null; then
+        docker image rm -f "${FULL_IMAGE_NAME}" 2>/dev/null || true
+        print_status "Removed existing image ${FULL_IMAGE_NAME}"
+    fi
+
+    # Prune builder cache (safe to ignore failures)
+    if docker builder prune -f >/dev/null 2>&1; then
+        print_status "Cleared Docker build cache"
+    else
+        print_warning "Could not prune builder cache (BuildKit may be disabled)"
     fi
 }
 
@@ -128,10 +141,14 @@ build_image() {
         BUILD_ARGS+=(--progress=plain)
     fi
 
-    # Add cache from previous builds if available
-    if docker image inspect "${FULL_IMAGE_NAME}" &> /dev/null; then
-        BUILD_ARGS+=(--cache-from "${FULL_IMAGE_NAME}")
-        print_status "Using cache from previous build"
+    if [[ "${CLEANUP:-false}" == "true" ]]; then
+        print_status "Cleanup flag detected - building without cache"
+        BUILD_ARGS+=(--no-cache)
+    else
+        if docker image inspect "${FULL_IMAGE_NAME}" &> /dev/null; then
+            BUILD_ARGS+=(--cache-from "${FULL_IMAGE_NAME}")
+            print_status "Using cache from previous build"
+        fi
     fi
 
     # Perform the build with better error handling
@@ -262,7 +279,6 @@ show_usage_examples() {
     echo "  # IMPORTANT: Preserve embeddings data with volume mounts:"
     echo "  docker run --rm -it \\"
     echo "    -v \$(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \\"
-    echo "    -v \$(pwd)/.cache:/app/.cache \\"
     echo "    ${FULL_IMAGE_NAME} --generate-questions"
     echo ""
     echo "  # Run outline generation:"
@@ -376,7 +392,7 @@ fix_docker_credentials() {
     print_status "You can now try ECR authentication again"
 }
 
-# Function to update embeddings in persistent volume and rebuild image
+# Function to refresh host embeddings and rebuild image
 update_embeddings_and_rebuild() {
     print_status "Starting complete embeddings update workflow..."
     echo "=================================================="
@@ -391,8 +407,8 @@ update_embeddings_and_rebuild() {
         fi
     fi
 
-    # Step 1: Update embeddings in persistent volume
-    print_status "Step 1: Updating embeddings in persistent volume..."
+    # Step 1: Regenerate embeddings in the host directory
+    print_status "Step 1: Regenerating embeddings in OUTPUT_DATA2/emdeddings..."
     if docker run --rm \
         --entrypoint python \
         -v "$(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2" \
@@ -405,9 +421,9 @@ update_embeddings_and_rebuild() {
         -c pdfs_bge_m3_cloudflare \
         --workers 4 \
         --resume 2>&1; then
-        print_success "Embeddings updated in persistent volume"
+        print_success "Embeddings regenerated in OUTPUT_DATA2/emdeddings"
     else
-        print_error "Failed to update embeddings in persistent volume"
+        print_error "Failed to regenerate embeddings in OUTPUT_DATA2/emdeddings"
         return 1
     fi
 
@@ -553,7 +569,7 @@ main() {
                 echo "  --debug          Show system information and debug build issues"
                 echo "  --deploy         Build and push image to AWS ECR"
                 echo "  --fix-credentials Fix Docker credential helper configuration"
-                echo "  --update-embeddings Update embeddings in volume, rebuild image, and deploy"
+                echo "  --update-embeddings Regenerate embeddings, rebuild image, and (optionally) deploy"
                 echo "  --help, -h       Show this help message"
                 exit 0
                 ;;

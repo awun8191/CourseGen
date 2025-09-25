@@ -13,7 +13,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
   NUMBA_CACHE_DIR=/tmp/numba_cache \
   MPLCONFIGDIR=/tmp/matplotlib \
   COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json \
-  COURSEGEN_CACHE_DIR=/app/.cache/coursegen \
+  COURSEGEN_CACHE_DIR=/app/OUTPUT_DATA2/cache \
   CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings \
   PYTHONPATH=/app
 
@@ -73,16 +73,16 @@ COPY . .
 RUN set -eux \
   && groupadd -r -g 1001 appuser \
   && useradd -r -u 1001 -g appuser appuser \
-  && mkdir -p /app/.cache/coursegen /app/OUTPUT_DATA2/emdeddings /tmp/numba_cache /tmp/matplotlib \
+  && mkdir -p /app/OUTPUT_DATA2/emdeddings /app/OUTPUT_DATA2/cache /tmp/numba_cache /tmp/matplotlib \
      /app/data/textbooks /app/data/exported_data /app/data/ocr_cache /app/chromadb_storage \
   && chown -R appuser:appuser /app \
   && chmod -R g+w /tmp
 
 # Ensure mounted directories have correct permissions (for persistent volumes)
 RUN set -eux \
-  && mkdir -p /app/OUTPUT_DATA2/emdeddings /app/.cache/coursegen /app/data \
-  && chmod -R 775 /app/OUTPUT_DATA2 /app/.cache /app/data \
-  && chown -R appuser:appuser /app/OUTPUT_DATA2 /app/.cache /app/data
+  && mkdir -p /app/OUTPUT_DATA2/emdeddings /app/OUTPUT_DATA2/cache /app/data \
+  && chmod -R 775 /app/OUTPUT_DATA2 /app/data \
+  && chown -R appuser:appuser /app/OUTPUT_DATA2 /app/data
 
 USER appuser
 

@@ -43,7 +43,7 @@ def check_data_directories():
     required_dirs = [
         '/app/data/textbooks',
         '/app/OUTPUT_DATA2/emdeddings',
-        '/app/.cache/coursegen'
+        '/app/OUTPUT_DATA2/cache'
     ]
     
     missing_dirs = []

@@ -14,7 +14,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json
-      - COURSEGEN_CACHE_DIR=/app/.cache/coursegen
+      - COURSEGEN_CACHE_DIR=/app/OUTPUT_DATA2/cache
       - CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings
       - OMP_NUM_THREADS=2
       - WORKERS=2   # configurable worker count
@@ -23,8 +23,7 @@ services:
     
     # Volume mounts for data persistence
     volumes:
-      - ./OUTPUT_DATA2:/app/OUTPUT_DATA2       # ChromaDB embeddings
-      - ./.cache:/app/.cache                   # generation cache
+      - ./OUTPUT_DATA2:/app/OUTPUT_DATA2       # embeddings, cache, exports
       - ./data:/app/data                       # data files
     
     # ✅ Real resource limits (works in plain Compose)

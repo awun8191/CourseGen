@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_ROOT_USER_ACTION=ignore \
     COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json \
-    COURSEGEN_CACHE_DIR=/app/.cache/coursegen \
+    COURSEGEN_CACHE_DIR=/app/OUTPUT_DATA2/cache \
     CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings \
     PYTHONPATH=/app \
     OMP_NUM_THREADS=4
@@ -54,7 +54,7 @@ RUN set -eux && \
     pip install --no-cache-dir --timeout=300 -r requirements.txt && \
     # Clean up
     rm -rf /tmp/* /var/tmp/* && \
-    mkdir -p /app/.cache/coursegen /app/OUTPUT_DATA2/emdeddings && \
+    mkdir -p /app/OUTPUT_DATA2/emdeddings /app/OUTPUT_DATA2/cache && \
     chown -R appuser:appuser /app
 
 # Copy application code
@@ -64,8 +64,8 @@ COPY --chown=appuser:appuser . .
 RUN mkdir -p \
     /app/data/textbooks \
     /app/OUTPUT_DATA2/emdeddings \
-    /app/.cache/coursegen && \
-    chown -R appuser:appuser /app/data /app/OUTPUT_DATA2 /app/.cache
+    /app/OUTPUT_DATA2/cache && \
+    chown -R appuser:appuser /app/data /app/OUTPUT_DATA2
 
 # Switch to non-root user
 USER appuser

@@ -125,7 +125,6 @@ docker run --rm -it --env-file .env coursegen:latest --generate-questions
 # With volume mounts for data persistence
 docker run --rm -it \
   -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
-  -v $(pwd)/.cache:/app/.cache \
   coursegen:latest --generate-questions
 ```
 
@@ -162,7 +161,7 @@ The Docker image includes:
 - ChromaDB embeddings (`OUTPUT_DATA2/emdeddings/`)
 - Course data (`data/textbooks/`)
 - OCR cache (`data/ocr_cache/`)
-- Application cache (`.cache/`)
+- Application cache (`OUTPUT_DATA2/cache/`)
 
 ### Volume Mounts (Optional)
 For data persistence and updates:
@@ -172,7 +171,6 @@ For data persistence and updates:
 docker run --rm -it \
   -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
   -v $(pwd)/data:/app/data \
-  -v $(pwd)/.cache:/app/.cache \
   coursegen:latest --generate-questions
 ```
 
@@ -182,7 +180,6 @@ Uncomment volume mounts in `docker-compose.yml`:
 ```yaml
 volumes:
   - ./OUTPUT_DATA2:/app/OUTPUT_DATA2
-  - ./.cache:/app/.cache
   - ./data:/app/data
 ```
 

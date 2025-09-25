@@ -68,69 +68,31 @@ aws ecr get-login-password --region us-east-1 | docker login --username AWS --pa
 **ECR Repository**: `888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest`
 
 ### 📁 Persistent Data Directories
-Your data persists across container rebuilds in these locations:
-- `./OUTPUT_DATA2/emdeddings/` - ChromaDB vector embeddings
-- `./.cache/coursegen/` - Question generation caches
-- `./data/` - Course data and configurations
+Only the cache and course metadata are mounted from the host when the container runs:
+- `./OUTPUT_DATA2/cache/` – question generation caches that survive between runs
+- `./data/` – course inputs, outlines, and configuration files
 
-### 🔄 Updating Embeddings Only
-To update just the embeddings without rebuilding the entire container:
+> ℹ️ Embeddings live inside the Docker image at `/app/OUTPUT_DATA2/emdeddings`. When you refresh them locally, rebuild (and optionally redeploy) the image so every environment picks up the new bundle.
 
-#### Method 1: Update Both Local Volume AND AWS Image (Complete Workflow)
-```bash
-# Step 1: Update local persistent volume embeddings
-docker-compose run --rm coursegen \
-  python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/COMPILATION/EEE \
-  --with-chroma \
-  -c pdfs_bge_m3_cloudflare \
-  --workers 4 \
-  --resume
+### 🔄 Updating Embeddings
+1. **Regenerate embeddings on the host** so `OUTPUT_DATA2/emdeddings` contains the new Chroma database:
 
-# Step 2: Rebuild image with updated embeddings
-./build.sh --cleanup
+   ```bash
+   python -m services.RAG.convert_to_embeddings \
+     -i data/textbooks/COMPILATION/EEE \
+     --with-chroma \
+     -c pdfs_bge_m3_cloudflare \
+     --workers 4 \
+     --resume
+   ```
 
-# Step 3: Deploy updated image to AWS ECR
-./build.sh --deploy
-```
+2. **Rebuild (and optionally deploy) the Docker image** to bake those embeddings into the container:
 
-#### Method 2: Using Docker with Volume Mounts (Local Volume Only)
-```bash
-# Run embeddings generation with persistent volumes
-docker run --rm -it \
-  -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
-  -v $(pwd)/data:/app/data \
-  888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest \
-  python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/COMPILATION/EEE \
-  --with-chroma \
-  -c pdfs_bge_m3_cloudflare \
-  --workers 4 \
-  --resume
-```
-
-#### Method 3: Using Docker Compose (Local Volume Only)
-```bash
-# Update embeddings using docker-compose
-docker-compose run --rm coursegen \
-  python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/COMPILATION/EEE \
-  --with-chroma \
-  -c pdfs_bge_m3_cloudflare \
-  --workers 4 \
-  --resume
-```
-
-#### Method 4: Manual Directory Replacement (Local Volume Only)
-```bash
-# Backup current embeddings
-cp -r OUTPUT_DATA2/emdeddings OUTPUT_DATA2/emdeddings.backup.$(date +%s)
-
-# Replace with new embeddings directory
-rm -rf OUTPUT_DATA2/emdeddings
-cp -r /path/to/new/emdeddings OUTPUT_DATA2/
-```
-
+   ```bash
+   ./build.sh --cleanup    # rebuild locally
+   ./build.sh --deploy     # push to ECR when ready
+   ```
+-
 ### 🔧 Advanced Usage
 ```bash
 # Interactive shell with persistent volumes
@@ -167,7 +129,7 @@ grep '"code"' data/textbooks/courses.json | head -10
 
 ### Question Generation Troubleshooting
 - **"Course code not found"**: Check available courses in `data/textbooks/courses.json`
-- **"No RAG context found"**: Ensure ChromaDB embeddings exist in `OUTPUT_DATA2/emdeddings/`
+- **"No RAG context found"**: Regenerate embeddings and rebuild the image so `/app/OUTPUT_DATA2/emdeddings` is up to date
 - **API errors**: Verify API keys in `.env` file are valid and have sufficient quota
 - **0 questions generated**: Course may not have sufficient RAG context or outlines
 - **Memory issues**: Reduce `--theory-per-request` and `--calc-per-request` values
@@ -183,16 +145,16 @@ grep '"code"' data/textbooks/courses.json | head -10
 - **AWS CLI not found**: Install AWS CLI or authenticate manually with `aws ecr get-login-password`
 
 ### Embeddings-Specific Troubleshooting
-- **"No RAG context found"**: Embeddings directory may be empty or corrupted
-- **"ChromaDB connection failed"**: Check if `OUTPUT_DATA2/emdeddings/` exists and has content
-- **"Permission denied on embeddings"**: Ensure proper ownership: `sudo chown -R $USER:$USER OUTPUT_DATA2/`
-- **"Embeddings outdated"**: Regenerate using the embeddings update commands above
-- **"Disk space full"**: Embeddings can be large; check available space with `df -h`
-- **"ChromaDB locked"**: Stop all containers and try again: `docker-compose down`
+- **"No RAG context found"**: Regenerate embeddings locally and rebuild the image so `/app/OUTPUT_DATA2/emdeddings` is refreshed.
+- **"ChromaDB connection failed"**: Ensure you rebuilt after uploading the latest SQLite bundle; during local generation confirm `OUTPUT_DATA2/emdeddings` exists before building.
+- **"Permission denied on embeddings"**: This can happen while regenerating locally—make sure `OUTPUT_DATA2/emdeddings` is writable (`chmod`/`chown`) before running the converter.
+- **"Embeddings outdated"**: Follow the two-step refresh (`convert_to_embeddings` → `./build.sh --cleanup` → optional `--deploy`).
+- **"Disk space full"**: Embedding databases are large; check available space with `df -h` before regenerating.
+- **"ChromaDB locked"**: Stop any process (local script or container) using the database, then retry the generation.
 
 ### 🚀 Recent Improvements
 - ✅ **AWS ECR Deployment**: Full integration with AWS Elastic Container Registry
-- ✅ **Persistent Volumes**: Embeddings and caches now survive container rebuilds
+- ✅ **Cache Volumes**: Cache/data directories persist while embeddings ship with the image
 - ✅ **Enhanced Reliability**: Added retry logic for network failures during build
 - ✅ **Fixed Dependencies**: Resolved numpy/albumentations version conflicts
 - ✅ **Better Error Handling**: Improved build script with debugging capabilities
@@ -202,7 +164,7 @@ grep '"code"' data/textbooks/courses.json | head -10
 - ✅ **Docker Credential Helper Fix**: Automatic resolution of credential helper issues
 - ✅ **Question Generation Fix**: Resolved "missing solution steps" error for calculation questions
 - ✅ **Enhanced Scripts**: Added deployment, credential fixing, and debugging options
-- ✅ **Automated Embeddings Update**: One-command workflow for updating embeddings in both local volume and AWS image
+- ✅ **Automated Embeddings Update**: One-command workflow to regenerate embeddings and rebuild/deploy the image
 - ✅ **Comprehensive Documentation**: Complete guide for all features and troubleshooting
 
 ### Build Script Features
@@ -223,13 +185,13 @@ The `./build.sh` script now includes:
 - **Security**: Non-root user with proper permissions
 - **Health Checks**: Built-in monitoring and health verification
 - **Resource Optimization**: Configured for optimal memory and CPU usage
-- **Persistent Volume Support**: Proper permissions and ownership for mounted directories
+- **Host Volume Support**: Proper permissions and ownership for cache/data mounts
 - **Directory Structure**: Ensures all required directories exist with correct permissions
 
 ### Run Script Features
 The `./run.sh` script provides enhanced container execution with:
 - **AWS ECR Integration**: Automatic authentication and image pulling from ECR
-- **Persistent Volume Management**: Automatic mounting of data directories
+- **Cache Volume Management**: Automatically binds cache/data directories needed at runtime
 - **Flexible Configuration**: Support for custom environment files and parameters
 - **Interactive/Background Modes**: Choose between interactive and detached execution
 - **Smart Prerequisites**: Validates Docker image availability and pulls from ECR if needed
@@ -237,10 +199,7 @@ The `./run.sh` script provides enhanced container execution with:
 
 ### 📋 Prerequisites
 - **API Keys**: Ensure `.env` has valid API keys for Gemini, Cloudflare, and Firestore
-- **Persistent Data**: Your embeddings and caches are preserved in:
-  - `OUTPUT_DATA2/emdeddings/` (ChromaDB embeddings)
-  - `.cache/coursegen/` (Generation caches)
-  - `data/` (Course data and configurations)
+- **Persistent Data**: Cache outputs live in `OUTPUT_DATA2/cache/` and course configs in `data/`; regenerate embeddings locally and rebuild the image when they change.
 - **Course Data**: Verify `data/textbooks/courses.json` contains your course outlines
 - **AWS ECR (Optional)**: For deployment, ensure AWS CLI is configured with proper permissions
 
@@ -397,10 +356,10 @@ tar -czf embeddings_backup_$(date +%Y%m%d_%H%M%S).tar.gz OUTPUT_DATA2/emdeddings
 tar -xzf embeddings_backup_20250101_120000.tar.gz
 ```
 
-#### Understanding Persistent vs Image Embeddings
-- **Persistent Volume** (`OUTPUT_DATA2/emdeddings/`): Survives container rebuilds, used for development
-- **Image Embeddings**: Baked into the Docker image, used for production deployments
-- **AWS ECR Image**: Contains embeddings that are deployed to AWS services
+#### Understanding Host vs Image Embeddings
+- **Host directory** (`OUTPUT_DATA2/emdeddings/`): Where regeneration writes during development; rebuild after updating it.
+- **Image embeddings**: Copied into the Docker image at `/app/OUTPUT_DATA2/emdeddings` during `./build.sh`.
+- **AWS ECR image**: The pushed artifact—rebuild & deploy whenever you refresh embeddings locally.
 
 ## Quick Start
 
@@ -413,6 +372,7 @@ tar -xzf embeddings_backup_20250101_120000.tar.gz
     # Start with persistent volumes (data survives rebuilds)
     docker-compose up
     ```
+    > Note: `./run.sh` binds only the cache directory by default; the compose profile mounts the full `OUTPUT_DATA2` tree for advanced workflows like local regeneration.
 
 2. **Configure Secrets**:
     ```bash
@@ -534,7 +494,7 @@ For in-depth guides:
 This CourseGen project is **production-ready** with comprehensive Docker integration and AWS ECR deployment capabilities. All major components have been implemented and tested:
 
 ### ✅ Completed Features
-- **Full Docker Integration**: Containerized application with persistent volumes
+- **Full Docker Integration**: Containerized application with cache/data host volumes
 - **AWS ECR Deployment**: Automated deployment to AWS Elastic Container Registry
 - **Embeddings Management**: Complete workflow for updating ChromaDB embeddings
 - **Question Generation**: Fixed all known issues including solution steps validation
