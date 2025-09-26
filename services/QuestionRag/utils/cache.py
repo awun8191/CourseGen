@@ -50,6 +50,7 @@ class QuestionCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.index_path = self.cache_dir / self.INDEX_FILE
         self._index: Dict[str, Dict[str, Any]] = {}
+        self._payload_cache: Dict[str, list[dict[str, Any]]] = {}
         self._load_index()
 
     # ------------------------------------------------------------------
@@ -97,12 +98,19 @@ class QuestionCache:
         if not path.exists():
             logger.debug("Cached file missing for %s; removing index entry", key.to_string())
             self._index.pop(key.to_string(), None)
+            self._payload_cache.pop(key.to_string(), None)
             self._save_index()
             return None
+        if key.to_string() in self._payload_cache:
+            return self._payload_cache[key.to_string()]
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, list):
+                self._payload_cache[key.to_string()] = payload
+            return payload
         except json.JSONDecodeError as exc:  # pragma: no cover - corrupted cache
             logger.warning("Invalid JSON in cached result %s: %s", path, exc)
+            self._payload_cache.pop(key.to_string(), None)
             return None
 
     def store(self, key: CacheKey, records: Iterable[dict[str, Any]], meta: Optional[Dict[str, Any]] = None) -> None:
@@ -119,6 +127,7 @@ class QuestionCache:
             "meta": meta or {},
             "updated_at": time.time(),
         }
+        self._payload_cache[key.to_string()] = payload
         self._save_index()
 
     def mark_skipped(
@@ -134,6 +143,7 @@ class QuestionCache:
             "meta": meta or {},
             "updated_at": time.time(),
         }
+        self._payload_cache.pop(key.to_string(), None)
         self._save_index()
 
     def mark_failed(
@@ -146,6 +156,23 @@ class QuestionCache:
         self._index[key.to_string()] = {
             "status": "failed",
             "reason": reason,
+            "meta": meta or {},
+            "updated_at": time.time(),
+        }
+        self._payload_cache.pop(key.to_string(), None)
+        self._save_index()
+
+    def mark_in_progress(
+        self,
+        key: CacheKey,
+        *,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        entry = self._index.get(key.to_string())
+        if entry and entry.get("status") == "in_progress" and entry.get("meta") == (meta or {}):
+            return
+        self._index[key.to_string()] = {
+            "status": "in_progress",
             "meta": meta or {},
             "updated_at": time.time(),
         }
@@ -180,6 +207,7 @@ class QuestionCache:
                     except OSError:
                         logger.debug("Failed to delete cache file %s", path)
             self._index.pop(key.to_string(), None)
+            self._payload_cache.pop(key.to_string(), None)
             self._save_index()
 
     def subtopic_request_states(self, key_prefix: CacheKey, request_names: Iterable[str]) -> Dict[str, str]:

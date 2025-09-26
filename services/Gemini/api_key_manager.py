@@ -68,6 +68,8 @@ class ApiKeyManager:
                     key: {
                         "rpd": 0,
                         "total_tokens": 0,
+                        "exhausted": False,
+                        "exhausted_reason": "",
                         "models": {
                             "flash": {"rpd": 0, "total_tokens": 0},
                             "lite": {"rpd": 0, "total_tokens": 0},
@@ -80,6 +82,22 @@ class ApiKeyManager:
             }
             self.cache.write_cache(cache_data)
 
+        # Ensure all keys have exhaustion markers when loading an existing cache file
+        for key in self.api_keys:
+            key_data = cache_data.setdefault("keys", {}).setdefault(key, {})
+            key_data.setdefault("rpd", 0)
+            key_data.setdefault("total_tokens", 0)
+            key_data.setdefault("exhausted", False)
+            key_data.setdefault("exhausted_reason", "")
+            key_data.setdefault(
+                "models",
+                {
+                    "flash": {"rpd": 0, "total_tokens": 0},
+                    "lite": {"rpd": 0, "total_tokens": 0},
+                    "pro": {"rpd": 0, "total_tokens": 0},
+                    "embedding": {"rpd": 0, "total_tokens": 0},
+                },
+            )
         return cache_data
 
     def get_key(self, model: str = "flash") -> str:
@@ -110,6 +128,8 @@ class ApiKeyManager:
     def is_key_available(self, key: str, model: str = "flash") -> bool:
         """Check if a key is within its usage limits (per model)."""
         key_data = self.cache_data["keys"][key]
+        if key_data.get("exhausted"):
+            return False
         model_data = key_data["models"][model]
         rate_limit = RATE_LIMITS[model]
 
@@ -170,3 +190,28 @@ class ApiKeyManager:
                 return key
 
         raise ValueError(f"All API keys are over their limits for model {model}.")
+
+    def mark_key_exhausted(self, key: str, model: str, reason: str = "") -> None:
+        if key not in self.cache_data.get("keys", {}):
+            return
+        key_data = self.cache_data["keys"][key]
+        key_data["exhausted"] = True
+        key_data["exhausted_reason"] = reason
+        # Clear per-model rpms to avoid stale entries when reset occurs next day
+        if model in key_data.get("models", {}):
+            key_data["models"][model]["rpd"] = RATE_LIMITS[model].per_day
+        self.cache.write_cache(self.cache_data)
+
+    def all_keys_exhausted(self, model: str = "flash") -> bool:
+        for idx, key in enumerate(self.api_keys):
+            key_data = self.cache_data.get("keys", {}).get(key)
+            if not key_data or key_data.get("exhausted"):
+                continue
+            # Temporarily reuse availability check without altering state
+            previous_index = self.current_key_index
+            self.current_key_index = idx
+            available = self.is_key_available(key, model)
+            self.current_key_index = previous_index
+            if available:
+                return False
+        return True

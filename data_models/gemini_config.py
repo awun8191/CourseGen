@@ -11,3 +11,11 @@ class GeminiConfig(BaseModel):
         default=None,
         description="Pydantic model describing the desired JSON response format",
     )
+    thinking_budget: Optional[int] = Field(
+        default=None,
+        description="Thinking budget in tokens for thinking models. 0=DISABLED, -1=AUTOMATIC",
+    )
+    use_thinking: bool = Field(
+        default=False,
+        description="Enable thinking mode for supported models",
+    )

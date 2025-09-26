@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from services.QuestionRag.pipelines.config import QuestionBatchConfig, RequestPlan
 from services.QuestionRag.pipelines.question_generator import (
-    QuestionBatchConfig,
     QuestionBatchRunner,
     QuestionGenerator,
-    RequestPlan,
 )
 
 

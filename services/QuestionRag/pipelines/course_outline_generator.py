@@ -34,56 +34,97 @@ from ..utils.chromadb_query import (
 )
 from ..utils.courses import DataFormatting  # keeps your search_course API
 
-# =========================
-# Global Config (env-overridable)
-# =========================
-TEMPERATURE = float(os.environ.get("GEN_QG_TEMPERATURE", "0.15"))
-TOP_P = float(os.environ.get("GEN_QG_TOP_P", "0.9"))
-THINKING_BUDGET = int(os.environ.get("GEN_QG_THINK_BUDGET", "12700"))
-MAX_OUTPUT_TOKENS = int(os.environ.get("GEN_QG_MAX_OUT_TOKENS", "15500"))
+# Import centralized configuration
+try:
+    from config import load_config
+    config = load_config()
+except ImportError:
+    # Fallback to environment variables if config not available
+    import os
+    from pathlib import Path
 
-GEMINI_THINKING_MODEL = os.environ.get("GEN_QG_THINK_MODEL", "gemini-2.5-flash-lite")
-GEMMA_MODEL = os.environ.get("GEN_QG_BASE_MODEL", "gemma-3-27b-it")
+    class FallbackConfig:
+        def __init__(self):
+            # Model Selection
+            self.gemini_thinking_model = os.environ.get("GEN_QG_THINK_MODEL", "gemini-2.5-flash-lite")
+            self.gemma_base_model = os.environ.get("GEN_QG_BASE_MODEL", "gemma-3-27b-it")
+
+            # Generation Parameters
+            self.gen_qg_temperature = float(os.environ.get("GEN_QG_TEMPERATURE", "0.15"))
+            self.gen_qg_top_p = float(os.environ.get("GEN_QG_TOP_P", "0.9"))
+            self.gen_qg_thinking_budget = int(os.environ.get("GEN_QG_THINK_BUDGET", "12700"))
+            self.gen_qg_max_output_tokens = int(os.environ.get("GEN_QG_MAX_OUT_TOKENS", "15500"))
+
+            # RAG Configuration for Outlines
+            self.gen_qg_rag_tau = float(os.environ.get("GEN_QG_RAG_TAU", "0.35"))
+            self.gen_qg_rag_min_sim = float(os.environ.get("GEN_QG_RAG_MIN_SIM", "0.60"))
+            self.gen_qg_rag_topk_per_query = int(os.environ.get("GEN_QG_RAG_TOPK", "10"))
+            self.gen_qg_rag_max_total = int(os.environ.get("GEN_QG_RAG_MAX", "40"))
+
+            # Subtopic RAG Configuration
+            self.gen_qg_subtopic_rag_enabled = os.environ.get("GEN_QG_SUBTOPIC_RAG", "1").lower() in ("1", "true", "yes")
+            self.gen_qg_sub_rag_tau = float(os.environ.get("GEN_QG_SUB_RAG_TAU", "0.35"))
+            self.gen_qg_sub_rag_min_sim = float(os.environ.get("GEN_QG_SUB_RAG_MIN_SIM", "0.60"))
+            self.gen_qg_sub_rag_topk_per_query = int(os.environ.get("GEN_QG_SUB_RAG_TOPK", "8"))
+            self.gen_qg_sub_rag_final_k = int(os.environ.get("GEN_QG_SUB_RAG_FINAL_K", "8"))
+
+            # Pacing Controls
+            self.gen_qg_course_delay_s = float(os.environ.get("GEN_QG_COURSE_DELAY_S", "2.0"))
+            self.gen_qg_topic_delay_s = float(os.environ.get("GEN_QG_TOPIC_DELAY_S", "1.0"))
+            self.gen_qg_query_delay_s = float(os.environ.get("GEN_QG_QUERY_DELAY_S", "0.5"))
+            self.gen_qg_delay_jitter_frac = float(os.environ.get("GEN_QG_JITTER_FRAC", "0.25"))
+
+            # Paths
+            self.repo_root = Path(__file__).resolve().parents[3]
+            self.courses_json_path_resolved = Path(os.environ.get("COURSEGEN_COURSES_JSON", str(self.repo_root / "data/textbooks/courses.json"))).expanduser().resolve()
+            self.cache_dir_resolved = Path(os.environ.get("COURSEGEN_CACHE_DIR", str(self.repo_root / "OUTPUT_DATA2/cache"))).expanduser().resolve()
+            self.chroma_out_dir_resolved = Path(os.environ.get("COURSEGEN_CHROMA_OUT_DIR", str(self.cache_dir_resolved / "outlines_by_chroma"))).expanduser().resolve()
+
+            # Logging
+            self.gen_qg_log_level = os.environ.get("GEN_QG_LOG_LVL", "INFO").upper()
+
+    config = FallbackConfig()
+
+# =========================
+# Global Config (now using centralized config)
+# =========================
+TEMPERATURE = config.gen_qg_temperature
+TOP_P = config.gen_qg_top_p
+THINKING_BUDGET = config.gen_qg_thinking_budget
+MAX_OUTPUT_TOKENS = config.gen_qg_max_output_tokens
+
+GEMINI_THINKING_MODEL = config.gemini_thinking_model
+GEMMA_MODEL = config.gemma_base_model
 
 # Outline retrieval
-RAG_TAU = float(os.environ.get("GEN_QG_RAG_TAU", "0.35"))
-RAG_MIN_SIM = float(os.environ.get("GEN_QG_RAG_MIN_SIM", "0.60"))
-RAG_TOPK_PER_QUERY = int(os.environ.get("GEN_QG_RAG_TOPK", "10"))
-RAG_MAX_TOTAL = int(os.environ.get("GEN_QG_RAG_MAX", "40"))
+RAG_TAU = config.gen_qg_rag_tau
+RAG_MIN_SIM = config.gen_qg_rag_min_sim
+RAG_TOPK_PER_QUERY = config.gen_qg_rag_topk_per_query
+RAG_MAX_TOTAL = config.gen_qg_rag_max_total
 
 # Subtopic refinement via embeddings
-ENABLE_SUBTOPIC_RAG = os.environ.get("GEN_QG_SUBTOPIC_RAG", "1").lower() in ("1", "true", "yes")
-SUB_RAG_TAU = float(os.environ.get("GEN_QG_SUB_RAG_TAU", str(RAG_TAU)))
-SUB_RAG_MIN_SIM = float(os.environ.get("GEN_QG_SUB_RAG_MIN_SIM", str(RAG_MIN_SIM)))
-SUB_RAG_TOPK_PER_QUERY = int(os.environ.get("GEN_QG_SUB_RAG_TOPK", "8"))
-SUB_RAG_FINAL_K = int(os.environ.get("GEN_QG_SUB_RAG_FINAL_K", "8"))
+ENABLE_SUBTOPIC_RAG = config.gen_qg_subtopic_rag_enabled
+SUB_RAG_TAU = config.gen_qg_sub_rag_tau
+SUB_RAG_MIN_SIM = config.gen_qg_sub_rag_min_sim
+SUB_RAG_TOPK_PER_QUERY = config.gen_qg_sub_rag_topk_per_query
+SUB_RAG_FINAL_K = config.gen_qg_sub_rag_final_k
 
 # Pacing controls to avoid provider overload
-COURSE_DELAY_S = float(os.environ.get("GEN_QG_COURSE_DELAY_S", "2.0"))
-TOPIC_DELAY_S = float(os.environ.get("GEN_QG_TOPIC_DELAY_S", "1.0"))
-QUERY_DELAY_S = float(os.environ.get("GEN_QG_QUERY_DELAY_S", "0.5"))
-DELAY_JITTER_FRAC = float(os.environ.get("GEN_QG_JITTER_FRAC", "0.25"))  # 0..1 of delay
+COURSE_DELAY_S = config.gen_qg_course_delay_s
+TOPIC_DELAY_S = config.gen_qg_topic_delay_s
+QUERY_DELAY_S = config.gen_qg_query_delay_s
+DELAY_JITTER_FRAC = config.gen_qg_delay_jitter_frac
 
-# Files
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_COURSES_JSON = REPO_ROOT / "data/textbooks/courses.json"
-DEFAULT_CACHE_DIR = REPO_ROOT / "OUTPUT_DATA2/cache"
+# Files (using centralized config)
+REPO_ROOT = config.repo_root
+DEFAULT_COURSES_JSON = config.courses_json_path_resolved
+DEFAULT_CACHE_DIR = config.cache_dir_resolved
+COURSES_JSON = config.courses_json_path_resolved
+CACHE_DIR = config.cache_dir_resolved
+CHROMA_OUT_DIR = config.chroma_out_dir_resolved
 
-COURSES_JSON = Path(
-    os.environ.get("COURSEGEN_COURSES_JSON", str(DEFAULT_COURSES_JSON))
-).expanduser().resolve()
-
-CACHE_DIR = Path(
-    os.environ.get("COURSEGEN_CACHE_DIR", str(DEFAULT_CACHE_DIR))
-).expanduser().resolve()
-
+# Ensure directories exist
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-# Default output dir for Chroma-wide runs
-DEFAULT_OUTLINE_DIR = CACHE_DIR / "outlines_by_chroma"
-CHROMA_OUT_DIR = Path(
-    os.environ.get("COURSEGEN_CHROMA_OUT_DIR", str(DEFAULT_OUTLINE_DIR))
-).expanduser().resolve()
 CHROMA_OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Logging
@@ -92,7 +133,7 @@ if not logger.handlers:
     h = logging.StreamHandler()
     h.setFormatter(logging.Formatter("[%(levelname)s] %(asctime)s - %(name)s - %(message)s"))
     logger.addHandler(h)
-logger.setLevel(os.environ.get("GEN_QG_LOG_LVL", "INFO").upper())
+logger.setLevel(config.gen_qg_log_level)
 
 
 # =========================

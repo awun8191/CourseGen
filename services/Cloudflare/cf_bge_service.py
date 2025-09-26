@@ -11,8 +11,17 @@ import requests
 
 from COURSEGEN.utils.logging_utils import get_rag_logger
 
-CF_DEFAULT_MODEL = "@cf/baai/bge-m3"           # Cloudflare Workers AI model slug
-CF_MAX_BATCH = int(os.getenv("CF_EMBED_MAX_BATCH", "100"))  # max per request
+# Import centralized configuration
+try:
+    from config import load_config
+    config = load_config()
+    CF_DEFAULT_MODEL = config.cf_default_model
+    CF_MAX_BATCH = config.cf_max_batch
+except ImportError:
+    # Fallback to hardcoded defaults if centralized config not available
+    import os
+    CF_DEFAULT_MODEL = "@cf/baai/bge-m3"           # Cloudflare Workers AI model slug
+    CF_MAX_BATCH = int(os.getenv("CF_EMBED_MAX_BATCH", "100"))  # max per request
 CF_WORKERS = int(os.getenv("CF_EMBED_WORKERS", "8"))        # client threads
 CF_TIMEOUT = int(os.getenv("CF_EMBED_TIMEOUT", "45"))       # seconds
 

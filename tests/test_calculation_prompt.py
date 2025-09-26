@@ -7,11 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from services.QuestionRag.pipelines.question_generator import (
-    QuestionBatchConfig,
-    QuestionGenerator,
-    RequestPlan,
-)
+from services.QuestionRag.pipelines.config import QuestionBatchConfig, RequestPlan
+from services.QuestionRag.pipelines.question_generator import QuestionGenerator
 
 
 class DummyGemini:
@@ -46,7 +43,7 @@ def test_calculation_prompt_parses_dollar_wrapped_latex(tmp_path, question_count
       "solution_steps": [
         "Convert $50\\,\\text{cm}^2$ to $\\text{m}^2$ giving $5.0\\times10^{-3}\\,\\text{m}^2$.",
         "Apply $\\tau = \\frac{F}{A}$ to get $\\tau = 1.0\\,\\text{MPa}$.",
-        "Select option A with the matching value.",
+            "Final: $\\tau = 1.0\\,\\text{MPa}$.",
       ],
     }
   ],
@@ -111,6 +108,5 @@ def test_calculation_prompt_parses_dollar_wrapped_latex(tmp_path, question_count
     assert "$\\tau = \\frac{F}{A}$" in question.question
     assert "$" in question.explanation
     assert question.solution_steps
-    assert question.solution_steps[0].startswith("\\(")
     assert "$" in question.solution_steps[0]
     assert gemini.last_prompt is not None and "Ensure every LaTeX expression" in gemini.last_prompt

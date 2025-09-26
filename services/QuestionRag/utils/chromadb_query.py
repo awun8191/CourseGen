@@ -66,13 +66,24 @@ CHROMA_COLLECTION = (
 # Distance metric of your Chroma collection: "cosine" | "l2" | "similarity"
 CHROMA_DISTANCE_METRIC = os.environ.get("CHROMA_DISTANCE_METRIC", "cosine").lower()
 
-# Retrieval knobs
-DEFAULT_TOPK = int(os.environ.get("CHROMA_TOPK", "50"))       # wide pool
-DEFAULT_FINAL_K = int(os.environ.get("CHROMA_FINAL_K", "8"))  # returned to LLM
-DEFAULT_TAU = float(os.environ.get("CHROMA_TAU", "0.35"))
-DEFAULT_MIN_SIM = float(os.environ.get("CHROMA_MIN_SIM", "0.60"))
-DEFAULT_SEED = os.environ.get("CHROMA_SEED")
-DEFAULT_SEED = int(DEFAULT_SEED) if (DEFAULT_SEED and DEFAULT_SEED.isdigit()) else None
+# Import centralized configuration
+try:
+    from config import load_config
+    config = load_config()
+    DEFAULT_TOPK = config.chroma_topk
+    DEFAULT_FINAL_K = config.chroma_final_k
+    DEFAULT_TAU = config.chroma_tau
+    DEFAULT_MIN_SIM = config.chroma_min_sim
+    DEFAULT_SEED = config.chroma_seed
+except ImportError:
+    # Fallback to environment variables if centralized config not available
+    import os
+    DEFAULT_TOPK = int(os.environ.get("CHROMA_TOPK", "50"))       # wide pool
+    DEFAULT_FINAL_K = int(os.environ.get("CHROMA_FINAL_K", "8"))  # returned to LLM
+    DEFAULT_TAU = float(os.environ.get("CHROMA_TAU", "0.35"))
+    DEFAULT_MIN_SIM = float(os.environ.get("CHROMA_MIN_SIM", "0.60"))
+    DEFAULT_SEED = os.environ.get("CHROMA_SEED")
+    DEFAULT_SEED = int(DEFAULT_SEED) if (DEFAULT_SEED and DEFAULT_SEED.isdigit()) else None
 
 # Cloudflare Workers AI / BGE-M3
 CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")

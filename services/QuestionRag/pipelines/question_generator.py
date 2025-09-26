@@ -4,28 +4,49 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import logging
 import os
 import random
-import textwrap
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
-
-from pydantic import BaseModel, Field, ValidationError
 
 from data_models.gemini_config import GeminiConfig
 from data_models.question_model import Question
 from services.Gemini.gemini_service import GeminiService
 
-from ..utils import ChromaQuery, MetaData, QuestionCache
-from ..utils.batch_utils import (
-    validate_answer_in_options,
-    validate_options,
-    write_jsonl,
-)
+from ..utils import ChromaQuery, CourseProgressCache, MetaData, QuestionCache
+from ..utils.batch_utils import write_jsonl
+from .config import QuestionBatchConfig, RequestPlan
+from .json_utils import QuestionGenerationError, parse_batch_from_raw, dump_failed_payload
+from .models import GeminiQuestionBatch
+from .prompt_utils import build_question_generation_prompt
+from .validation_utils import convert_to_questions
+
+# Import centralized configuration
+try:
+    from config import load_config
+    config = load_config()
+except ImportError:
+    # Fallback to local config if centralized config not available
+    import os
+    from pathlib import Path
+
+    class FallbackConfig:
+        def __init__(self):
+            self.gemini_default_model = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash")
+            self.gemini_temperature = 0.15
+            self.gemini_top_p = 0.4
+            self.gemini_max_output_tokens = 10000
+            self.gemini_use_thinking = False
+            self.gemini_thinking_budget = 12700
+            self.courses_json_path_resolved = Path(os.environ.get("COURSEGEN_COURSES_JSON", "data/textbooks/courses.json")).expanduser()
+            self.cache_dir_resolved = Path(os.environ.get("COURSEGEN_CACHE_DIR", "OUTPUT_DATA2/cache")).expanduser()
+            self.coursegen_qg_loglevel = os.environ.get("COURSEGEN_QG_LOGLEVEL", "INFO").upper()
+            self.coursegen_debug = os.environ.get("COURSEGEN_DEBUG", "").lower() == "true"
+            self.coursegen_use_structured = os.environ.get("COURSEGEN_USE_STRUCTURED", "0").lower() in ("1", "true", "yes")
+
+    config = FallbackConfig()
 
 try:  # pragma: no cover - Firestore is optional in tests
     from ...Firestore.firebase_service import FireStore  # type: ignore
@@ -40,124 +61,7 @@ if not logger.handlers:
         logging.Formatter("[%(levelname)s] %(asctime)s - %(name)s - %(message)s")
     )
     logger.addHandler(handler)
-logger.setLevel(os.environ.get("COURSEGEN_QG_LOGLEVEL", "INFO").upper())
-
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_COURSES_JSON = Path(
-    os.environ.get(
-        "COURSEGEN_COURSES_JSON", str(REPO_ROOT / "data/textbooks/courses.json")
-    )
-).expanduser()
-DEFAULT_CACHE_ROOT = Path(
-    os.environ.get("COURSEGEN_CACHE_DIR", str(REPO_ROOT / "OUTPUT_DATA2/cache"))
-).expanduser()
-DEFAULT_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
-
-DEFAULT_MODEL = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash-lite")
-
-
-class QuestionGenerationError(RuntimeError):
-    """Raised when the model returns invalid or incomplete data."""
-
-
-@dataclass(frozen=True)
-class RequestPlan:
-    """Description of an individual Gemini request within a subtopic run."""
-
-    name: str
-    kind: str
-    question_count: int
-    difficulty_rank: int
-
-
-@dataclass
-class QuestionBatchConfig:
-    """Configuration holder for question batch generation."""
-
-    course_code: str
-    courses_json_path: Path = DEFAULT_COURSES_JSON
-    cache_dir: Path = DEFAULT_CACHE_ROOT
-    rag_topk: int = 30
-    rag_final_k: int = 12
-    rag_tau: float = 0.35
-    rag_min_similarity: float = 0.6
-    rag_where: Optional[Dict[str, Any]] = None
-    theory_questions_per_request: int = 10
-    calc_questions_per_request: int = 5
-    resume: bool = True
-    store_firestore: bool = True
-    request_delay_s: float = 1.5
-    delay_jitter: float = 0.25
-    gemini_model: str = DEFAULT_MODEL
-    gemini_temperature: float = 0.25
-    gemini_top_p: float = 0.85
-    gemini_max_output_tokens: int = 6000
-    request_attempts: int = 2
-    rag_attempts: int = 2
-    rag_context_limit: int = 8
-    latex_wrap_steps: bool = True
-    target_topics: Optional[Sequence[str]] = None
-    target_subtopics: Optional[Sequence[str]] = None
-    output_path: Optional[Path] = None
-    custom_plan: Optional[List[RequestPlan]] = None
-
-    def normalized_topics(self) -> Optional[set[str]]:
-        if self.target_topics is None:
-            return None
-        return {t.strip().lower() for t in self.target_topics if str(t).strip()}
-
-    def normalized_subtopics(self) -> Optional[set[str]]:
-        if self.target_subtopics is None:
-            return None
-        return {t.strip().lower() for t in self.target_subtopics if str(t).strip()}
-
-    def request_plan(self) -> List[RequestPlan]:
-        if self.custom_plan is not None:
-            return list(self.custom_plan)
-        # Generate exactly 20 questions per subtopic: 10 theory + 10 calculation
-        return [
-            RequestPlan(
-                name="theory-1",
-                kind="theory",
-                question_count=10,  # Exactly 10 theory questions per request
-                difficulty_rank=4,
-            ),
-            RequestPlan(
-                name="calculation-1",
-                kind="calculation",
-                question_count=10,  # Exactly 10 calculation questions per request
-                difficulty_rank=6,
-            ),
-        ]
-
-
-class GeminiGeneratedQuestion(BaseModel):
-    """Schema describing the expected Gemini JSON payload."""
-
-    question: str = Field(..., description="Main question text")
-    options: List[str] = Field(
-        ...,
-        min_length=4,
-        max_length=4,
-    )
-    correct_answer: str = Field(..., description="Correct option letter (A-D)")
-    correct_answer_text: Optional[str] = Field(
-        None, description="Correct option text (fallback if letter missing)"
-    )
-    explanation: str = Field(..., description="Grounded explanation")
-    solution_steps: Optional[List[str]] = Field(
-        default=None,
-        description="Ordered list of solution steps for calculations",
-    )
-
-
-class GeminiQuestionBatch(BaseModel):
-    questions: List[GeminiGeneratedQuestion] = Field(
-        ...,
-        min_length=1,
-        description="Collection of questions returned from Gemini",
-    )
+logger.setLevel(config.coursegen_qg_loglevel)
 
 
 class QuestionGenerator:
@@ -171,26 +75,13 @@ class QuestionGenerator:
         firestore: Optional[Any] = None,
         use_structured: Optional[bool] = None,
     ) -> None:
-        # Initialize Gemini service with explicit API keys to avoid env var fallback
-        if gemini_service is None:
-            from services.Gemini.gemini_api_keys import GeminiApiKeys
-            from services.Gemini.api_key_manager import ApiKeyManager
-
-            gemini_keys = GeminiApiKeys()
-            api_keys = gemini_keys.get_keys()
-            api_key_manager = ApiKeyManager(api_keys)
-
-            self.gemini = GeminiService(api_key_manager=api_key_manager)
-        else:
-            self.gemini = gemini_service
-
+        self.gemini = gemini_service
         self.rag = rag_client or ChromaQuery()
         self._firestore = firestore
         self._cache_map: Dict[Path, QuestionCache] = {}
         self._course_store: Dict[Path, List[Dict[str, Any]]] = {}
         if use_structured is None:
-            env_flag = os.environ.get("COURSEGEN_USE_STRUCTURED", "0").lower()
-            use_structured = env_flag in ("1", "true", "yes")
+            use_structured = config.coursegen_use_structured
         self.use_structured = bool(use_structured)
 
     # ------------------------------------------------------------------
@@ -243,6 +134,13 @@ class QuestionGenerator:
         normalized_topics = config.normalized_topics()
         normalized_subtopics = config.normalized_subtopics()
 
+        progress_cache = CourseProgressCache(
+            course_code=str(course.get("code") or "unknown"),
+            cache_root=config.cache_dir,
+            theory_target=config.theory_questions_per_request,
+            calc_target=config.calc_questions_per_request,
+        )
+
         results: List[Question] = []
         for topic in outline:
             topic_title = str(topic.get("title") or "").strip()
@@ -266,6 +164,7 @@ class QuestionGenerator:
                     course=course,
                     topic_title=topic_title,
                     subtopic_title=subtopic_title,
+                    progress=progress_cache,
                 )
                 results.extend(generated)
         return results
@@ -280,9 +179,20 @@ class QuestionGenerator:
         course: Dict[str, Any],
         topic_title: str,
         subtopic_title: str,
+        progress: CourseProgressCache,
     ) -> List[Question]:
         cache = self._cache_for(config.cache_dir)
         plan = config.request_plan()
+        progress.touch_subtopic(topic_title, subtopic_title)
+        if progress.subtopic_state(topic_title, subtopic_title) == "completed" and progress.has_persisted(topic_title, subtopic_title):
+            logger.info(
+                "Skipping %s - %s (%s); already completed and persisted",
+                course.get("code"),
+                topic_title,
+                subtopic_title,
+            )
+            return []
+
         rag_contexts = self._retrieve_rag_context(
             course=course,
             topic_title=topic_title,
@@ -306,9 +216,12 @@ class QuestionGenerator:
             for request in plan:
                 key = cache.make_key(course.get("code", ""), topic_title, subtopic_title, request.name)
                 cache.mark_skipped(key, reason="rag_empty", meta=meta)
+                progress.mark_request_failed(topic_title, subtopic_title, request.name, "rag_empty")
+            progress.mark_subtopic_error(topic_title, subtopic_title, "rag_empty")
             return []
 
         questions: List[Question] = []
+        subtopic_completed = progress.subtopic_state(topic_title, subtopic_title) == "completed"
         for idx, request in enumerate(plan):
             key = cache.make_key(
                 course.get("code", ""), topic_title, subtopic_title, request.name
@@ -323,18 +236,28 @@ class QuestionGenerator:
             }
 
             status = cache.get_status(key)
+            if status == "in_progress":
+                logger.info(
+                    "Found interrupted cache entry for %s - %s (%s); marking for retry",
+                    course.get("code"),
+                    topic_title,
+                    request.name,
+                )
+                cache.mark_failed(key, reason="interrupted", meta=meta)
+                status = None
             if status in {"failed", "skipped"}:
                 entry = cache.get_entry(key) or {}
-                reason = str(entry.get("reason", ""))
-                if status == "failed" or reason.startswith("error:"):
-                    logger.info(
-                        "Clearing failed cache entry for %s - %s (%s) to retry",
-                        course.get("code"),
-                        topic_title,
-                        request.name,
-                    )
-                    cache.clear(key)
-                    status = None
+                reason = str(entry.get("reason", "")) or status
+                logger.info(
+                    "Retrying %s cache entry for %s - %s (%s); previous reason: %s",
+                    status,
+                    course.get("code"),
+                    topic_title,
+                    request.name,
+                    reason,
+                )
+                cache.clear(key)
+                status = None
 
             if config.resume and cache.has_completed(key):
                 cached = cache.load(key)
@@ -348,7 +271,16 @@ class QuestionGenerator:
                         topic_title,
                         request.name,
                     )
+                    progress.mark_request_completed(
+                        topic_title,
+                        subtopic_title,
+                        request.name,
+                        len(restored),
+                    )
+                    subtopic_completed = progress.subtopic_state(topic_title, subtopic_title) == "completed"
                 continue
+
+            progress.mark_request_started(topic_title, subtopic_title, request.name)
 
             context_text, rag_sources = self._format_context(
                 rag_contexts, limit=config.rag_context_limit, offset=idx * config.rag_context_limit
@@ -356,6 +288,7 @@ class QuestionGenerator:
             if not context_text or len(rag_sources) < 2:  # Require at least some meaningful context
                 logger.warning("Insufficient RAG context (%d sources) for %s; skipping", len(rag_sources), request.name)
                 cache.mark_skipped(key, reason="rag_insufficient", meta=meta)
+                progress.mark_request_failed(topic_title, subtopic_title, request.name, "rag_insufficient")
                 continue
 
             attempt = 0
@@ -363,6 +296,7 @@ class QuestionGenerator:
             last_error: Optional[Exception] = None
             while attempt < max(1, config.request_attempts):
                 try:
+                    cache.mark_in_progress(key, meta=meta)
                     generated = self._call_gemini(
                         config=config,
                         course=course,
@@ -405,6 +339,7 @@ class QuestionGenerator:
                     else:
                         reason = f"error:{last_error}"
                 cache.mark_failed(key, reason=reason, meta=meta)
+                progress.mark_request_failed(topic_title, subtopic_title, request.name, reason)
                 continue
 
             cache.store(
@@ -412,8 +347,14 @@ class QuestionGenerator:
                 [q.model_dump() for q in generated],
                 meta={**meta, "rag_sources": rag_sources},
             )
+            is_complete = progress.mark_request_completed(
+                topic_title,
+                subtopic_title,
+                request.name,
+                len(generated),
+            )
             questions.extend(generated)
-            self._persist_to_firestore(generated, enable=config.store_firestore)
+            subtopic_completed = progress.subtopic_state(topic_title, subtopic_title) == "completed"
 
             # Update progress after each batch completion
             self._update_progress_after_batch(
@@ -427,6 +368,18 @@ class QuestionGenerator:
 
             self._sleep_with_jitter(config.request_delay_s, config.delay_jitter)
 
+        subtopic_completed = progress.subtopic_state(topic_title, subtopic_title) == "completed"
+        if subtopic_completed:
+            if questions and not progress.has_persisted(topic_title, subtopic_title):
+                self._persist_to_firestore(questions, enable=config.store_firestore)
+                progress.mark_persisted(topic_title, subtopic_title)
+                self._cleanup_subtopic_cache(
+                    cache=cache,
+                    course_code=str(course.get("code")),
+                    topic_title=topic_title,
+                    subtopic_title=subtopic_title,
+                    plan=plan,
+                )
         return questions
 
     # ------------------------------------------------------------------
@@ -567,7 +520,7 @@ class QuestionGenerator:
         context_text: str,
         rag_sources: List[Dict[str, Any]],
     ) -> List[Question]:
-        prompt = self._build_prompt(
+        prompt = build_question_generation_prompt(
             course=course,
             topic_title=topic_title,
             subtopic_title=subtopic_title,
@@ -578,6 +531,8 @@ class QuestionGenerator:
             temperature=config.gemini_temperature,
             top_p=config.gemini_top_p,
             max_output_tokens=config.gemini_max_output_tokens,
+            use_thinking=config.use_thinking,
+            thinking_budget=config.thinking_budget,
         )
 
         if self.use_structured:
@@ -613,7 +568,7 @@ class QuestionGenerator:
             )
 
         # Debug: print the raw response before validation (only in verbose mode)
-        if os.environ.get("COURSEGEN_DEBUG", "").lower() == "true":
+        if config.coursegen_debug:
             print(f"DEBUG: Raw response type: {type(response)}")
             if isinstance(response, dict):
                 print(f"DEBUG: Response keys: {response.keys()}")
@@ -632,9 +587,16 @@ class QuestionGenerator:
             if isinstance(response, dict) and 'result' in response:
                 raw_result = response['result']
                 try:
-                    batch = self._parse_batch_from_raw(raw_result)
+                    batch = parse_batch_from_raw(raw_result)
                 except (ValueError, KeyError) as exc:
-                    self._dump_failed_payload(raw_result)
+                    dump_path = dump_failed_payload(raw_result)
+                    logger.error(
+                        "Could not parse JSON for %s - %s (%s). Saved raw payload to %s",
+                        course.get("code"),
+                        topic_title,
+                        request.name,
+                        dump_path or "<memory>",
+                    )
                     raise ValueError(
                         f"Could not parse JSON from response: {raw_result[:200]}..."
                     ) from exc
@@ -648,8 +610,8 @@ class QuestionGenerator:
                 f"Expected {expected_count} questions for {request.name} but received {actual_count}"
             )
 
-        return self._convert_to_questions(
-            batch.questions,
+        return convert_to_questions(
+            [q.model_dump() for q in batch.questions],
             course=course,
             topic_title=topic_title,
             subtopic_title=subtopic_title,
@@ -658,579 +620,23 @@ class QuestionGenerator:
             wrap_latex=config.latex_wrap_steps,
         )
 
-    @staticmethod
-    def _extract_json_payload(text: str) -> Optional[str]:
-        if not text:
-            return None
-
-        code_block = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text, re.DOTALL)
-        if code_block:
-            candidate = code_block.group(1).strip()
-            if candidate:
-                return candidate
-
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            candidate = text[start : end + 1].strip()
-            if candidate:
-                return candidate
-        return None
-
-    def _parse_batch_from_raw(self, raw_result: str) -> GeminiQuestionBatch:
-        parsed_response = self._extract_json_content(raw_result)
-        normalized = self._normalize_question_payload(parsed_response)
-        return GeminiQuestionBatch.model_validate(normalized)
-
-    def _dump_failed_payload(self, raw_result: str) -> None:
-        try:
-            dump_root = Path(os.environ.get("COURSEGEN_DEBUG_DUMP_DIR", str(DEFAULT_CACHE_ROOT / "failed_responses")))
-            dump_root.mkdir(parents=True, exist_ok=True)
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            random_suffix = f"{random.randint(0, 9999):04d}"
-            path = dump_root / f"failed_payload_{timestamp}_{random_suffix}.json"
-            path.write_text(raw_result, encoding="utf-8")
-            logger.debug("Wrote failing payload to %s", path)
-        except Exception as exc:
-            logger.debug("Failed to write debug payload: %s", exc)
-
-    @staticmethod
-    def _strip_trailing_commas(text: str) -> str:
-        if not text:
-            return text
-
-        result: list[str] = []
-        in_string = False
-        escaped = False
-        length = len(text)
-        i = 0
-        while i < length:
-            ch = text[i]
-            if in_string:
-                result.append(ch)
-                if escaped:
-                    escaped = False
-                elif ch == "\\":
-                    escaped = True
-                elif ch == '"':
-                    in_string = False
-                i += 1
-                continue
-            if ch == '"':
-                in_string = True
-                result.append(ch)
-                i += 1
-                continue
-            if ch == ',':
-                j = i + 1
-                while j < length and text[j] in " \t\r\n":
-                    j += 1
-                if j < length and text[j] in '}]':
-                    i += 1
-                    continue
-            result.append(ch)
-            i += 1
-        return "".join(result)
-
-    @staticmethod
-    def _repair_truncated_json(text: str) -> Optional[str]:
-        if not text:
-            return None
-
-        start = None
-        for idx, ch in enumerate(text):
-            if ch in "[{":
-                start = idx
-                break
-        if start is None:
-            return None
-
-        in_string = False
-        escaped = False
-        stack: list[str] = []
-        for ch in text[start:]:
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif ch == "\\":
-                    escaped = True
-                elif ch == '"':
-                    in_string = False
-                continue
-            if ch == '"':
-                in_string = True
-                continue
-            if ch in "[{":
-                stack.append(ch)
-            elif ch in "]}":
-                if stack:
-                    opener = stack[-1]
-                    if (opener == "[" and ch == "]") or (opener == "{" and ch == "}"):
-                        stack.pop()
-
-        repaired = text[start:]
-        if in_string:
-            repaired += '"'
-        for opener in reversed(stack):
-            repaired += ']' if opener == '[' else '}'
-        return repaired
-
-    @staticmethod
-    def _simple_json_load(content: str) -> Any:
-        if not content:
-            raise ValueError("Empty JSON payload")
-        if not isinstance(content, str):
-            content = str(content)
-
-        # Enhanced LaTeX escaping for JSON compatibility
-        def _escape_latex_for_json(text: str) -> str:
-            # Handle LaTeX math expressions: \(...\), \[...\], \(...\)
-            text = re.sub(r'\\\(', '\\\\(', text)  # \( -> \(
-            text = re.sub(r'\\\)', '\\\\)', text)  # \) -> \)
-            text = re.sub(r'\\\[', '\\\\[', text)  # \[ -> \[
-            text = re.sub(r'\\\]', '\\\\]', text)  # \] -> \]
-
-            # Handle common LaTeX commands and symbols
-            text = re.sub(r'\\(?![\\/bfnrt\"u\\\\])', r'\\\\', text)
-
-            return text
-
-        def _attempt_load(candidate: str) -> Optional[Any]:
-            try:
-                return json.loads(candidate)
-            except json.JSONDecodeError:
-                return None
-
-        def _add_candidate(candidates: list[str], value: Optional[str]) -> None:
-            if not value:
-                return
-            if value not in candidates:
-                candidates.append(value)
-
-        candidates: list[str] = []
-        _add_candidate(candidates, content)
-        _add_candidate(candidates, QuestionGenerator._strip_trailing_commas(content))
-
-        sanitized = _escape_latex_for_json(content)
-        _add_candidate(candidates, sanitized)
-        _add_candidate(candidates, QuestionGenerator._strip_trailing_commas(sanitized))
-
-        doubled = sanitized.replace("\\", "\\\\")
-        _add_candidate(candidates, doubled)
-        _add_candidate(candidates, QuestionGenerator._strip_trailing_commas(doubled))
-
-        for candidate in candidates:
-            result = _attempt_load(candidate)
-            if result is not None:
-                return result
-
-        for candidate in candidates:
-            repaired = QuestionGenerator._repair_truncated_json(candidate)
-            if not repaired or repaired == candidate:
-                continue
-            result = _attempt_load(repaired)
-            if result is not None:
-                return result
-
-        raise ValueError("Failed to parse JSON content")
-
-    def _extract_json_content(self, text: str) -> Any:
-        if not text:
-            raise ValueError("No JSON content in empty response")
-
-        # Prefer fenced code blocks
-        match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
-        if match:
-            snippet = match.group(1).strip()
-            if snippet:
-                return self._simple_json_load(snippet)
-
-        # Try raw payload
-        trimmed = text.strip()
-        try:
-            return json.loads(trimmed)
-        except json.JSONDecodeError:
-            pass
-
-        # Fallback to the first JSON-looking object
-        brace_match = re.search(r"\{[\s\S]*\}", text)
-        if brace_match:
-            snippet = brace_match.group(0).strip()
-            return self._simple_json_load(snippet)
-
-        raise ValueError(f"No JSON found in response: {text[:200]}...")
-
-    @staticmethod
-    def _normalize_solution_steps(value: Any) -> List[str]:
-        if value is None:
-            return []
-        if isinstance(value, list):
-            return [str(step).strip() for step in value if str(step).strip()]
-        if isinstance(value, tuple):
-            return [str(step).strip() for step in value if str(step).strip()]
-        if isinstance(value, str):
-            text = value.strip()
-            if not text:
-                return []
-            if text.startswith("[") and text.endswith("]"):
-                try:
-                    parsed = json.loads(text)
-                    if isinstance(parsed, list):
-                        return [str(step).strip() for step in parsed if str(step).strip()]
-                except json.JSONDecodeError:
-                    pass
-            return [text]
-        # Fallback: wrap anything else in a list
-        return [str(value).strip()]
-
-    def _normalize_question_payload(self, payload: Any) -> Dict[str, Any]:
-        if isinstance(payload, list):
-            normalized = []
-            for item in payload:
-                if isinstance(item, dict):
-                    item["solution_steps"] = self._normalize_solution_steps(
-                        item.get("solution_steps")
-                    )
-                    normalized.append(item)
-            return {"questions": normalized}
-
-        if not isinstance(payload, dict):
-            return {"questions": []}
-
-        questions = payload.get("questions")
-        if isinstance(questions, list):
-            for question in questions:
-                if not isinstance(question, dict):
-                    continue
-                question["solution_steps"] = self._normalize_solution_steps(
-                    question.get("solution_steps")
-                )
-            return payload
-
-        # Handle single-question payloads
-        if isinstance(payload, dict) and "question" in payload:
-            normalized_question = dict(payload)
-            normalized_question["solution_steps"] = self._normalize_solution_steps(
-                normalized_question.get("solution_steps")
-            )
-            return {"questions": [normalized_question]}
-
-        return payload
-
-    def _convert_to_questions(
+    def _cleanup_subtopic_cache(
         self,
-        llm_questions: Iterable[GeminiGeneratedQuestion],
         *,
-        course: Dict[str, Any],
+        cache: QuestionCache,
+        course_code: str,
         topic_title: str,
         subtopic_title: str,
-        request: RequestPlan,
-        rag_sources: List[Dict[str, Any]],
-        wrap_latex: bool,
-    ) -> List[Question]:
-        if not rag_sources:
-            raise QuestionGenerationError("RAG sources are required for question generation")
-
-        questions: List[Question] = []
-        level = self._first(course.get("levels"))
-        semester = self._first(course.get("semesters"))
-        course_code = str(course.get("code") or "")
-        course_title = str(course.get("title") or "")
-
-        for idx, item in enumerate(llm_questions, start=1):
-            options = [str(opt).strip() for opt in item.options]
-            validate_options(options)
-
-            if any(not option for option in options):
-                raise QuestionGenerationError("Options must not be empty")
-
-            normalized_options = {option.lower() for option in options}
-            if len(normalized_options) != len(options):
-                raise QuestionGenerationError("Options must be unique")
-
-            answer_letter, answer_text = self._normalize_answer(
-                item.correct_answer,
-                item.correct_answer_text,
-                options,
-            )
-            validate_answer_in_options(answer_text, options)
-
-            question_text = str(item.question or "").strip()
-            if not question_text:
-                raise QuestionGenerationError("Question text is empty")
-
-            explanation = str(item.explanation or "").strip()
-            if not explanation:
-                raise QuestionGenerationError("Explanation is required")
-            steps = [str(step).strip() for step in (item.solution_steps or []) if str(step).strip()]
-            if request.kind == "calculation":
-                steps = self._ensure_latex_steps(steps, wrap_latex=wrap_latex)
-                # Allow empty solution steps for calculation questions instead of raising error
-                if not steps:
-                    steps = []
-            else:
-                # For theory questions, ensure solution_steps is an empty list, not an empty string
-                steps = []
-
-            question = Question(
-                course_code=course_code,
-                course_name=course_title,
-                topic_name=topic_title,
-                subtopic_name=subtopic_title,
-                level=level,
-                semester=semester,
-                question_type=request.kind,
-                difficulty_ranking=request.difficulty_rank,
-                difficulty=self._difficulty_from_rank(request.difficulty_rank),
-                question=question_text,
-                options=options,
-                correct_answer=answer_letter,
-                correct_answer_text=answer_text,
-                explanation=explanation,
-                solution_steps=steps,
-                rag_sources=[dict(src) for src in rag_sources],
-                extra_metadata={
-                    "request_name": request.name,
-                    "question_index": idx,
-                    "generated_at": time.time(),
-                },
-            )
-            questions.append(question)
-        return questions
-
-    # ------------------------------------------------------------------
-    # Formatting helpers
-    # ------------------------------------------------------------------
-    def _difficulty_from_rank(self, rank: int) -> str:
-        if rank <= 3:
-            return "Easy"
-        if rank <= 6:
-            return "Medium"
-        return "Hard"
-
-    def _first(self, value: Any) -> Optional[str]:
-        if isinstance(value, list) and value:
-            return str(value[0])
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-        return None
-
-    def _normalize_answer(
-        self,
-        answer_value: Any,
-        answer_text_value: Optional[str],
-        options: List[str],
-    ) -> tuple[str, str]:
-        letters = ["A", "B", "C", "D"]
-        if answer_text_value:
-            text = answer_text_value.strip()
-            for idx, option in enumerate(options):
-                if text.lower() == option.lower():
-                    return letters[idx], option
-        if isinstance(answer_value, int):
-            idx = answer_value - 1
-            if 0 <= idx < len(options):
-                return letters[idx], options[idx]
-        if isinstance(answer_value, str):
-            cleaned = answer_value.strip().upper()
-            for idx, letter in enumerate(letters):
-                if cleaned in {letter, f"OPTION {letter}", f"{letter}.", f"{letter})"}:
-                    return letter, options[idx]
-            for idx, option in enumerate(options):
-                if cleaned.lower() == option.lower():
-                    return letters[idx], option
-        raise QuestionGenerationError("Unable to determine correct answer letter")
-
-    def _ensure_latex_steps(self, steps: List[str], *, wrap_latex: bool) -> List[str]:
-        if not steps:
-            return []
-        formatted: List[str] = []
-        for step in steps[:8]:
-            clean = step.strip()
-            if not clean:
-                continue
-            if not wrap_latex:
-                formatted.append(clean)
-                continue
-            if clean.startswith("$") or clean.startswith("\\("):
-                formatted.append(clean)
-            else:
-                formatted.append(f"\\({clean}\\)")
-        return formatted
-
-    @staticmethod
-    def _format_latex_for_display(latex_text: str) -> str:
-        """Format LaTeX text for proper display, handling escaped backslashes."""
-        if not latex_text:
-            return latex_text
-
-        # Convert escaped backslashes back to single backslashes for display
-        # This handles cases where JSON had \\( -> \( for display
-        text = latex_text.replace("\\\\", "\\")
-
-        # Ensure proper LaTeX delimiters for display
-        if "\\(" in text and not text.startswith("\\("):
-            # If contains inline math but not wrapped, wrap it
-            text = f"\\({text}\\)"
-
-        return text
+        plan: Sequence[RequestPlan],
+    ) -> None:
+        for request in plan:
+            key = cache.make_key(course_code, topic_title, subtopic_title, request.name)
+            cache.clear(key)
 
 
 
         
 
-    def _build_prompt(
-        self,
-        *,
-        course: Dict[str, Any],
-        topic_title: str,
-        subtopic_title: str,
-        request: RequestPlan,
-        context_text: str,
-    ) -> str:
-        level = self._first(course.get("levels")) or "Unknown"
-        semester = self._first(course.get("semesters")) or "Unknown"
-
-        base_guidance = textwrap.dedent("""
-        - Questions must be original, unambiguous, and self-contained.
-        - Provide exactly four distinct options labelled A, B, C, D.
-        - 'correct_answer' must be one of "A", "B", "C", or "D" and match 'correct_answer_text'.
-        - Explanations should help students understand why the answer is correct and reference key formulas when relevant.
-        - Wrap every formula or symbol in `$...$` with double-escaped commands (e.g., `$\\omega = 2\\pi f$`).
-        """).strip()
-
-
-        latex_guidance = textwrap.dedent("""
-        - Use LaTeX for every mathematical expression.
-        - Wrap inline math with `$...$` and multi-line math with `$$...$$` so the renderer treats it correctly.
-        - Because the output is JSON, ESCAPE every backslash twice (e.g., write `\\frac{a}{b}` to render `$\frac{a}{b}$`).
-        - Example inline: `$\\frac{12}{4} = 3 \\text{Ohms}$`.
-        - Example integral: `$\\int_{0}^{1} x^2 \\, dx$`.
-        - Ensure explanations and solution steps follow the same `$`-delimited, double-escaped format.
-        """).strip()
-
-
-        if request.kind == "calculation":
-            steps_guidance = textwrap.dedent("""
-            - Treat every question as calculation-focused with appropriate numeric work.
-            - 'solution_steps' must be a JSON array containing 3–7 concise steps.
-            - Steps should include formula selection, substitution, computation, and conclusion.
-            """).strip()
-        else:
-            steps_guidance = textwrap.dedent("""
-            - Emphasize conceptual understanding and qualitative reasoning.
-            - 'solution_steps' must be an empty JSON array []. Do not place text, null, or placeholders there.
-            """).strip()
-
-        prompt = textwrap.dedent(f"""
-Generate {request.question_count} unique, curriculum-aligned multiple-choice questions (MCQs) for the course "{course.get('title','')}" ({course.get('code','')}) on the topic "{topic_title}" (subtopic: "{subtopic_title}"). Use ONLY the provided extracts for grounding; do not quote them verbatim. Keep each question self-contained and original.
-
-### REQUIRED OUTPUT (VALID JSON ONLY)
-- Return a single JSON object and nothing else. No markdown, no comments, no surrounding prose.
-- Top-level format:
-  {{
-    "questions": [
-      {{
-        "question": "<string>",
-        "options": ["<string>", "<string>", "<string>", "<string>"],
-        "correct_answer": "A" | "B" | "C" | "D",
-        "correct_answer_text": "<string>",
-        "explanation": "<string>",
-        "solution_steps": ["<step1>", "<step2>", "..."]
-      }}
-    ]
-  }}
-- The JSON MUST parse as-is. Do not include extra keys or null placeholders.
-
-### OPTIONS / ANSWER RULES
-- Provide exactly **four** option *strings* in `options`. **Do not** prefix option strings with "A)", "B)", etc — options should be raw option text.
-- `correct_answer` must be one of "A"|"B"|"C"|"D".
-- `correct_answer_text` must be exactly equal to the corresponding element of `options`.
-- All option texts must be distinct and plausible. Avoid distractors that are obviously wrong (e.g., unit mismatch, off by factor of 1000).
-- For numeric options, include units in the option text (e.g., "29.8 MPa").
-
-### CONSISTENCY & NO-BACKTRACKING RULES
-- Never alter the problem data to fit an answer. If a mismatch is detected, DISCARD that question and generate a new one that is internally consistent.
-- Do not “work backwards from options.” Compute the correct result first, then compose options (1 correct + 3 plausible distractors).
-- Absolutely forbid meta-reasoning or self-correction in `solution_steps` (e.g., “recalculating”, “let’s assume”, “there seems to be a discrepancy”, “work backwards”, “typo”).
-- `solution_steps` style for calculation items:
-  - Exactly 3–5 short lines, each starting with one of: “Formula:”, “Convert:”, “Substitute:”, “Compute:”, “Final:”.
-  - No extra sentences or commentary; each line ≤ 25 words.
-  - The **Final** line must repeat the numeric answer with units and rounding.
-- For concept items, `solution_steps` must be `[]` (empty).
-- Options policy:
-  - Generate options AFTER computing the answer.
-  - Ensure `correct_answer_text` equals the selected element in `options` (A=0, B=1, C=2, D=3).
-  - For numeric questions, every option includes units; distractors reflect realistic slips (rounding, factor-of-10, omitted factor of 2), not nonsense.
-  - Keep steps **minimal**: no repeating the same calculation in different units.
-  - If SI units are already consistent, do not add conversions. Only convert when units are mismatched.
-  - Do not restate or re-check the same formula more than once.
-
-
-### SOLUTION STEPS RULES
-- If `request.kind == "calculation"`:
-  - `solution_steps` must be an array of **3–7** concise steps (strings).
-  - Steps should include: formula selection, unit conversions, substitution (show numbers using double-escaped LaTeX where relevant), a short arithmetic line, and one concluding line that states the final numeric value with units and rounding.
-  - Round intermediate and final numeric results sensibly (2–4 significant figures) and state the rounding rule used.
-- If `request.kind != "calculation"`:
-  - `solution_steps` must be an empty JSON array [].
-- Never put long prose in `solution_steps` — keep them terse, ordered, and actionable.
-
-### MATHEMATICAL / LATEX FORMATTING
-- Use LaTeX for all math. Wrap inline math with `$...$` and display math with `$$...$$`.
-- Because the output is JSON, **escape every backslash twice** so a LaTeX fraction looks like `"\\frac{{a}}{{b}}"` in the JSON string (which renders as `$\\frac{{a}}{{b}}$` when unescaped).
-- Example inline in a JSON string: `"$\\frac{{12}}{{4}} = 3\\ \\text{{Ohms}}$"`.
-- Ensure every LaTeX expression appears inside `$...$` or `$$...$$` and that backslashes are doubled.
-- Use exactly two backslashes for every LaTeX command in JSON (e.g., "\\\\frac", "\\\\int", "\\\\text").
-- Never triple-escape backslashes (avoid \\\\\\int).
-- Do not expand algebra more than once; keep expressions in their simplest readable LaTeX form.
-- Write units as "\\\\text{{...}}" immediately after the number, with a single space if needed (e.g., "$333.3\\\\,\\\\text{{kN}}$").
-
-
-### CONTENT & PEDAGOGICAL GUIDELINES
-- Align difficulty with Level **{level}** and Semester **{semester}**.
-- Questions must be: original, unambiguous, self-contained, and solvable using the provided context + common engineering formulas.
-- For calculation questions, always include units and show unit conversions in `solution_steps`.
-- Distractors:
-  - For calculations: include 3 plausible distractors (e.g., common algebraic slips, rounding variants, unit conversion mistakes).
-  - For concept questions: include 3 plausible conceptual distractors that test common misunderstandings.
-- Avoid excessive edge cases, trick wording, or ambiguous qualifiers (e.g., "usually", "often", "may").
-- If the grounding context lacks enough data to compute a value, either:
-  - create a self-contained numeric assumption and state it in the question (and in the steps), **or**
-  - do NOT generate the question — prefer safe, answerable items.
-
-### QUALITY & SANITY CHECKS (do these before returning JSON)
-1. Confirm `options` contains exactly 4 items and `correct_answer_text` matches one of them exactly.
-2. Confirm no option duplicates.
-3. For numeric answers, re-calculate the result and ensure the value in `correct_answer_text` matches the `solution_steps` final line.
-4. Confirm all LaTeX backslashes are double-escaped.
-5. Validate that the full output is legal JSON (single parseable object).
-
-
-### Numerical Consistency
-- The numeric value in the "Final" solution step **must exactly match** the 'correct_answer_text'.
-- Never produce mismatched results (e.g., steps yielding 5625 but correct_answer_text = 1125).
-- If rounding is required, round consistently across steps, final answer, and correct_answer_text.
-- Do not exaggerate or miscompute values; ensure units are realistic (e.g., MPa range for stresses, not GPa unless physically correct).
-
-
-### TERMINATION
-- After the final numeric result is given, stop generating steps.
-- Do not continue with alternative derivations, assumptions, or repeated formulas.
-
-
-### REFERENCE CONTEXT (grounding only)
-Use these extracts strictly for background/context. Do not copy text verbatim; rephrase and use them to ensure curriculum alignment:
-{context_text}
-
-### FINAL INSTRUCTIONS
-- Return exactly {request.question_count} questions that satisfy every rule above.
-- Keep `explanation` concise — one paragraph (1–3 sentences) that teaches why the correct answer is right and calls out the key formula(s) in `$...$` form.
-- If any constraint cannot be satisfied for a candidate question (e.g., missing numbers in context), skip that question and generate another that is fully answerable.
-""").strip()
-
-
-        return prompt
 
     def _persist_to_firestore(self, questions: Iterable[Question], *, enable: bool) -> None:
         if not enable or not questions:
@@ -1344,12 +750,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--course-code", default="all", help="Course code e.g. EEE 301 (default: all courses)")
     parser.add_argument(
         "--courses-json",
-        default=str(DEFAULT_COURSES_JSON),
+        default=str(config.courses_json_path_resolved),
         help="Path to courses.json containing outlines",
     )
     parser.add_argument(
         "--cache-dir",
-        default=str(DEFAULT_CACHE_ROOT),
+        default=str(config.cache_dir_resolved),
         help="Directory for generation cache",
     )
     parser.add_argument("--rag-topk", type=int, default=30, help="Candidate retrieval pool size")
@@ -1400,15 +806,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-jsonl", help="Path to save generated questions as JSONL")
     parser.add_argument(
         "--model",
-        default=DEFAULT_MODEL,
+        default=config.gemini_default_model,
         help="Gemini model name (e.g. gemini-2.5-flash)",
     )
-    parser.add_argument("--temperature", type=float, default=0.25, help="Generation temperature")
-    parser.add_argument("--top-p", type=float, default=0.85, help="Top-p nucleus sampling value")
+    parser.add_argument("--temperature", type=float, default=0.15, help="Generation temperature")
+    parser.add_argument("--top-p", type=float, default=0.4, help="Top-p nucleus sampling value")
     parser.add_argument(
         "--max-output-tokens",
         type=int,
-        default=6000,
+        default=10000,
         help="Maximum tokens Gemini can return per request",
     )
     parser.add_argument(
@@ -1454,6 +860,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Disable Gemini structured output schema (default)",
     )
     parser.set_defaults(structured_output=None)
+    parser.add_argument(
+        "--thinking",
+        action="store_true",
+        default=False,
+        help="Enable thinking mode for Gemini models",
+    )
+    parser.add_argument(
+        "--thinking-budget",
+        type=int,
+        default=12700,
+        help="Thinking budget in tokens (default: 12700)",
+    )
     return parser
 
 
@@ -1470,6 +888,7 @@ def _load_course_standalone(courses_path: Path, course_code: str) -> Dict[str, A
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    global config
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
@@ -1513,6 +932,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "target_topics": args.topics,
         "target_subtopics": args.subtopics,
         "output_path": Path(args.output_jsonl) if args.output_jsonl else None,
+        "use_thinking": args.thinking,
+        "thinking_budget": args.thinking_budget,
+        "coursegen_debug": config.coursegen_debug if hasattr(config, 'coursegen_debug') else False,
     }
 
     # Initialize Gemini service with explicit API keys to avoid env var fallback
@@ -1530,6 +952,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             temperature=args.temperature,
             top_p=args.top_p,
             max_output_tokens=args.max_output_tokens,
+            use_thinking=args.thinking,
+            thinking_budget=args.thinking_budget,
         ),
     )
 

@@ -58,8 +58,17 @@ except Exception:
 
 T = TypeVar("T", bound=BaseModel)
 
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
-EMBEDDING_MODEL = "gemini-embedding-001"
+# Import centralized configuration
+try:
+    from config import load_config
+    config = load_config()
+    DEFAULT_MODEL = config.gemini_default_model
+    EMBEDDING_MODEL = config.gemini_embedding_model
+except ImportError:
+    # Fallback to hardcoded defaults if centralized config not available
+    DEFAULT_MODEL = "gemini-2.5-flash"
+    EMBEDDING_MODEL = "gemini-embedding-001"
+
 IMAGE_TOKEN_COST = 1000
 
 # --- sample models (you can remove if unused) ---
@@ -84,6 +93,7 @@ class GeminiService:
     ) -> None:
         self.model = model
         self.default_config = generation_config or GeminiConfig()
+        self._active_api_key: Optional[str] = None
 
         # Resolve API keys (prefer explicit manager, else provided list, else optional provider)
         if api_keys is None and api_key_manager is None and GeminiApiKeys is not None:
@@ -116,9 +126,11 @@ class GeminiService:
         # If no key is available here, the caller must rely on GOOGLE_API_KEY/GEMINI_API_KEY envs
         if api_key:
             self.client = genai.Client(api_key=api_key)
+            self._active_api_key = api_key
         else:
             # Fall back to default client (will use env var if present)
             self.client = genai.Client()
+            self._active_api_key = None
 
     def _get_model_name(self, model_str: str) -> str:
         s = model_str.lower()
@@ -196,6 +208,16 @@ class GeminiService:
             response_mime_type=("application/json" if config.response_schema else None),
         )
 
+        # Add thinking configuration if enabled
+        if config.use_thinking and config.thinking_budget is not None:
+            try:
+                gen_config.thinking_config = gtypes.ThinkingConfig(
+                    thinking_budget=config.thinking_budget
+                )
+            except Exception:
+                # Fallback for older versions of google-genai that don't support thinking
+                pass
+
         tools = None
         if config.response_schema:
             try:
@@ -249,6 +271,28 @@ class GeminiService:
                     )
                     break
                 except (genai_errors.APIError, httpx.HTTPError, OSError) as e:
+                    if self._is_api_key_exhausted_error(e):
+                        exhausted_key = getattr(self, "_active_api_key", None)
+                        if exhausted_key:
+                            self.api_key_manager.mark_key_exhausted(
+                                exhausted_key,
+                                model_name,
+                                reason=str(e),
+                            )
+                        if self.api_key_manager.all_keys_exhausted(model_name):
+                            raise RuntimeError(
+                                "All Gemini API keys are exhausted for model "
+                                f"{model_name}. Wait for quota reset or add new keys."
+                            ) from e
+                        attempt += 1
+                        time.sleep(min(2 ** attempt, 30))
+                        try:
+                            self.api_key_manager.rotate_key(model_name)
+                        except ValueError as rot_exc:
+                            raise RuntimeError(
+                                "No available Gemini API keys remain after exhaustion."
+                            ) from rot_exc
+                        continue
                     attempt += 1
                     if attempt >= max_attempts:
                         raise e
@@ -276,10 +320,10 @@ class GeminiService:
                     response_text = ""
 
             # Update usage heuristically
-            key = self.api_key_manager.get_key(model_name)
             tokens = max(1, input_tokens + len(response_text) // 4)
-            if key:
-                self.api_key_manager.update_usage(key, model_name, int(tokens))
+            active_key = getattr(self, "_active_api_key", None)
+            if active_key:
+                self.api_key_manager.update_usage(active_key, model_name, int(tokens))
 
             # If structured output isn't requested, return raw text
             if generation_config and isinstance(generation_config, GeminiConfig) and generation_config.response_schema is None:
@@ -514,6 +558,37 @@ class GeminiService:
         for opener in reversed(stack):
             repaired += "]" if opener == "[" else "}"
         return repaired
+
+    @staticmethod
+    def _is_api_key_exhausted_error(error: Exception) -> bool:
+        message = str(error).lower()
+        if not message:
+            return False
+        exhaustion_markers = [
+            "quota",
+            "exhaust",
+            "out of credits",
+            "billing",
+            "usage cap",
+            "resource exhausted",
+            "insufficient tokens",
+        ]
+        if any(marker in message for marker in exhaustion_markers):
+            return True
+        code = getattr(error, "code", None)
+        reason = getattr(error, "reason", "").lower() if getattr(error, "reason", None) else ""
+        if reason and any(marker in reason for marker in exhaustion_markers):
+            return True
+        # Some API errors surface through HTTP exceptions with status 429/403 and quota messaging
+        status = getattr(error, "response", None)
+        if status is not None:
+            try:
+                status_code = getattr(status, "status_code", None)
+                if status_code in {402, 403} and "quota" in message:
+                    return True
+            except Exception:
+                pass
+        return code == 429 and "quota" in message
 
     # -------------------- High-level generate --------------------
 

@@ -36,13 +36,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from services.QuestionRag.pipelines.question_generator import (
-    GeminiConfig,
-    GeminiQuestionBatch,
-    QuestionBatchConfig,
-    QuestionGenerator,
-    RequestPlan,
-)
+from data_models.gemini_config import GeminiConfig
+from services.QuestionRag.pipelines.config import QuestionBatchConfig, RequestPlan
+from services.QuestionRag.pipelines.models import GeminiQuestionBatch
+from services.QuestionRag.pipelines.question_generator import QuestionGenerator
 
 
 def _print_heading(title: str) -> None:
@@ -135,7 +132,8 @@ def main(argv: List[str]) -> int:
         difficulty_rank=5,
     )
 
-    prompt = generator._build_prompt(
+    from services.QuestionRag.pipelines.prompt_utils import build_question_generation_prompt
+    prompt = build_question_generation_prompt(
         course=course,
         topic_title=args.topic,
         subtopic_title=args.subtopic,
@@ -181,9 +179,10 @@ def main(argv: List[str]) -> int:
         parsed_json = response.model_dump()
     else:
         try:
-            parsed_batch = generator._parse_batch_from_raw(raw_result)
+            from services.QuestionRag.pipelines.json_utils import parse_batch_from_raw, dump_failed_payload
+            parsed_batch = parse_batch_from_raw(raw_result)
         except Exception as exc:
-            generator._dump_failed_payload(raw_result)
+            dump_failed_payload(raw_result)
             print(f"[ERROR] Failed to parse Gemini response: {exc}")
             return 3
         parsed_json = parsed_batch.model_dump()
@@ -191,8 +190,9 @@ def main(argv: List[str]) -> int:
     _print_heading("Parsed JSON")
     print(json.dumps(parsed_json, indent=2, ensure_ascii=False))
 
-    questions = generator._convert_to_questions(
-        parsed_batch.questions,
+    from services.QuestionRag.pipelines.validation_utils import convert_to_questions
+    questions = convert_to_questions(
+        [q.model_dump() for q in parsed_batch.questions],
         course=course,
         topic_title=args.topic,
         subtopic_title=args.subtopic,

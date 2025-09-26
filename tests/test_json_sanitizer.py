@@ -8,6 +8,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from services.QuestionRag.pipelines.question_generator import QuestionGenerator
+from services.QuestionRag.pipelines.json_utils import extract_json_content
 
 
 class DummyGemini:  # minimal stub for QuestionGenerator
@@ -29,7 +30,7 @@ def test_extract_json_with_latex_equations():
   ]
 }
 ```"""
-    parsed = generator._extract_json_content(raw)
+    parsed = extract_json_content(raw)
     assert isinstance(parsed, dict)
     assert parsed["questions"][0]["question"].startswith("A component")
 
@@ -45,7 +46,7 @@ def test_extract_json_with_single_backslashes():
   ]
 }
 ```"""
-    parsed = generator._extract_json_content(raw)
+    parsed = extract_json_content(raw)
     assert parsed["questions"][0]["question"].startswith("Compute")
 
 
@@ -60,7 +61,7 @@ def test_extract_json_with_spaced_latex_sequences():
   ]
 }
 ```"""
-    parsed = generator._extract_json_content(raw)
+    parsed = extract_json_content(raw)
     assert "lambda" in parsed["questions"][0]["question"].lower()
 
 
@@ -75,13 +76,12 @@ def test_extract_json_with_trailing_commas():
   ],
 }
 ```"""
-    parsed = generator._extract_json_content(raw)
+    parsed = extract_json_content(raw)
     assert parsed["questions"][0]["question"].startswith("A wing section")
     assert len(parsed["questions"]) == 1
 
 
 def test_extract_json_repair_truncated_payload():
-    generator = make_generator()
     raw = r"""```json
 {
   "questions": [
@@ -96,5 +96,5 @@ def test_extract_json_repair_truncated_payload():
     }
   ]
 ```"""
-    parsed = generator._extract_json_content(raw)
+    parsed = extract_json_content(raw)
     assert parsed["questions"][0]["options"][0] == "Option A"

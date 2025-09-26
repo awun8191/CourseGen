@@ -39,7 +39,7 @@ services:
       start_period: 10s
 
     # Default command - run question generation
-    command: ["--theory-per-request", "10", "--calc-per-request", "10", "--request-delay", "2"]
+    command: ["--theory-per-request", "10", "--calc-per-request", "5", "--request-delay", "2"]
     
     stdin_open: true
     tty: true

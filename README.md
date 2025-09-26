@@ -42,10 +42,10 @@ docker-compose up
 docker-compose up coursegen-questions
 
 # Generate questions for all courses (20 per subtopic: 10 theory + 10 calculation)
-docker-compose run --rm coursegen --theory-per-request 10 --calc-per-request 10
+docker-compose run --rm coursegen --theory-per-request 10 --calc-per-request 5
 
 # Generate questions for specific course
-docker-compose run --rm coursegen --course-code "AAE 101" --theory-per-request 10 --calc-per-request 10
+docker-compose run --rm coursegen --course-code "AAE 101" --theory-per-request 10 --calc-per-request 5
 ```
 
 ### ☁️ AWS ECR Deployment
@@ -105,7 +105,7 @@ docker-compose --env-file .env.production up
 docker-compose run --rm coursegen \
   --course-code "AAE 101" \
   --theory-per-request 10 \
-  --calc-per-request 10 \
+  --calc-per-request 5 \
   --request-delay 2 \
   --temperature 0.7
 
@@ -132,6 +132,7 @@ grep '"code"' data/textbooks/courses.json | head -10
 - **"No RAG context found"**: Regenerate embeddings and rebuild the image so `/app/OUTPUT_DATA2/emdeddings` is up to date
 - **API errors**: Verify API keys in `.env` file are valid and have sufficient quota
 - **0 questions generated**: Course may not have sufficient RAG context or outlines
+- **Resume stuck on a subtopic**: Check `OUTPUT_DATA2/cache/course_progress/` for the course manifest; delete a single file to reset one course or fix any `state: "error"` entries.
 - **Memory issues**: Reduce `--theory-per-request` and `--calc-per-request` values
 - **Volume permission errors**: Ensure host directories have proper permissions (775 recommended)
 - **Firestore errors**: Check Firebase credentials and network connectivity
@@ -401,14 +402,14 @@ tar -xzf embeddings_backup_20250101_120000.tar.gz
     # Generate for all courses
     docker-compose run --rm coursegen \
       --theory-per-request 10 \
-      --calc-per-request 10 \
+      --calc-per-request 5 \
       --request-delay 2
 
     # Or for specific course
     docker-compose run --rm coursegen \
       --course-code "EEE 315" \
       --theory-per-request 10 \
-      --calc-per-request 10
+      --calc-per-request 5
 
     # Or use the enhanced run script
     ./run.sh --course-code "EEE 315"
@@ -465,7 +466,7 @@ tar -xzf embeddings_backup_20250101_120000.tar.gz
     ```bash
     python -m services.QuestionRag.pipelines.question_generator \
       --theory-per-request 10 \
-      --calc-per-request 10 \
+      --calc-per-request 5 \
       --request-delay 2
     ```
 
