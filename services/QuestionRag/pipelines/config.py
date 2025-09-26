@@ -80,6 +80,8 @@ class QuestionBatchConfig:
     use_thinking: bool = False
     thinking_budget: int = 12700
     coursegen_debug: bool = False
+    default_theory_difficulty_rank: int = int(os.environ.get("COURSEGEN_THEORY_DIFFICULTY_RANK", "2"))
+    default_calculation_difficulty_rank: int = int(os.environ.get("COURSEGEN_CALCULATION_DIFFICULTY_RANK", "2"))
 
     def normalized_topics(self) -> Optional[set[str]]:
         if self.target_topics is None:
@@ -110,18 +112,18 @@ class QuestionBatchConfig:
                 name="theory-1",
                 kind="theory",
                 question_count=self.theory_questions_per_request,
-                difficulty_rank=4,
+                difficulty_rank=self.default_theory_difficulty_rank,
             ),
             RequestPlan(
                 name="calculation-1",
                 kind="calculation",
                 question_count=calc_count,
-                difficulty_rank=6,
+                difficulty_rank=self.default_calculation_difficulty_rank,
             ),
             RequestPlan(
                 name="calculation-2",
                 kind="calculation",
                 question_count=calc_count,
-                difficulty_rank=6,
+                difficulty_rank=self.default_calculation_difficulty_rank,
             ),
         ]

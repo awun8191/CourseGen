@@ -279,19 +279,27 @@ class GeminiService:
                                 model_name,
                                 reason=str(e),
                             )
-                        if self.api_key_manager.all_keys_exhausted(model_name):
-                            raise RuntimeError(
-                                "All Gemini API keys are exhausted for model "
-                                f"{model_name}. Wait for quota reset or add new keys."
-                            ) from e
+
+                        # Force termination if all keys are exhausted
+                        try:
+                            self.api_key_manager.force_terminate_if_all_exhausted(model_name)
+                        except RuntimeError:
+                            # Re-raise the termination error to stop all operations
+                            raise
+
                         attempt += 1
                         time.sleep(min(2 ** attempt, 30))
                         try:
                             self.api_key_manager.rotate_key(model_name)
                         except ValueError as rot_exc:
-                            raise RuntimeError(
-                                "No available Gemini API keys remain after exhaustion."
-                            ) from rot_exc
+                            # Force termination if rotation fails
+                            try:
+                                self.api_key_manager.force_terminate_if_all_exhausted(model_name)
+                            except RuntimeError:
+                                raise RuntimeError(
+                                    "🚨 CRITICAL: All API keys exhausted and rotation failed. "
+                                    "Terminating all operations immediately."
+                                ) from rot_exc
                         continue
                     attempt += 1
                     if attempt >= max_attempts:
@@ -772,6 +780,13 @@ class GeminiService:
                     rotation_cycles += 1
                 except ValueError as rotate_error:
                     if "All API keys are over their limits" in str(rotate_error):
+                        # Force termination if all keys are exhausted
+                        try:
+                            self.api_key_manager.force_terminate_if_all_exhausted("embedding")
+                        except RuntimeError:
+                            # Re-raise the termination error to stop all operations
+                            raise
+
                         if rotation_cycles >= max_cycles_before_delay:
                             delay_time = 70
                             print(

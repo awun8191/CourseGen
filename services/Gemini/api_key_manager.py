@@ -60,7 +60,10 @@ class ApiKeyManager:
         cache_data = self.cache.read_cache()
         today = datetime.date.today().isoformat()
 
-        if cache_data.get("date") != today:
+        # Check for environment variable to disable daily reset
+        disable_daily_reset = os.environ.get("COURSEGEN_DISABLE_CACHE_DAILY_RESET", "false").lower() == "true"
+
+        if cache_data.get("date") != today and not disable_daily_reset:
             cache_data = {
                 "date": today,
                 "current_key_index": 0,
@@ -203,6 +206,7 @@ class ApiKeyManager:
         self.cache.write_cache(self.cache_data)
 
     def all_keys_exhausted(self, model: str = "flash") -> bool:
+        """Check if all keys are exhausted for the given model."""
         for idx, key in enumerate(self.api_keys):
             key_data = self.cache_data.get("keys", {}).get(key)
             if not key_data or key_data.get("exhausted"):
@@ -215,3 +219,23 @@ class ApiKeyManager:
             if available:
                 return False
         return True
+
+    def force_terminate_if_all_exhausted(self, model: str = "flash") -> None:
+        """Force termination if all keys are exhausted. Use when API errors indicate exhaustion."""
+        if self.all_keys_exhausted(model):
+            # Mark all remaining keys as exhausted to prevent further attempts
+            for key in self.api_keys:
+                if key in self.cache_data.get("keys", {}):
+                    key_data = self.cache_data["keys"][key]
+                    key_data["exhausted"] = True
+                    key_data["exhausted_reason"] = "All keys exhausted - forced termination"
+            self.cache.write_cache(self.cache_data)
+
+            # Raise a clear termination error
+            exhausted_keys = [k for k in self.api_keys if self.cache_data.get("keys", {}).get(k, {}).get("exhausted")]
+            raise RuntimeError(
+                f"🚨 ALL API KEYS EXHAUSTED - TERMINATING OPERATIONS 🚨\n"
+                f"Exhausted keys: {len(exhausted_keys)}/{len(self.api_keys)}\n"
+                f"Model: {model}\n"
+                f"Check your API quotas and add more keys to services/Gemini/gemini_api_keys.py"
+            )

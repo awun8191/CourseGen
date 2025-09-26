@@ -130,6 +130,19 @@ class QuestionGenerator:
 
     def _generate_single_course_questions(self, config: QuestionBatchConfig, course: Dict[str, Any]) -> List[Question]:
         """Generate questions for a single course."""
+        # Check if all API keys are exhausted before starting
+        if hasattr(self.gemini, 'api_key_manager'):
+            model_name = self.gemini._get_model_name(self.gemini.model)
+            if self.gemini.api_key_manager.all_keys_exhausted(model_name):
+                logger.error(
+                    "🚨 All API keys exhausted before starting course %s. Terminating operations.",
+                    course.get("code", "unknown")
+                )
+                raise RuntimeError(
+                    f"🚨 ALL API KEYS EXHAUSTED - TERMINATING OPERATIONS 🚨\n"
+                    f"Cannot start processing course {course.get('code', 'unknown')} - all keys exhausted."
+                )
+
         outline = course.get("outline") or []
         normalized_topics = config.normalized_topics()
         normalized_subtopics = config.normalized_subtopics()
@@ -181,6 +194,19 @@ class QuestionGenerator:
         subtopic_title: str,
         progress: CourseProgressCache,
     ) -> List[Question]:
+        # Check if all API keys are exhausted before processing this subtopic
+        if hasattr(self.gemini, 'api_key_manager'):
+            model_name = self.gemini._get_model_name(self.gemini.model)
+            if self.gemini.api_key_manager.all_keys_exhausted(model_name):
+                logger.error(
+                    "🚨 All API keys exhausted before processing subtopic %s - %s. Terminating.",
+                    topic_title, subtopic_title
+                )
+                raise RuntimeError(
+                    f"🚨 ALL API KEYS EXHAUSTED - TERMINATING OPERATIONS 🚨\n"
+                    f"Cannot process subtopic {topic_title} - {subtopic_title} - all keys exhausted."
+                )
+
         cache = self._cache_for(config.cache_dir)
         plan = config.request_plan()
         progress.touch_subtopic(topic_title, subtopic_title)
@@ -307,6 +333,33 @@ class QuestionGenerator:
                         rag_sources=rag_sources,
                     )
                     break
+                except RuntimeError as exc:  # pragma: no cover - API key exhaustion termination
+                    # Handle forced termination when all API keys are exhausted
+                    if "ALL API KEYS EXHAUSTED" in str(exc) or "CRITICAL" in str(exc):
+                        logger.error(
+                            "🚨 CRITICAL: All API keys exhausted - terminating question generation for %s - %s (%s)",
+                            course.get("code"),
+                            topic_title,
+                            request.name,
+                        )
+                        # Mark this request as failed and exit the entire process
+                        cache.mark_failed(key, reason="all_keys_exhausted", meta=meta)
+                        progress.mark_request_failed(topic_title, subtopic_title, request.name, "all_keys_exhausted")
+                        raise exc  # Re-raise to terminate the entire process
+                    else:
+                        # Handle other RuntimeErrors as regular errors
+                        last_error = exc
+                        attempt += 1
+                        if attempt >= config.request_attempts:
+                            break
+                        sleep_for = 1.5 * attempt
+                        logger.warning(
+                            "Retrying %s after RuntimeError (%s); sleep %.1fs",
+                            request.name,
+                            exc,
+                            sleep_for,
+                        )
+                        time.sleep(sleep_for)
                 except Exception as exc:  # pragma: no cover - network dependent
                     last_error = exc
                     attempt += 1
@@ -971,6 +1024,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             questions = runner.run(config)
             all_questions.extend(questions)
             logger.info("Generated %d questions for %s", len(questions), course_code)
+        except RuntimeError as exc:
+            # Handle forced termination when all API keys are exhausted
+            if "ALL API KEYS EXHAUSTED" in str(exc) or "CRITICAL" in str(exc):
+                logger.error(
+                    "🚨 CRITICAL: All API keys exhausted during %s processing. "
+                    "Terminating all question generation operations.",
+                    course_code
+                )
+                # Save any questions generated so far
+                if all_questions and output_path:
+                    write_jsonl(str(output_path), [q.model_dump() for q in all_questions])
+                    logger.info("Saved %d questions generated before termination to %s", len(all_questions), output_path)
+                raise exc  # Re-raise to terminate the entire process
+            else:
+                logger.error("RuntimeError for %s: %s", course_code, exc)
+                continue
         except ValidationError as exc:
             logger.error("Validation failed for %s: %s", course_code, exc)
             continue
