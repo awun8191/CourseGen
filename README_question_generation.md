@@ -50,6 +50,33 @@ python -m services.QuestionRag.pipelines.question_generator [OPTIONS]
 # By default, processes all courses in courses.json
 ```
 
+### EC2 Helper Script (`ec2_execution.sh`)
+- Syncs the latest `courses.json` and embeddings from the published Docker image onto an EC2 host before executing the container.
+- Respects your `.env` (defaulting to `~/.env`) and reuses the same question-generation flags as `run.sh` (course code, theory/calculation counts, resume controls, etc.).
+- Mounts host paths for cache (`~/OUTPUT_DATA2/cache`), textbooks (`~/data/textbooks/courses.json`), and embeddings (`~/OUTPUT_DATA2/emdeddings`) so progress persists between runs while still picking up fresh assets on every pull.
+- Mirrors the Gemini API key cache (`~/OUTPUT_DATA2/data/gemini_cache`) so key rotation state persists across runs.
+- Sends email notifications via `services/Email/email_service.py` whenever the container finishes or crashes (enable with `EMAIL_NOTIFICATIONS_ENABLED=true` and provide SMTP credentials in the env file).
+
+#### Usage
+```bash
+# 1. Ensure ~/.env is populated with Gemini, Cloudflare, Firestore credentials
+# 2. Pull the latest image & start generation (sync happens automatically)
+./ec2_execution.sh --course-code "EEE 471" --request-delay 2.0
+
+# Optional flags
+./ec2_execution.sh \
+  --env-file ~/.env.production \
+  --structured-output \
+  --background \
+  --port 8000:8000
+```
+
+Key behaviour:
+- Pass `--skip-sync` to skip copying data from the image, or `--no-pull` to use the local image.
+- Use `DATA_DIR`, `CACHE_ROOT`, or `EMBEDDINGS_DIR` env vars to customise host mount locations.
+- Override `GEMINI_CACHE_DIR` if you store API key cache elsewhere.
+- Background mode keeps the container alive (`docker logs -f coursegen-rag` to follow output); rerun the script to replace an existing container.
+
 #### Key Options
 - `--course-code STR`: Course code (e.g., "EEE 471") or "all" for all courses (default: "all")
 - `--topics LIST`: Optional list of topics to include (case insensitive)
@@ -149,8 +176,8 @@ from services.Firestore.firebase_service import FireStore
 config = QuestionBatchConfig(
     course_code="all",  # Process all courses
     cache_dir="data/gemini_cache",
-    theory_questions_per_request=10,
-    calc_questions_per_request=10,
+    theory_questions_per_request_override=10,
+    calc_questions_per_request_override=10,
     resume=True,
     store_firestore=True
 )
@@ -201,6 +228,7 @@ Each line:
     "C) z/(z-1)",
     "D) 1"
   ],
+  "correct_answer_indexes": [0],
   "answer": "A",
   "explanation": "The z-transform of u[n] is the sum from n=0 to inf of z^-n = 1/(1 - z^-1) for |z| > 1.",
   "sources": [

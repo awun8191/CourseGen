@@ -231,6 +231,41 @@ def normalize_solution_steps(value: Any) -> list[str]:
     return [str(value).strip()]
 
 
+def _ensure_correct_answer_indexes(question: dict[str, Any]) -> None:
+    """Ensure `correct_answer_indexes` exists using legacy fields as fallback."""
+
+    if not isinstance(question, dict):
+        return
+
+    indexes = question.get("correct_answer_indexes")
+    if isinstance(indexes, list) and indexes:
+        return
+
+    options = question.get("options")
+    if not isinstance(options, list) or len(options) != 4:
+        return
+
+    def _set_index(idx: int) -> None:
+        question["correct_answer_indexes"] = [int(idx)]
+        if not question.get("correct_answer_text") and 0 <= idx < len(options):
+            question["correct_answer_text"] = options[idx]
+
+    letter = question.get("correct_answer")
+    if isinstance(letter, str) and letter.strip():
+        mapping = {"A": 0, "B": 1, "C": 2, "D": 3}
+        idx = mapping.get(letter.strip().upper()[0])
+        if idx is not None and 0 <= idx < len(options):
+            _set_index(idx)
+            return
+
+    answer_text = question.get("correct_answer_text")
+    if isinstance(answer_text, str) and answer_text.strip():
+        for idx, option in enumerate(options):
+            if str(answer_text).strip().lower() == str(option).strip().lower():
+                _set_index(idx)
+                return
+
+
 def normalize_question_payload(payload: Any) -> dict[str, Any]:
     """Normalize question payload to standard format."""
     if isinstance(payload, list):
@@ -240,6 +275,7 @@ def normalize_question_payload(payload: Any) -> dict[str, Any]:
                 item["solution_steps"] = normalize_solution_steps(
                     item.get("solution_steps")
                 )
+                _ensure_correct_answer_indexes(item)
                 normalized.append(item)
         return {"questions": normalized}
 
@@ -254,6 +290,7 @@ def normalize_question_payload(payload: Any) -> dict[str, Any]:
             question["solution_steps"] = normalize_solution_steps(
                 question.get("solution_steps")
             )
+            _ensure_correct_answer_indexes(question)
         return payload
 
     # Handle single-question payloads
@@ -262,6 +299,7 @@ def normalize_question_payload(payload: Any) -> dict[str, Any]:
         normalized_question["solution_steps"] = normalize_solution_steps(
             normalized_question.get("solution_steps")
         )
+        _ensure_correct_answer_indexes(normalized_question)
         return {"questions": [normalized_question]}
 
     return payload

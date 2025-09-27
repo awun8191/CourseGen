@@ -89,22 +89,21 @@ def main(argv: List[str]) -> int:
     if args.cache_dir is not None:
         cfg_kwargs["cache_dir"] = args.cache_dir
     if args.model is not None:
-        cfg_kwargs["gemini_model"] = args.model
+        cfg_kwargs["gemini_model_override"] = args.model
+    if args.rag_limit is not None:
+        cfg_kwargs["rag_context_limit_override"] = args.rag_limit
 
     config = QuestionBatchConfig(
         course_code=args.course_code,
-        theory_questions_per_request=args.questions,
-        calc_questions_per_request=args.questions,
+        theory_questions_per_request_override=args.questions,
+        calc_questions_per_request_override=args.questions,
         resume=False,
         store_firestore=False,
-        request_delay_s=0.0,
-        delay_jitter=0.0,
-        request_attempts=1,
+        request_delay_override=0.0,
+        delay_jitter_override=0.0,
+        request_attempts_override=1,
         **cfg_kwargs,
     )
-
-    if args.rag_limit is not None:
-        config.rag_context_limit = args.rag_limit
 
     course = generator._load_course(config.courses_json_path, args.course_code)
 

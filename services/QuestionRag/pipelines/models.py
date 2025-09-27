@@ -16,9 +16,14 @@ class GeminiGeneratedQuestion(BaseModel):
         min_length=4,
         max_length=4,
     )
-    correct_answer: str = Field(..., description="Correct option letter (A-D)")
+    correct_answer_indexes: List[int] = Field(
+        ..., description="Zero-based indices of correct options (single element)", min_length=1, max_length=4
+    )
+    correct_answer: Optional[str] = Field(
+        default=None, description="Legacy correct option letter (A-D)"
+    )
     correct_answer_text: Optional[str] = Field(
-        None, description="Correct option text (fallback if letter missing)"
+        default=None, description="Correct option text"
     )
     explanation: str = Field(..., description="Grounded explanation")
     solution_steps: Optional[List[str]] = Field(

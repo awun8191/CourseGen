@@ -22,6 +22,7 @@ from .json_utils import QuestionGenerationError, parse_batch_from_raw, dump_fail
 from .models import GeminiQuestionBatch
 from .prompt_utils import build_question_generation_prompt
 from .validation_utils import convert_to_questions
+from .question_gen_config import get_question_gen_config
 
 # Import centralized configuration
 try:
@@ -34,12 +35,14 @@ except ImportError:
 
     class FallbackConfig:
         def __init__(self):
-            self.gemini_default_model = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash")
-            self.gemini_temperature = 0.15
-            self.gemini_top_p = 0.4
-            self.gemini_max_output_tokens = 10000
-            self.gemini_use_thinking = False
-            self.gemini_thinking_budget = 12700
+            # Use centralized config for consistency
+            central_config = get_question_gen_config()
+            self.gemini_default_model = central_config.gemini_model
+            self.gemini_temperature = central_config.gemini_temperature
+            self.gemini_top_p = central_config.gemini_top_p
+            self.gemini_max_output_tokens = central_config.gemini_max_output_tokens
+            self.gemini_use_thinking = central_config.use_thinking
+            self.gemini_thinking_budget = central_config.thinking_budget
             self.courses_json_path_resolved = Path(os.environ.get("COURSEGEN_COURSES_JSON", "data/textbooks/courses.json")).expanduser()
             self.cache_dir_resolved = Path(os.environ.get("COURSEGEN_CACHE_DIR", "OUTPUT_DATA2/cache")).expanduser()
             self.coursegen_qg_loglevel = os.environ.get("COURSEGEN_QG_LOGLEVEL", "INFO").upper()
@@ -74,6 +77,7 @@ class QuestionGenerator:
         rag_client: Optional[ChromaQuery] = None,
         firestore: Optional[Any] = None,
         use_structured: Optional[bool] = None,
+        email_service: Optional[Any] = None,
     ) -> None:
         self.gemini = gemini_service
         self.rag = rag_client or ChromaQuery()
@@ -83,6 +87,7 @@ class QuestionGenerator:
         if use_structured is None:
             use_structured = config.coursegen_use_structured
         self.use_structured = bool(use_structured)
+        self._email_service = email_service
 
     # ------------------------------------------------------------------
     # Public orchestrators
@@ -144,9 +149,6 @@ class QuestionGenerator:
                 )
 
         outline = course.get("outline") or []
-        normalized_topics = config.normalized_topics()
-        normalized_subtopics = config.normalized_subtopics()
-
         progress_cache = CourseProgressCache(
             course_code=str(course.get("code") or "unknown"),
             cache_root=config.cache_dir,
@@ -154,8 +156,15 @@ class QuestionGenerator:
             calc_target=config.calc_questions_per_request,
         )
 
+        self._notify_course_started(course=course, outline=outline)
+
         results: List[Question] = []
+        normalized_topics = config.normalized_topics()
+        normalized_subtopics = config.normalized_subtopics()
+
         for topic in outline:
+            topic_start_time = time.time()
+            topic_question_count = 0
             topic_title = str(topic.get("title") or "").strip()
             if normalized_topics and topic_title.lower() not in normalized_topics:
                 logger.debug("Skipping topic '%s' not in filter", topic_title)
@@ -180,6 +189,22 @@ class QuestionGenerator:
                     progress=progress_cache,
                 )
                 results.extend(generated)
+                topic_question_count += len(generated)
+
+            self._notify_topic_finished(
+                course=course,
+                topic_title=topic_title,
+                progress=progress_cache,
+                topic_question_count=topic_question_count,
+                topic_start_time=topic_start_time,
+                expected_subtopics=len(topic.get("subtopics") or []),
+            )
+
+        self._finalize_course_progress(
+            config=config,
+            course=course,
+            progress=progress_cache,
+        )
         return results
 
     # ------------------------------------------------------------------
@@ -410,13 +435,12 @@ class QuestionGenerator:
             subtopic_completed = progress.subtopic_state(topic_title, subtopic_title) == "completed"
 
             # Update progress after each batch completion
-            self._update_progress_after_batch(
+            self._mark_cache_completion(
                 config=config,
                 course=course,
                 topic_title=topic_title,
                 subtopic_title=subtopic_title,
                 request=request,
-                completed_count=len(generated)
             )
 
             self._sleep_with_jitter(config.request_delay_s, config.delay_jitter)
@@ -717,7 +741,97 @@ class QuestionGenerator:
             self._firestore = None
             return None
 
-    def _update_progress_after_batch(
+    def _notify_course_started(
+        self,
+        *,
+        course: Dict[str, Any],
+        outline: List[Dict[str, Any]],
+    ) -> None:
+        if not self._email_service:
+            return
+        try:
+            total_topics = len(outline)
+            total_subtopics = sum(len(topic.get("subtopics") or []) for topic in outline)
+            self._email_service.send_course_started(
+                course_code=str(course.get("code", "unknown")),
+                course_title=str(course.get("title", "")),
+                total_topics=total_topics,
+                total_subtopics=total_subtopics,
+            )
+        except Exception as exc:  # pragma: no cover - notification best effort
+            logger.warning(
+                "Failed to send course start notification for %s: %s",
+                course.get("code", "unknown"),
+                exc,
+            )
+
+    def _notify_topic_finished(
+        self,
+        *,
+        course: Dict[str, Any],
+        topic_title: str,
+        progress: CourseProgressCache,
+        topic_question_count: int,
+        topic_start_time: float,
+        expected_subtopics: int,
+    ) -> None:
+        if not self._email_service:
+            return
+        try:
+            course_code = str(course.get("code", "unknown"))
+            course_title = str(course.get("title", ""))
+            topic_entry = progress.data.get("topics", {}).get(topic_title, {})
+            subtopic_entries = topic_entry.get("subtopics", {})
+            total_subtopics = expected_subtopics if expected_subtopics is not None else len(subtopic_entries)
+            completed_subtopics = sum(
+                1 for entry in subtopic_entries.values() if entry.get("state") == "completed"
+            )
+            errored_subtopics = sum(
+                1 for entry in subtopic_entries.values() if entry.get("state") == "error"
+            )
+            duration_seconds = time.time() - topic_start_time
+
+            self._email_service.send_topic_finished(
+                course_code=course_code,
+                course_title=course_title,
+                topic_title=topic_title,
+                question_count=topic_question_count,
+                total_subtopics=total_subtopics,
+                completed_subtopics=completed_subtopics,
+                errored_subtopics=errored_subtopics,
+                duration_seconds=duration_seconds,
+            )
+        except Exception as exc:  # pragma: no cover - notification best effort
+            logger.warning(
+                "Failed to send topic completion notification for %s/%s: %s",
+                course.get("code", "unknown"),
+                topic_title,
+                exc,
+            )
+
+    def _iter_target_subtopics(
+        self,
+        course: Dict[str, Any],
+        normalized_topics: Optional[set[str]],
+        normalized_subtopics: Optional[set[str]],
+    ) -> Iterable[tuple[str, str]]:
+        """Yield (topic, subtopic) pairs that match current filters."""
+
+        for topic in course.get("outline") or []:
+            topic_title = str(topic.get("title") or "").strip()
+            if not topic_title:
+                continue
+            if normalized_topics and topic_title.lower() not in normalized_topics:
+                continue
+            for subtopic in topic.get("subtopics") or []:
+                subtopic_title = str(subtopic).strip()
+                if not subtopic_title:
+                    continue
+                if normalized_subtopics and subtopic_title.lower() not in normalized_subtopics:
+                    continue
+                yield topic_title, subtopic_title
+
+    def _mark_cache_completion(
         self,
         *,
         config: QuestionBatchConfig,
@@ -725,47 +839,105 @@ class QuestionGenerator:
         topic_title: str,
         subtopic_title: str,
         request: RequestPlan,
-        completed_count: int,
     ) -> None:
-        """Update progress tracking after a batch is completed."""
+        """Persist cache metadata for a completed batch."""
         cache = self._cache_for(config.cache_dir)
         course_code = str(course.get("code", ""))
 
         # Update cache.json with batch completion
         cache.mark_batch_completed(course_code, topic_title, subtopic_title, request.name)
 
-        # Update Firestore GenerationProgress collection
-        if config.store_firestore:
-            try:
-                store = self._resolve_firestore()
-                if store:
-                    # Calculate total questions for this subtopic (20: 10 theory + 10 calculation)
-                    total_questions = 20
-                    completed_questions = completed_count
+    def _finalize_course_progress(
+        self,
+        *,
+        config: QuestionBatchConfig,
+        course: Dict[str, Any],
+        progress: CourseProgressCache,
+    ) -> None:
+        """Update Firestore once a course finishes processing."""
 
-                    # Get current progress to accumulate
-                    try:
-                        existing_progress = store.db.collection("GenerationProgress").document(f"{course_code}-{topic_title}-{subtopic_title}").get()
-                        if existing_progress.exists:
-                            data = existing_progress.to_dict()
-                            completed_questions += data.get("completed_questions", 0)
-                    except Exception:
-                        pass  # Continue with current batch count if unable to fetch existing
+        if not config.store_firestore:
+            return
 
-                    status = "completed" if completed_questions >= total_questions else "in_progress"
+        try:
+            store = self._resolve_firestore()
+            if not store:
+                return
 
-                    store.update_generation_progress(
-                        course_code=course_code,
-                        course_title=course.get("title", ""),
-                        department=course.get("department", "Unknown"),
-                        status=status,
-                        total_topics=1,  # This subtopic
-                        completed_topics=1 if status == "completed" else 0,
-                        total_questions=total_questions,
-                        completed_questions=completed_questions,
-                    )
-            except Exception as exc:
-                logger.warning("Failed to update Firestore progress: %s", exc)
+            normalized_topics = config.normalized_topics()
+            normalized_subtopics = config.normalized_subtopics()
+            target_pairs = list(
+                self._iter_target_subtopics(
+                    course,
+                    normalized_topics,
+                    normalized_subtopics,
+                )
+            )
+
+            if not target_pairs:
+                return
+
+            topics_data = progress.data.get("topics", {})
+            questions_per_subtopic = (
+                progress.theory_target
+                + progress.calc_target
+                + progress.calc_target
+            )
+
+            total_topics = len(target_pairs)
+            completed_topics = 0
+            errored_topics = 0
+            completed_questions = 0
+
+            for topic_name, subtopic_name in target_pairs:
+                topic_entry = topics_data.get(topic_name, {})
+                entry = (
+                    topic_entry.get("subtopics", {})
+                    .get(subtopic_name)
+                )
+                if not entry:
+                    continue
+
+                theory_progress = min(
+                    entry.get("theory_progress", 0),
+                    progress.theory_target,
+                )
+                calc_progress = min(
+                    entry.get("calculation_progress", 0),
+                    progress.calc_target,
+                )
+                calc2_progress = min(
+                    entry.get("calc_progress2", 0),
+                    progress.calc_target,
+                )
+                completed_questions += theory_progress + calc_progress + calc2_progress
+
+                state = entry.get("state", "in_progress")
+                if state == "completed":
+                    completed_topics += 1
+                elif state == "error":
+                    errored_topics += 1
+
+            total_questions = questions_per_subtopic * total_topics
+            completed_questions = min(completed_questions, total_questions)
+
+            if completed_topics < total_topics or errored_topics > 0:
+                # Only record progress once an entire course finishes successfully.
+                return
+
+            store.update_generation_progress(
+                course_code=str(course.get("code", "")),
+                course_title=course.get("title", ""),
+                department=course.get("department", "Unknown"),
+                status="completed",
+                total_topics=total_topics,
+                completed_topics=completed_topics,
+                total_questions=total_questions,
+                completed_questions=completed_questions,
+                errored_topics=errored_topics,
+            )
+        except Exception as exc:
+            logger.warning("Failed to update Firestore progress for %s: %s", course.get("code"), exc)
 
     def _sleep_with_jitter(self, base: float, jitter: float) -> None:
         if base <= 0:
@@ -862,8 +1034,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=config.gemini_default_model,
         help="Gemini model name (e.g. gemini-2.5-flash)",
     )
-    parser.add_argument("--temperature", type=float, default=0.15, help="Generation temperature")
-    parser.add_argument("--top-p", type=float, default=0.4, help="Top-p nucleus sampling value")
+    parser.add_argument("--temperature", type=float, default=0.8, help="Generation temperature")
+    parser.add_argument("--top-p", type=float, default=0.9, help="Top-p nucleus sampling value")
     parser.add_argument(
         "--max-output-tokens",
         type=int,
@@ -947,6 +1119,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     courses_path = Path(args.courses_json)
     course_code = args.course_code or "all"
+    output_path = Path(args.output_jsonl) if args.output_jsonl else None
 
     if course_code.lower() != "all":
         course = _load_course_standalone(courses_path, course_code)
@@ -960,34 +1133,63 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             logger.warning("No courses with outlines found in %s", courses_path)
             return 0
 
+    # Initialize email notifications if enabled
+    email_service = None
+    try:
+        from services.Email.email_service import get_email_service
+
+        candidate = get_email_service()
+        if getattr(candidate, "enabled", False):
+            email_service = candidate
+    except Exception as exc:
+        logger.warning("Email service unavailable: %s", exc)
+        email_service = None
+
+    if email_service:
+        try:
+            course_codes = [str(row.get("code", "unknown")) for row in courses]
+            email_service.send_generation_started(
+                course_codes,
+                theory_per_request=args.theory_per_request,
+                calc_per_request=args.calc_per_request,
+                resume=not args.no_resume,
+                store_firestore=not args.skip_firestore,
+                model=args.model,
+                temperature=args.temperature,
+            )
+        except Exception as exc:
+            logger.warning("Failed to send start notification: %s", exc)
+
     all_questions = []
     common_config = {
         "courses_json_path": courses_path,
         "cache_dir": Path(args.cache_dir),
-        "rag_topk": args.rag_topk,
-        "rag_final_k": args.rag_final_k,
-        "rag_tau": args.rag_tau,
-        "rag_min_similarity": args.rag_min_sim,
+        "rag_topk_override": args.rag_topk,
+        "rag_final_k_override": args.rag_final_k,
+        "rag_tau_override": args.rag_tau,
+        "rag_min_similarity_override": args.rag_min_sim,
         "rag_where": args.rag_where,
-        "theory_questions_per_request": args.theory_per_request,
-        "calc_questions_per_request": args.calc_per_request,
+        "theory_questions_per_request_override": args.theory_per_request,
+        "calc_questions_per_request_override": args.calc_per_request,
         "resume": not args.no_resume,
         "store_firestore": not args.skip_firestore,
-        "request_delay_s": args.request_delay,
-        "delay_jitter": args.delay_jitter,
-        "gemini_model": args.model,
-        "gemini_temperature": args.temperature,
-        "gemini_top_p": args.top_p,
-        "gemini_max_output_tokens": args.max_output_tokens,
-        "request_attempts": args.request_attempts,
-        "rag_attempts": args.rag_attempts,
+        "request_delay_override": args.request_delay,
+        "delay_jitter_override": args.delay_jitter,
+        "gemini_model_override": args.model,
+        "gemini_temperature_override": args.temperature,
+        "gemini_top_p_override": args.top_p,
+        "gemini_max_output_tokens_override": args.max_output_tokens,
+        "request_attempts_override": args.request_attempts,
+        "rag_attempts_override": args.rag_attempts,
         "latex_wrap_steps": not args.no_latex_wrap,
         "target_topics": args.topics,
         "target_subtopics": args.subtopics,
-        "output_path": Path(args.output_jsonl) if args.output_jsonl else None,
-        "use_thinking": args.thinking,
-        "thinking_budget": args.thinking_budget,
-        "coursegen_debug": config.coursegen_debug if hasattr(config, 'coursegen_debug') else False,
+        "output_path": output_path,
+        "use_thinking_override": args.thinking,
+        "thinking_budget_override": args.thinking_budget,
+        "coursegen_debug_override": (
+            config.coursegen_debug if hasattr(config, "coursegen_debug") else False
+        ),
     }
 
     # Initialize Gemini service with explicit API keys to avoid env var fallback
@@ -1019,11 +1221,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for course in courses:
         course_code = course.get("code", "unknown")
         config = QuestionBatchConfig(course_code=course_code, **common_config)
+        course_start_time = time.time()
+        course_question_count = 0
 
         try:
             questions = runner.run(config)
             all_questions.extend(questions)
+            course_question_count = len(questions)
             logger.info("Generated %d questions for %s", len(questions), course_code)
+
+            if email_service:
+                try:
+                    email_service.send_course_finished(
+                        course_code=course_code,
+                        course_title=course.get("title", ""),
+                        question_count=course_question_count,
+                        duration_seconds=time.time() - course_start_time,
+                        status="completed",
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to send completion notification for %s: %s", course_code, exc)
         except RuntimeError as exc:
             # Handle forced termination when all API keys are exhausted
             if "ALL API KEYS EXHAUSTED" in str(exc) or "CRITICAL" in str(exc):
@@ -1036,18 +1253,84 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 if all_questions and output_path:
                     write_jsonl(str(output_path), [q.model_dump() for q in all_questions])
                     logger.info("Saved %d questions generated before termination to %s", len(all_questions), output_path)
+
+                if email_service:
+                    try:
+                        duration = time.time() - course_start_time
+                        email_service.send_course_finished(
+                            course_code=course_code,
+                            course_title=course.get("title", ""),
+                            question_count=course_question_count,
+                            duration_seconds=duration,
+                            status="error",
+                            error=str(exc),
+                        )
+
+                        api_manager = getattr(gemini_service, "api_key_manager", None)
+                        exhausted = 0
+                        total = 0
+                        if api_manager:
+                            total = len(getattr(api_manager, "api_keys", []) or [])
+                            cache_data = getattr(api_manager, "cache_data", {}) or {}
+                            key_data = cache_data.get("keys", {})
+                            exhausted = len([key for key, meta in key_data.items() if meta.get("exhausted")])
+
+                        email_service.send_api_exhaustion_alert(
+                            exhausted_keys=exhausted,
+                            total_keys=total,
+                            model=getattr(gemini_service, "model", "unknown"),
+                            questions_generated=len(all_questions),
+                        )
+                    except Exception as notification_error:
+                        logger.warning("Failed to send detailed email notification: %s", notification_error)
+
                 raise exc  # Re-raise to terminate the entire process
             else:
                 logger.error("RuntimeError for %s: %s", course_code, exc)
+                if email_service:
+                    try:
+                        email_service.send_course_finished(
+                            course_code=course_code,
+                            course_title=course.get("title", ""),
+                            question_count=course_question_count,
+                            duration_seconds=time.time() - course_start_time,
+                            status="error",
+                            error=str(exc),
+                        )
+                    except Exception as notif_error:
+                        logger.warning("Failed to send error notification for %s: %s", course_code, notif_error)
                 continue
         except ValidationError as exc:
             logger.error("Validation failed for %s: %s", course_code, exc)
+            if email_service:
+                try:
+                    email_service.send_course_finished(
+                        course_code=course_code,
+                        course_title=course.get("title", ""),
+                        question_count=course_question_count,
+                        duration_seconds=time.time() - course_start_time,
+                        status="error",
+                        error=str(exc),
+                    )
+                except Exception as notif_error:
+                    logger.warning("Failed to send validation error notification for %s: %s", course_code, notif_error)
             continue
         except Exception as exc:
             logger.error("Question generation failed for %s: %s", course_code, exc)
+            if email_service:
+                try:
+                    email_service.send_course_finished(
+                        course_code=course_code,
+                        course_title=course.get("title", ""),
+                        question_count=course_question_count,
+                        duration_seconds=time.time() - course_start_time,
+                        status="error",
+                        error=str(exc),
+                    )
+                except Exception as notif_error:
+                    logger.warning("Failed to send failure notification for %s: %s", course_code, notif_error)
             continue
 
-    output_path = common_config["output_path"]
     if output_path:
         write_jsonl(str(output_path), [q.model_dump() for q in all_questions])
         logger.info("Saved %d total questions to %s", len(all_questions), output_path)

@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from ..utils import ChromaQuery, CourseProgressCache, MetaData, QuestionCache
 from ..utils.batch_utils import validate_answer_in_options, validate_options
 from .models import GeminiGeneratedQuestion, GeminiQuestionBatch
+from .question_gen_config import get_question_gen_config
 
 
 # Import centralized configuration
@@ -33,7 +34,7 @@ except ImportError:
         os.environ.get("COURSEGEN_CACHE_DIR", str(REPO_ROOT / "OUTPUT_DATA2/cache"))
     ).expanduser()
     DEFAULT_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
-    DEFAULT_MODEL = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash")
+    DEFAULT_MODEL = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash-lite")
 
 
 @dataclass(frozen=True)
@@ -53,35 +54,158 @@ class QuestionBatchConfig:
     course_code: str
     courses_json_path: Path = DEFAULT_COURSES_JSON
     cache_dir: Path = DEFAULT_CACHE_ROOT
-    # Use centralized configuration values
-    rag_topk: int = 30
-    rag_final_k: int = 12
-    rag_tau: float = 0.35
-    rag_min_similarity: float = 0.6
+
+    # Import centralized config
+    _central_config: QuestionGenerationConfig = None
+
+    def __post_init__(self):
+        if self._central_config is None:
+            self._central_config = get_question_gen_config()
+
+    # Properties that delegate to centralized config
+    @property
+    def rag_topk(self) -> int:
+        if self.rag_topk_override is not None:
+            return int(self.rag_topk_override)
+        return self._central_config.rag_topk
+
+    @property
+    def rag_final_k(self) -> int:
+        if self.rag_final_k_override is not None:
+            return int(self.rag_final_k_override)
+        return self._central_config.rag_final_k
+
+    @property
+    def rag_tau(self) -> float:
+        if self.rag_tau_override is not None:
+            return float(self.rag_tau_override)
+        return self._central_config.rag_tau
+
+    @property
+    def rag_min_similarity(self) -> float:
+        if self.rag_min_similarity_override is not None:
+            return float(self.rag_min_similarity_override)
+        return self._central_config.rag_min_similarity
+
+    @property
+    def theory_questions_per_request(self) -> int:
+        if self.theory_questions_per_request_override is not None:
+            return int(self.theory_questions_per_request_override)
+        return self._central_config.theory_questions_per_request
+
+    @property
+    def calc_questions_per_request(self) -> int:
+        if self.calc_questions_per_request_override is not None:
+            return int(self.calc_questions_per_request_override)
+        return self._central_config.calc_questions_per_request
+
+    @property
+    def request_delay_s(self) -> float:
+        if self.request_delay_override is not None:
+            return float(self.request_delay_override)
+        return self._central_config.request_delay_s
+
+    @property
+    def delay_jitter(self) -> float:
+        if self.delay_jitter_override is not None:
+            return float(self.delay_jitter_override)
+        return self._central_config.delay_jitter
+
+    @property
+    def gemini_model(self) -> str:
+        if self.gemini_model_override:
+            return str(self.gemini_model_override)
+        return self._central_config.gemini_model
+
+    @property
+    def gemini_temperature(self) -> float:
+        if self.gemini_temperature_override is not None:
+            return float(self.gemini_temperature_override)
+        return self._central_config.gemini_temperature
+
+    @property
+    def gemini_top_p(self) -> float:
+        if self.gemini_top_p_override is not None:
+            return float(self.gemini_top_p_override)
+        return self._central_config.gemini_top_p
+
+    @property
+    def gemini_max_output_tokens(self) -> int:
+        if self.gemini_max_output_tokens_override is not None:
+            return int(self.gemini_max_output_tokens_override)
+        return self._central_config.gemini_max_output_tokens
+
+    @property
+    def request_attempts(self) -> int:
+        if self.request_attempts_override is not None:
+            return int(self.request_attempts_override)
+        return self._central_config.request_attempts
+
+    @property
+    def rag_attempts(self) -> int:
+        if self.rag_attempts_override is not None:
+            return int(self.rag_attempts_override)
+        return self._central_config.rag_attempts
+
+    @property
+    def rag_context_limit(self) -> int:
+        if self.rag_context_limit_override is not None:
+            return int(self.rag_context_limit_override)
+        return self._central_config.rag_context_limit
+
+    @property
+    def default_theory_difficulty_rank(self) -> int:
+        return self._central_config.default_theory_difficulty_rank
+
+    @property
+    def default_calculation_difficulty_rank(self) -> int:
+        return self._central_config.default_calculation_difficulty_rank
+
+    @property
+    def use_thinking(self) -> bool:
+        if self.use_thinking_override is not None:
+            return bool(self.use_thinking_override)
+        return self._central_config.use_thinking
+
+    @property
+    def thinking_budget(self) -> int:
+        if self.thinking_budget_override is not None:
+            return int(self.thinking_budget_override)
+        return self._central_config.thinking_budget
+
+    @property
+    def coursegen_debug(self) -> bool:
+        if self.coursegen_debug_override is not None:
+            return bool(self.coursegen_debug_override)
+        return os.environ.get("COURSEGEN_DEBUG", "false").lower() == "true"
+
+    # Optional overrides for specific use cases
+    rag_topk_override: Optional[int] = None
+    rag_final_k_override: Optional[int] = None
+    rag_tau_override: Optional[float] = None
+    rag_min_similarity_override: Optional[float] = None
+    theory_questions_per_request_override: Optional[int] = None
+    calc_questions_per_request_override: Optional[int] = None
+    request_delay_override: Optional[float] = None
+    delay_jitter_override: Optional[float] = None
+    gemini_model_override: Optional[str] = None
+    gemini_temperature_override: Optional[float] = None
+    gemini_top_p_override: Optional[float] = None
+    gemini_max_output_tokens_override: Optional[int] = None
+    request_attempts_override: Optional[int] = None
+    rag_attempts_override: Optional[int] = None
+    rag_context_limit_override: Optional[int] = None
+    use_thinking_override: Optional[bool] = None
+    thinking_budget_override: Optional[int] = None
+    coursegen_debug_override: Optional[bool] = None
     rag_where: Optional[Dict[str, Any]] = None
-    theory_questions_per_request: int = 10
-    calc_questions_per_request: int = 5
-    resume: bool = True
-    store_firestore: bool = True
-    request_delay_s: float = 1.5
-    delay_jitter: float = 0.25
-    gemini_model: str = DEFAULT_MODEL
-    gemini_temperature: float = 0.15
-    gemini_top_p: float = 0.6
-    gemini_max_output_tokens: int = 10000
-    request_attempts: int = 2
-    rag_attempts: int = 2
-    rag_context_limit: int = 8
     latex_wrap_steps: bool = True
     target_topics: Optional[Sequence[str]] = None
     target_subtopics: Optional[Sequence[str]] = None
     output_path: Optional[Path] = None
     custom_plan: Optional[List[RequestPlan]] = None
-    use_thinking: bool = False
-    thinking_budget: int = 12700
-    coursegen_debug: bool = False
-    default_theory_difficulty_rank: int = int(os.environ.get("COURSEGEN_THEORY_DIFFICULTY_RANK", "2"))
-    default_calculation_difficulty_rank: int = int(os.environ.get("COURSEGEN_CALCULATION_DIFFICULTY_RANK", "2"))
+    resume: bool = True
+    store_firestore: bool = True
 
     def normalized_topics(self) -> Optional[set[str]]:
         if self.target_topics is None:

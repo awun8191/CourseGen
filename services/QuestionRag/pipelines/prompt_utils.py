@@ -22,8 +22,9 @@ def build_question_generation_prompt(
 
     base_guidance = textwrap.dedent("""
         - Questions must be original, unambiguous, and self-contained.
-        - Provide exactly four distinct options labelled A, B, C, D.
-        - 'correct_answer' must be one of "A", "B", "C", or "D" and match 'correct_answer_text'.
+        - Provide exactly four distinct options and preserve their order.
+        - `correct_answer_indexes` must be a JSON array containing the zero-based index of the correct option (e.g., `[2]` when the third option is correct). Include exactly one index.
+        - `correct_answer_text` must repeat the option string at that index verbatim.
         - Explanations should help students understand why the answer is correct and reference key formulas when relevant.
         - Wrap every formula or symbol in `$...$` with double-escaped commands (e.g., `$\\omega = 2\\pi f$`).
         """).strip()
@@ -95,7 +96,7 @@ Generate {request.question_count} unique, curriculum-aligned multiple-choice que
       {{
         "question": "<string>",
         "options": ["<string>", "<string>", "<string>", "<string>"],
-        "correct_answer": "A" | "B" | "C" | "D",
+        "correct_answer_indexes": [<int>],
         "correct_answer_text": "<string>",
         "explanation": "<string>",
         "solution_steps": ["<step1>", "<step2>", "..."]
@@ -106,8 +107,8 @@ Generate {request.question_count} unique, curriculum-aligned multiple-choice que
 
 ### OPTIONS / ANSWER RULES
 - Provide exactly **four** option *strings* in `options`. **Do not** prefix option strings with "A)", "B)", etc — options should be raw option text.
-- `correct_answer` must be one of "A"|"B"|"C"|"D".
-- `correct_answer_text` must be exactly equal to the corresponding element of `options`.
+- Populate `correct_answer_indexes` with a single-element array holding the zero-based index of the correct option (0 for the first option, 1 for the second, etc.).
+- `correct_answer_text` must be exactly equal to `options[correct_answer_indexes[0]]`.
 - All option texts must be distinct and plausible. Avoid distractors that are obviously wrong (e.g., unit mismatch, off by factor of 1000).
 - For numeric options, include units in the option text (e.g., "29.8 MPa").
 
@@ -123,7 +124,7 @@ Generate {request.question_count} unique, curriculum-aligned multiple-choice que
     - The **Final** line must repeat the numeric answer with units and rounding.
   - Options policy:
     - Generate options AFTER computing the answer.
-    - Ensure `correct_answer_text` equals the selected element in `options` (A=0, B=1, C=2, D=3).
+    - Ensure `correct_answer_indexes` identifies the correct option and `correct_answer_text` repeats it exactly.
     - For numeric questions, every option includes units; distractors reflect realistic slips (rounding, factor-of-10, omitted factor of 2), not nonsense.
     - Keep steps **minimal**: no repeating the same calculation in different units.
     - If SI units are already consistent, do not add conversions. Only convert when units are mismatched.
@@ -192,7 +193,7 @@ Generate {request.question_count} unique, curriculum-aligned multiple-choice que
 - Avoid excessive edge cases, trick wording, or ambiguous qualifiers (e.g., "usually", "often", "may").
 
 ### QUALITY & SANITY CHECKS (do these before returning JSON)
-1. Confirm `options` contains exactly 4 items and `correct_answer_text` matches one of them exactly.
+1. Confirm `options` contains exactly 4 items and `correct_answer_indexes[0]` points to one of them (0–3) with `correct_answer_text` matching that option exactly.
 2. Confirm no option duplicates.
 3. For numeric answers, re-calculate the result and ensure the value in `correct_answer_text` matches the `solution_steps` final line.
 4. Confirm all LaTeX backslashes are double-escaped.

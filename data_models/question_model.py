@@ -23,6 +23,12 @@ class Question(BaseModel):
     options: List[str] = Field(
         ..., description="Exactly four multiple choice options", min_length=4, max_length=4
     )
+    correct_answer_index: Optional[int] = Field(
+        None,
+        description="Zero-based index of the correct option",
+        ge=0,
+        le=3,
+    )
     correct_answer: Literal["A", "B", "C", "D"] = Field(
         ..., description="The correct option letter (A, B, C, or D)"
     )

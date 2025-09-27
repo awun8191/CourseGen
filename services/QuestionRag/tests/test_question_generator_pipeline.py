@@ -21,7 +21,7 @@ class FakeGeminiService:
                 {
                     "question": "Sample question?",
                     "options": ["Option A", "Option B", "Option C", "Option D"],
-                    "correct_answer": "A",
+                    "correct_answer_indexes": [0],
                     "correct_answer_text": "Option A",
                     "explanation": "Because Option A is correct",
                     "solution_steps": ["Step 1"],
@@ -53,9 +53,13 @@ class FakeChromaQuery:
 class FakeFireStore:
     def __init__(self) -> None:
         self.saved: list[dict] = []
+        self.progress_updates: list[dict] = []
 
     def set_question(self, question) -> None:  # pragma: no cover - simple container
         self.saved.append(question)
+
+    def update_generation_progress(self, **payload) -> None:  # pragma: no cover - simple container
+        self.progress_updates.append(payload)
 
 
 def _write_courses(tmp_path: Path) -> Path:
@@ -96,25 +100,30 @@ def test_question_generation_with_cache(tmp_path: Path) -> None:
         course_code="EEE 101",
         courses_json_path=courses_path,
         cache_dir=cache_dir,
-        theory_questions_per_request=1,
-        calc_questions_per_request=1,
-        request_delay_s=0,
+        custom_plan=[
+            RequestPlan(name="theory-1", kind="theory", question_count=1, difficulty_rank=2),
+            RequestPlan(name="calculation-1", kind="calculation", question_count=1, difficulty_rank=5),
+            RequestPlan(name="calculation-2", kind="calculation", question_count=1, difficulty_rank=5),
+        ],
+        theory_questions_per_request_override=1,
+        calc_questions_per_request_override=1,
+        request_delay_override=0,
     )
 
     runner = QuestionBatchRunner(generator)
     results = runner.run(config)
 
-    assert len(results) == 4
-    assert len(fake_gemini.calls) == 4
-    assert len(fake_store.saved) == 4
+    assert len(results) == 3
+    assert len(fake_gemini.calls) == 3
+    assert len(fake_store.saved) == 3
 
     # Second run should reuse cache and avoid additional Gemini calls
     results_again = runner.run(config)
-    assert len(results_again) == 4
-    assert len(fake_gemini.calls) == 4  # unchanged
-    assert len(fake_store.saved) == 4  # cached questions do not re-persist
+    assert len(results_again) == 0
+    assert len(fake_gemini.calls) == 3  # unchanged
+    assert len(fake_store.saved) == 3  # cached questions do not re-persist
 
-    calc_questions = [q for q in results_again if q.question_type == "calculation"]
+    calc_questions = [q for q in results if q.question_type == "calculation"]
     assert calc_questions
     for question in calc_questions:
         assert all(step.startswith("\\(") or step.startswith("$") for step in question.solution_steps)
@@ -145,8 +154,8 @@ def test_generation_skips_when_count_mismatch(tmp_path: Path) -> None:
                 difficulty_rank=5,
             )
         ],
-        request_attempts=1,
-        request_delay_s=0,
+        request_attempts_override=1,
+        request_delay_override=0,
     )
 
     runner = QuestionBatchRunner(generator)
@@ -159,5 +168,4 @@ def test_generation_skips_when_count_mismatch(tmp_path: Path) -> None:
     cache = generator._cache_for(cache_dir)
     key_prefix = cache.make_key("EEE 101", "Resistors", "Ohm's Law", "placeholder")
     states = cache.subtopic_request_states(key_prefix, ["theory-only"])
-    assert states["theory-only"] == "skipped"
-
+    assert states["theory-only"] == "failed"

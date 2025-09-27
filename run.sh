@@ -105,7 +105,7 @@ check_prerequisites() {
 }
 
 ensure_volume_permissions() {
-    local paths=("OUTPUT_DATA2" "OUTPUT_DATA2/cache" "data")
+    local paths=("OUTPUT_DATA2" "OUTPUT_DATA2/cache" "OUTPUT_DATA2/data/gemini_cache" "data")
     for dir in "${paths[@]}"; do
         if [[ ! -d "$dir" ]]; then
             mkdir -p "$dir"
@@ -124,6 +124,7 @@ build_docker_command() {
         "docker" "run"
         "--rm"
         "-v" "$(pwd)/OUTPUT_DATA2/cache:/app/OUTPUT_DATA2/cache"
+        "-v" "$(pwd)/OUTPUT_DATA2/data/gemini_cache:/app/OUTPUT_DATA2/data/gemini_cache"
         "-v" "$(pwd)/data:/app/data"
     )
 

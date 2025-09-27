@@ -20,7 +20,7 @@ def validate_options(options: List[str]) -> None:
             raise QuestionGenerationError(f"Option {i+1} is empty")
 
 
-def validate_answer_in_options(answer_text: str, options: List[str]) -> None:
+def validate_answer_in_options(answer_text: str | None, options: List[str]) -> None:
     """Validate that the correct answer text exists in options."""
     if not answer_text:
         raise QuestionGenerationError("Answer text cannot be empty")
@@ -33,32 +33,47 @@ def validate_answer_in_options(answer_text: str, options: List[str]) -> None:
 
 
 def normalize_answer(
+    indexes_value: Any,
     answer_value: Any,
     answer_text_value: str | None,
     options: List[str],
-) -> tuple[str, str]:
-    """Normalize answer to letter and text format."""
+) -> tuple[int, str, str]:
+    """Normalize answer to index, letter, and text format."""
     letters = ["A", "B", "C", "D"]
+
+    # Prefer explicit index array
+    if isinstance(indexes_value, list) and indexes_value:
+        raw_idx = indexes_value[0]
+        try:
+            idx = int(raw_idx)
+        except (TypeError, ValueError):
+            raise QuestionGenerationError("correct_answer_indexes must contain integers") from None
+        if idx < 0 or idx >= len(options):
+            raise QuestionGenerationError(
+                f"correct_answer_indexes[0]={idx} is out of range for {len(options)} options"
+            )
+        text = options[idx]
+        return idx, letters[idx], text
 
     if answer_text_value:
         text = answer_text_value.strip()
         for idx, option in enumerate(options):
             if text.lower() == option.lower():
-                return letters[idx], option
+                return idx, letters[idx], option
 
     if isinstance(answer_value, int):
         idx = answer_value - 1
         if 0 <= idx < len(options):
-            return letters[idx], options[idx]
+            return idx, letters[idx], options[idx]
 
     if isinstance(answer_value, str):
         cleaned = answer_value.strip().upper()
         for idx, letter in enumerate(letters):
             if cleaned in {letter, f"OPTION {letter}", f"{letter}.", f"{letter})"}:
-                return letter, options[idx]
+                return idx, letter, options[idx]
         for idx, option in enumerate(options):
             if cleaned.lower() == option.lower():
-                return letters[idx], option
+                return idx, letters[idx], option
 
     raise QuestionGenerationError("Unable to determine correct answer letter")
 
@@ -174,7 +189,8 @@ def convert_to_questions(
         if len(normalized_options) != len(options):
             raise QuestionGenerationError("Options must be unique")
 
-        answer_letter, answer_text = normalize_answer(
+        answer_index, answer_letter, answer_text = normalize_answer(
+            item.get("correct_answer_indexes"),
             item.get("correct_answer"),
             item.get("correct_answer_text"),
             options,
@@ -217,6 +233,7 @@ def convert_to_questions(
             difficulty=difficulty_from_rank(request.difficulty_rank),
             question=question_text,
             options=options,
+            correct_answer_index=answer_index,
             correct_answer=answer_letter,
             correct_answer_text=answer_text,
             explanation=explanation,
@@ -226,6 +243,7 @@ def convert_to_questions(
                 "request_name": request.name,
                 "question_index": idx,
                 "generated_at": __import__("time").time(),
+                "correct_answer_index": answer_index,
             },
         )
         questions.append(question)

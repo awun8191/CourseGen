@@ -37,7 +37,7 @@ def test_calculation_prompt_parses_dollar_wrapped_latex(tmp_path, question_count
         "$\\tau = 10\\,\\text{kPa}$",
         "$\\tau = 0.01\\,\\text{kPa}$",
       ],
-      "correct_answer": "A",
+      "correct_answer_indexes": [0],
       "correct_answer_text": "$\\tau = 1.0\\,\\text{MPa}$",
       "explanation": "Using $\\tau = \\frac{F}{A}$ with $A = 5.0\\times10^{-3}\\,\\text{m}^2$ gives $\\tau = 1.0\\,\\text{MPa}$.",
       "solution_steps": [
@@ -62,11 +62,11 @@ def test_calculation_prompt_parses_dollar_wrapped_latex(tmp_path, question_count
         cache_dir=tmp_path,
         store_firestore=False,
         resume=False,
-        request_delay_s=0.0,
-        delay_jitter=0.0,
-        theory_questions_per_request=question_count,
-        calc_questions_per_request=question_count,
-        request_attempts=1,
+        request_delay_override=0.0,
+        delay_jitter_override=0.0,
+        theory_questions_per_request_override=question_count,
+        calc_questions_per_request_override=question_count,
+        request_attempts_override=1,
     )
 
     request = RequestPlan(

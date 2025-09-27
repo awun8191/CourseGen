@@ -66,8 +66,10 @@ try:
     EMBEDDING_MODEL = config.gemini_embedding_model
 except ImportError:
     # Fallback to hardcoded defaults if centralized config not available
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    DEFAULT_MODEL = "gemini-2.5-flash-lite"
     EMBEDDING_MODEL = "gemini-embedding-001"
+    DEFAULT_TEMPERATURE = 0.8
+    DEFAULT_TOP_P = 0.9
 
 IMAGE_TOKEN_COST = 1000
 

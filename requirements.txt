@@ -25,6 +25,9 @@ firebase_admin==7.1.0
 google-cloud-firestore==2.21.0
 google-cloud-storage==3.3.1
 
+# Communication and notifications
+twilio==9.4.2
+
 # Image processing and OCR
 albumentations==1.4.10
 albucore==0.0.13

@@ -3,6 +3,8 @@ import json
 import time
 from pathlib import Path
 from typing import List
+import os
+from zoneinfo import ZoneInfo
 
 try:  # pragma: no cover - optional dependency
     from COURSEGEN.utils.Caching.cache import Cache  # type: ignore
@@ -40,9 +42,11 @@ class ApiKeyManager:
             gemini_keys = GeminiApiKeys()
             api_keys = gemini_keys.get_keys()
         
-        # Set cache file to data/gemini_cache directory
+        # Set cache file to OUTPUT_DATA2/data/gemini_cache directory (persistent volume)
         if cache_file is None:
-            cache_dir = Path(__file__).parent.parent.parent / "data" / "gemini_cache"
+            default_root = Path(__file__).resolve().parents[2] / "OUTPUT_DATA2"
+            cache_root = Path(os.environ.get("COURSEGEN_CACHE_ROOT", str(default_root)))
+            cache_dir = cache_root / "data" / "gemini_cache"
             cache_dir.mkdir(parents=True, exist_ok=True)
             cache_file = str(cache_dir / "api_key_cache.json")
             
@@ -58,7 +62,8 @@ class ApiKeyManager:
     def _load_cache(self) -> dict:
         """Load cache data and reset if it's a new day."""
         cache_data = self.cache.read_cache()
-        today = datetime.date.today().isoformat()
+        pacific_today = datetime.datetime.now(ZoneInfo("America/Los_Angeles")).date()
+        today = pacific_today.isoformat()
 
         # Check for environment variable to disable daily reset
         disable_daily_reset = os.environ.get("COURSEGEN_DISABLE_CACHE_DAILY_RESET", "false").lower() == "true"
@@ -231,6 +236,14 @@ class ApiKeyManager:
                     key_data["exhausted_reason"] = "All keys exhausted - forced termination"
             self.cache.write_cache(self.cache_data)
 
+            # Send email notification if email service is configured
+            try:
+                from services.Email.email_service import send_termination_notification
+                send_termination_notification(len(exhausted_keys), len(self.api_keys), model, questions_generated=0)
+            except Exception as notification_error:
+                # Don't fail termination if notification fails
+                pass
+    
             # Raise a clear termination error
             exhausted_keys = [k for k in self.api_keys if self.cache_data.get("keys", {}).get(k, {}).get("exhausted")]
             raise RuntimeError(
