@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import re
+import string
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -126,18 +128,67 @@ def simple_json_load(content: str) -> Any:
     if not isinstance(content, str):
         content = str(content)
 
+    def preprocess_latex_in_math(text: str) -> str:
+        """Pre-process LaTeX within $...$ delimiters to ensure proper escaping."""
+        if not text or '$' not in text:
+            return text
+        
+        # Find all math expressions and fix backslashes within them
+        def fix_math_expr(match):
+            content = match.group(1)
+            # Double any single backslashes that aren't already doubled
+            # This regex looks for backslash not followed by another backslash
+            fixed = re.sub(r'(?<!\\)\\(?!\\)', r'\\\\', content)
+            return f'${fixed}$'
+        
+        # Process inline math $...$
+        result = re.sub(r'\$([^$]+)\$', fix_math_expr, text)
+        return result
+
     def escape_latex_for_json(text: str) -> str:
-        """Handle LaTeX math expressions for JSON compatibility."""
-        # Handle LaTeX math expressions: \(...\), \[...\], \(...\)
-        text = re.sub(r'\\\(', '\\\\(', text)  # \( -> \(
-        text = re.sub(r'\\\)', '\\\\)', text)  # \) -> \)
-        text = re.sub(r'\\\[', '\\\\[', text)  # \[ -> \[
-        text = re.sub(r'\\\]', '\\\\]', text)  # \] -> \]
+        """Escape stray LaTeX backslashes without breaking valid JSON escapes."""
 
-        # Handle common LaTeX commands and symbols
-        text = re.sub(r'\\(?![\\/bfnrt\"u\\\\])', r'\\\\', text)
+        if not text:
+            return text
 
-        return text
+        valid_escapes = {'"', "\\", '/', 'b', 'f', 'n', 'r', 't'}
+        result: list[str] = []
+        idx = 0
+        length = len(text)
+
+        while idx < length:
+            ch = text[idx]
+            if ch != "\\":
+                result.append(ch)
+                idx += 1
+                continue
+
+            # Last character being a backslash; double it and move on.
+            if idx + 1 >= length:
+                result.append("\\\\")
+                idx += 1
+                continue
+
+            nxt = text[idx + 1]
+
+            # Preserve valid JSON escapes (e.g. \n, \", \u1234).
+            if nxt in valid_escapes:
+                result.append("\\" + nxt)
+                idx += 2
+                continue
+
+            if nxt == "u":
+                hex_digits = text[idx + 2 : idx + 6]
+                if len(hex_digits) == 4 and all(char in string.hexdigits for char in hex_digits):
+                    result.append("\\u" + hex_digits)
+                    idx += 6
+                    continue
+
+            # Treat everything else as a LaTeX command and escape the backslash only.
+            result.append("\\\\")
+            idx += 1
+
+        return "".join(result)
 
     def attempt_load(candidate: str) -> Optional[Any]:
         try:
@@ -152,13 +203,22 @@ def simple_json_load(content: str) -> Any:
             candidates.append(value)
 
     candidates: list[str] = []
+    
+    # Try original first
     add_candidate(candidates, content)
     add_candidate(candidates, strip_trailing_commas(content))
+    
+    # Pre-process LaTeX in math expressions
+    preprocessed = preprocess_latex_in_math(content)
+    add_candidate(candidates, preprocessed)
+    add_candidate(candidates, strip_trailing_commas(preprocessed))
 
-    sanitized = escape_latex_for_json(content)
+    # Apply full sanitization
+    sanitized = escape_latex_for_json(preprocessed)
     add_candidate(candidates, sanitized)
     add_candidate(candidates, strip_trailing_commas(sanitized))
 
+    # Try doubling as last resort (for cases where model used single backslash)
     doubled = sanitized.replace("\\", "\\\\")
     add_candidate(candidates, doubled)
     add_candidate(candidates, strip_trailing_commas(doubled))
@@ -315,16 +375,26 @@ def parse_batch_from_raw(raw_result: str) -> GeminiQuestionBatch:
 def dump_failed_payload(raw_result: str) -> Optional[Path]:
     """Dump failed payload to debug file."""
     try:
-        dump_root = Path(
-            os.environ.get(
-                "COURSEGEN_DEBUG_DUMP_DIR", str(DEFAULT_CACHE_ROOT / "failed_responses")
-            )
-        )
-        dump_root.mkdir(parents=True, exist_ok=True)
+        dump_dirs = [
+            Path(
+                os.environ.get(
+                    "COURSEGEN_DEBUG_DUMP_DIR", str(DEFAULT_CACHE_ROOT / "failed_responses")
+                )
+            ),
+            Path.cwd() / "failed_responses",
+        ]
+
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         random_suffix = f"{random.randint(0, 9999):04d}"
-        path = dump_root / f"failed_payload_{timestamp}_{random_suffix}.json"
-        path.write_text(raw_result, encoding="utf-8")
-        return path
+
+        for dump_root in dump_dirs:
+            try:
+                dump_root.mkdir(parents=True, exist_ok=True)
+                path = dump_root / f"failed_payload_{timestamp}_{random_suffix}.json"
+                path.write_text(raw_result, encoding="utf-8")
+                return path
+            except Exception:
+                continue
+        return None
     except Exception:
         return None

@@ -23,6 +23,7 @@ from .models import GeminiQuestionBatch
 from .prompt_utils import build_question_generation_prompt
 from .validation_utils import convert_to_questions
 from .question_gen_config import get_question_gen_config
+from .worker_pool import TopicWorkerPool
 
 # Import centralized configuration
 try:
@@ -93,6 +94,9 @@ class QuestionGenerator:
     # Public orchestrators
     # ------------------------------------------------------------------
     def generate_course_questions(self, config: QuestionBatchConfig) -> List[Question]:
+        if config.enable_topic_parallelism:
+            return self.generate_course_questions_parallel(config)
+
         # If no course code specified, process all courses from courses.json
         if not config.course_code or config.course_code.lower() == "all":
             return self._generate_all_courses_questions(config)
@@ -460,6 +464,178 @@ class QuestionGenerator:
         return questions
 
     # ------------------------------------------------------------------
+    # Parallel processing methods
+    # ------------------------------------------------------------------
+    def generate_course_questions_parallel(self, config: QuestionBatchConfig) -> List[Question]:
+        """
+        Generate questions for a course using parallel topic processing.
+
+        This method uses a worker pool to process multiple topics simultaneously,
+        significantly improving performance for courses with many topics.
+        """
+        # If no course code specified, process all courses from courses.json
+        if not config.course_code or config.course_code.lower() == "all":
+            return self._generate_all_courses_questions_parallel(config)
+
+        # Single course mode
+        course = self._load_course(config.courses_json_path, config.course_code)
+        return self._generate_single_course_questions_parallel(config, course)
+
+    def _generate_all_courses_questions_parallel(self, config: QuestionBatchConfig) -> List[Question]:
+        """Generate questions for all courses using parallel processing."""
+        logger.info("Generating questions for all courses using parallel processing")
+
+        courses_path = config.courses_json_path
+        if not courses_path.exists():
+            raise ValueError(f"Courses file not found: {courses_path}")
+
+        # Load all courses
+        data = json.loads(courses_path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            raise ValueError("courses.json must be a list of course objects")
+
+        courses = [row for row in data if row.get("outline")]  # Only courses with outlines
+        if not courses:
+            logger.warning("No courses with outlines found in %s", courses_path)
+            return []
+
+        logger.info(f"Found {len(courses)} courses with outlines")
+
+        all_results: List[Question] = []
+
+        # Process courses sequentially but with parallel topics within each course
+        for course in courses:
+            try:
+                course_results = self._generate_single_course_questions_parallel(config, course)
+                all_results.extend(course_results)
+                logger.info(f"Generated {len(course_results)} questions for {course.get('code', 'unknown')}")
+            except Exception as exc:
+                logger.error(f"Failed to generate questions for course {course.get('code', 'unknown')}: {exc}")
+                continue
+
+        return all_results
+
+    def _generate_single_course_questions_parallel(self, config: QuestionBatchConfig, course: Dict[str, Any]) -> List[Question]:
+        """Generate questions for a single course using parallel topic processing."""
+        # Check if all API keys are exhausted before starting
+        if hasattr(self.gemini, 'api_key_manager'):
+            model_name = self.gemini._get_model_name(self.gemini.model)
+            if self.gemini.api_key_manager.all_keys_exhausted(model_name):
+                logger.error(
+                    "🚨 All API keys exhausted before starting course %s. Terminating operations.",
+                    course.get("code", "unknown")
+                )
+                raise RuntimeError(
+                    f"🚨 ALL API KEYS EXHAUSTED - TERMINATING OPERATIONS 🚨\n"
+                    f"Cannot start processing course {course.get('code', 'unknown')} - all keys exhausted."
+                )
+
+        outline = course.get("outline") or []
+        progress_cache = CourseProgressCache(
+            course_code=str(course.get("code") or "unknown"),
+            cache_root=config.cache_dir,
+            theory_target=config.theory_questions_per_request,
+            calc_target=config.calc_questions_per_request,
+        )
+
+        self._notify_course_started(course=course, outline=outline)
+
+        # Check if parallel processing is enabled
+        if not config.enable_topic_parallelism:
+            logger.info("Parallel processing disabled, falling back to sequential processing")
+            return self._generate_single_course_questions(config, course)
+
+        # Create worker pool for parallel topic processing
+        worker_pool = TopicWorkerPool(
+            max_workers=config.max_topic_workers,
+            timeout=config.worker_timeout,
+            retry_attempts=config.worker_retry_attempts,
+        )
+
+        try:
+            # Process topics in parallel
+            results = worker_pool.process_topics_parallel(
+                course=course,
+                topics=outline,
+                generator_func=self._generate_topic_questions_worker,
+                config=config,
+                progress_cache=progress_cache,
+            )
+
+            # Collect all questions from successful workers
+            all_questions: List[Question] = []
+            for result in results:
+                if result.success:
+                    all_questions.extend(result.questions)
+                else:
+                    logger.warning(
+                        "Failed to process topic '%s': %s",
+                        result.topic_title,
+                        result.error,
+                    )
+
+            self._finalize_course_progress(
+                config=config,
+                course=course,
+                progress=progress_cache,
+            )
+
+            return all_questions
+
+        finally:
+            worker_pool.shutdown()
+
+    def _generate_topic_questions_worker(
+        self,
+        course: Dict[str, Any],
+        topic_title: str,
+        subtopics: List[str],
+        config: QuestionBatchConfig,
+        progress_cache: CourseProgressCache,
+    ) -> List[Question]:
+        """Worker function to generate questions for a single topic."""
+        logger.info("Processing topic '%s' with %d subtopics", topic_title, len(subtopics))
+
+        topic_start_time = time.time()
+        topic_question_count = 0
+        topic_questions: List[Question] = []
+        normalized_subtopics = config.normalized_subtopics()
+
+        for subtopic_title in subtopics:
+            if not subtopic_title.strip():
+                continue
+
+            if normalized_subtopics and subtopic_title.strip().lower() not in normalized_subtopics:
+                logger.debug(
+                    "Skipping subtopic '%s' under '%s' due to filter",
+                    subtopic_title,
+                    topic_title,
+                )
+                continue
+
+            generated = self._generate_for_subtopic(
+                config=config,
+                course=course,
+                topic_title=topic_title,
+                subtopic_title=subtopic_title,
+                progress=progress_cache,
+            )
+            topic_question_count += len(generated)
+            topic_questions.extend(generated)
+
+        # Notify topic completion
+        self._notify_topic_finished(
+            course=course,
+            topic_title=topic_title,
+            progress=progress_cache,
+            topic_question_count=topic_question_count,
+            topic_start_time=topic_start_time,
+            expected_subtopics=len(subtopics),
+        )
+
+        return topic_questions
+
+    # ------------------------------------------------------------------
     # Core helpers
     # ------------------------------------------------------------------
     def _cache_for(self, cache_dir: Path) -> QuestionCache:
@@ -674,6 +850,7 @@ class QuestionGenerator:
                         request.name,
                         dump_path or "<memory>",
                     )
+                    logger.debug("Raw Gemini payload: %s", raw_result)
                     raise ValueError(
                         f"Could not parse JSON from response: {raw_result[:200]}..."
                     ) from exc
@@ -682,10 +859,18 @@ class QuestionGenerator:
 
         actual_count = len(batch.questions)
         expected_count = request.question_count
-        if actual_count != expected_count:
+        if actual_count < expected_count:
             raise QuestionGenerationError(
                 f"Expected {expected_count} questions for {request.name} but received {actual_count}"
             )
+        if actual_count > expected_count:
+            logger.warning(
+                "Received %d questions for %s; trimming to requested %d",
+                actual_count,
+                request.name,
+                expected_count,
+            )
+            batch = GeminiQuestionBatch(questions=batch.questions[:expected_count])
 
         return convert_to_questions(
             [q.model_dump() for q in batch.questions],
@@ -957,6 +1142,10 @@ class QuestionBatchRunner:
     def run(self, config: QuestionBatchConfig) -> List[Question]:
         return self.generator.generate_course_questions(config)
 
+    def run_parallel(self, config: QuestionBatchConfig) -> List[Question]:
+        """Run question generation with parallel topic processing."""
+        return self.generator.generate_course_questions_parallel(config)
+
 
 def _parse_optional_json(value: Optional[str]) -> Optional[Dict[str, Any]]:
     if not value:
@@ -1097,6 +1286,29 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=12700,
         help="Thinking budget in tokens (default: 12700)",
     )
+    parser.add_argument(
+        "--max-topic-workers",
+        type=int,
+        default=3,
+        help="Maximum number of worker threads for topic-level parallelism (default: 3)",
+    )
+    parser.add_argument(
+        "--worker-timeout",
+        type=int,
+        default=300,
+        help="Timeout in seconds for individual worker threads (default: 300)",
+    )
+    parser.add_argument(
+        "--worker-retry-attempts",
+        type=int,
+        default=2,
+        help="Number of retry attempts for failed worker threads (default: 2)",
+    )
+    parser.add_argument(
+        "--disable-parallel",
+        action="store_true",
+        help="Disable topic-level parallelism and use sequential processing",
+    )
     return parser
 
 
@@ -1190,6 +1402,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "coursegen_debug_override": (
             config.coursegen_debug if hasattr(config, "coursegen_debug") else False
         ),
+        "max_topic_workers_override": args.max_topic_workers,
+        "worker_timeout_override": args.worker_timeout,
+        "worker_retry_attempts_override": args.worker_retry_attempts,
+        "enable_topic_parallelism_override": not args.disable_parallel,
     }
 
     # Initialize Gemini service with explicit API keys to avoid env var fallback
@@ -1225,7 +1441,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         course_question_count = 0
 
         try:
-            questions = runner.run(config)
+            # Use parallel processing by default
+            questions = runner.run_parallel(config)
             all_questions.extend(questions)
             course_question_count = len(questions)
             logger.info("Generated %d questions for %s", len(questions), course_code)

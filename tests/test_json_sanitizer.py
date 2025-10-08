@@ -8,7 +8,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from services.QuestionRag.pipelines.question_generator import QuestionGenerator
-from services.QuestionRag.pipelines.json_utils import extract_json_content
+from services.QuestionRag.pipelines.json_utils import extract_json_content, simple_json_load
 
 
 class DummyGemini:  # minimal stub for QuestionGenerator
@@ -98,3 +98,16 @@ def test_extract_json_repair_truncated_payload():
 ```"""
     parsed = extract_json_content(raw)
     assert parsed["questions"][0]["options"][0] == "Option A"
+
+
+def test_simple_json_load_recovers_invalid_latex_backslashes():
+    raw = r"""{"questions": [{"question": "Compute the field strength \mu_0 I / (2 \pi r)"}]}"""
+    parsed = simple_json_load(raw)
+    question = parsed["questions"][0]["question"]
+    assert "mu_0" in question.replace("\\", "")
+
+
+def test_simple_json_load_preserves_unicode_sequences():
+    raw = r"""{"symbol": "\u03bc"}"""
+    parsed = simple_json_load(raw)
+    assert parsed["symbol"] == "\u03bc"

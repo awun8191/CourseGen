@@ -46,6 +46,12 @@ class QuestionGenerationConfig:
     # Cache settings
     disable_cache_daily_reset: bool = False
 
+    # Worker settings for parallel processing
+    max_topic_workers: int = 3
+    worker_timeout: int = 300  # 5 minutes
+    worker_retry_attempts: int = 2
+    enable_topic_parallelism: bool = True
+
     @classmethod
     def from_env(cls) -> 'QuestionGenerationConfig':
         """Create configuration using central config with environment fallbacks."""
@@ -111,6 +117,12 @@ class QuestionGenerationConfig:
 
             # Cache settings
             disable_cache_daily_reset=_coerce_bool(getattr(config, "qg_disable_cache_daily_reset", defaults.disable_cache_daily_reset), defaults.disable_cache_daily_reset),
+
+            # Worker settings
+            max_topic_workers=_coerce_int(getattr(config, "qg_max_topic_workers", defaults.max_topic_workers), defaults.max_topic_workers),
+            worker_timeout=_coerce_int(getattr(config, "qg_worker_timeout", defaults.worker_timeout), defaults.worker_timeout),
+            worker_retry_attempts=_coerce_int(getattr(config, "qg_worker_retry_attempts", defaults.worker_retry_attempts), defaults.worker_retry_attempts),
+            enable_topic_parallelism=_coerce_bool(getattr(config, "qg_enable_topic_parallelism", defaults.enable_topic_parallelism), defaults.enable_topic_parallelism),
         )
 
 # Global configuration instance

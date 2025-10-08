@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """End-to-end test for email notification integration with question generation pipeline."""
-
 import os
 import sys
 import tempfile

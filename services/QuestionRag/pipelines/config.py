@@ -179,6 +179,30 @@ class QuestionBatchConfig:
             return bool(self.coursegen_debug_override)
         return os.environ.get("COURSEGEN_DEBUG", "false").lower() == "true"
 
+    @property
+    def max_topic_workers(self) -> int:
+        if self.max_topic_workers_override is not None:
+            return int(self.max_topic_workers_override)
+        return self._central_config.max_topic_workers
+
+    @property
+    def worker_timeout(self) -> int:
+        if self.worker_timeout_override is not None:
+            return int(self.worker_timeout_override)
+        return self._central_config.worker_timeout
+
+    @property
+    def worker_retry_attempts(self) -> int:
+        if self.worker_retry_attempts_override is not None:
+            return int(self.worker_retry_attempts_override)
+        return self._central_config.worker_retry_attempts
+
+    @property
+    def enable_topic_parallelism(self) -> bool:
+        if self.enable_topic_parallelism_override is not None:
+            return bool(self.enable_topic_parallelism_override)
+        return self._central_config.enable_topic_parallelism
+
     # Optional overrides for specific use cases
     rag_topk_override: Optional[int] = None
     rag_final_k_override: Optional[int] = None
@@ -198,6 +222,10 @@ class QuestionBatchConfig:
     use_thinking_override: Optional[bool] = None
     thinking_budget_override: Optional[int] = None
     coursegen_debug_override: Optional[bool] = None
+    max_topic_workers_override: Optional[int] = None
+    worker_timeout_override: Optional[int] = None
+    worker_retry_attempts_override: Optional[int] = None
+    enable_topic_parallelism_override: Optional[bool] = None
     rag_where: Optional[Dict[str, Any]] = None
     latex_wrap_steps: bool = True
     target_topics: Optional[Sequence[str]] = None

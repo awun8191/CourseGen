@@ -32,10 +32,13 @@ def build_question_generation_prompt(
     latex_guidance = textwrap.dedent("""
         - Use LaTeX for every mathematical expression.
         - Wrap inline math with `$...$` and multi-line math with `$$...$$` so the renderer treats it correctly.
-        - Because the output is JSON, ESCAPE every backslash twice (e.g., write `\\frac{a}{b}` to render `$\frac{a}{b}$`).
-        - Example inline: `$\\frac{12}{4} = 3 \\text{Ohms}$`.
-        - Example integral: `$\\int_{0}^{1} x^2 \\, dx$`.
-        - Ensure explanations and solution steps follow the same `$`-delimited, double-escaped format.
+        - **CRITICAL JSON ESCAPING:** Because the output is JSON, you MUST double-escape ALL backslashes in LaTeX.
+        - Write `\\\\frac{a}{b}` in your JSON output (which becomes `\\frac{a}{b}` after JSON parsing).
+        - Example inline in JSON: `"$\\\\frac{12}{4} = 3\\\\,\\\\text{Ohms}$"` (note the double backslashes).
+        - Example with subscript: `"$\\\\epsilon_0$"` (double backslash before epsilon).
+        - Example integral: `"$\\\\int_{0}^{1} x^2 \\\\, dx$"` (double backslashes throughout).
+        - **EVERY LaTeX command needs double backslashes:** `\\\\text`, `\\\\frac`, `\\\\int`, `\\\\epsilon`, `\\\\omega`, etc.
+        - Ensure explanations and solution steps follow the same double-escaped format.
         """).strip()
 
     if request.kind == "calculation":
@@ -155,13 +158,21 @@ Generate {request.question_count} unique, curriculum-aligned multiple-choice que
 
 ### MATHEMATICAL / LATEX FORMATTING
 - Use LaTeX for all math. Wrap inline math with `$...$` and display math with `$$...$$`.
-- Because the output is JSON, **escape every backslash twice** so a LaTeX fraction looks like `"\\frac{{a}}{{b}}"` in the JSON string (which renders as `$\\frac{{a}}{{b}}$` when unescaped).
-- Example inline in a JSON string: `"$\\frac{{12}}{{4}} = 3\\ \\text{{Ohms}}$"`.
-- Ensure every LaTeX expression appears inside `$...$` or `$$...$$` and that backslashes are doubled.
-- Use exactly two backslashes for every LaTeX command in JSON (e.g., "\\\\frac", "\\\\int", "\\\\text").
-- Never triple-escape backslashes (avoid \\\\\\int).
+- **CRITICAL: Because the output is JSON, you MUST double-escape ALL backslashes in LaTeX commands.**
+- A LaTeX fraction must look like `"\\\\frac{{a}}{{b}}"` in your JSON output (which becomes `\\frac{a}{b}` after JSON parsing).
+- **CORRECT JSON EXAMPLES:**
+  - Fraction: `"$\\\\frac{{12}}{{4}} = 3\\\\,\\\\text{{Ohms}}$"`
+  - Subscript: `"$\\\\epsilon_0 = 8.85 \\\\times 10^{{-12}}$"`
+  - Integral: `"$\\\\int_{{0}}^{{1}} x^2 \\\\, dx$"`
+  - Greek letters: `"$\\\\omega = 2\\\\pi f$"`, `"$\\\\theta$"`, `"$\\\\epsilon$"`
+  - Text in math: `"$R = 0.5\\\\,\\\\text{{m}}$"`
+- **WRONG (will break JSON parsing):**
+  - Single backslash: `"$\frac{a}{b}$"` ❌
+  - Triple backslash: `"$\\\frac{a}{b}$"` ❌
+  - No backslash: `"$frac{a}{b}$"` ❌
+- Use exactly **two backslashes** for every LaTeX command: `\\\\frac`, `\\\\int`, `\\\\text`, `\\\\epsilon`, `\\\\omega`, etc.
 - Do not expand algebra more than once; keep expressions in their simplest readable LaTeX form.
-- Write units as "\\\\text{{...}}" immediately after the number, with a single space if needed (e.g., "$333.3\\\\,\\\\text{{kN}}$").
+- Write units as `"\\\\text{{...}}"` immediately after the number, with a thin space if needed (e.g., `"$333.3\\\\,\\\\text{{kN}}$"`).
 
 
 ### CONTENT & PEDAGOGICAL GUIDELINES
