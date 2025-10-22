@@ -1,200 +1,120 @@
-# API Key Load Balancer in CourseGen
+# Gemini API Key Load Balancer
 
-The API Key Load Balancer is a resilient system for managing multiple Google API keys (for Gemini) to handle high-volume requests without hitting rate limits. It implements round-robin rotation, usage tracking, automatic fallbacks, and integration with caching to ensure scalability and reliability in production environments like batch question generation or outline creation.
+High-volume Gemini workloads in CourseGen rely on `services/Gemini/api_key_manager.py` to rotate across multiple API keys, enforce per-model quotas, and surface exhaustion state to upstream pipelines. This document explains how the manager works, how to configure it, and how to monitor its state.
 
-## Overview
-Gemini API has per-key quotas (e.g., 60 RPM, 1500 RPD). For workloads exceeding this (e.g., 1000+ questions/day), a single key fails. This balancer:
-- Rotates across 5-20 keys from multiple projects/accounts.
-- Tracks per-key usage and errors (e.g., 429 responses).
-- Falls back to secondary keys or alternative providers (Ollama).
-- Caches responses to minimize API calls.
-- Logs metrics for monitoring and billing attribution.
+## Core Responsibilities
+- **Key discovery** – loads keys from `GeminiApiKeys` (list in `services/Gemini/gemini_api_keys.py`) or from explicit arguments when instantiated manually.
+- **Persistent usage tracking** – stores daily counters, tokens, and exhaustion flags in `OUTPUT_DATA2/data/gemini_cache/api_key_cache.json` (path adjustable via `COURSEGEN_CACHE_ROOT`).
+- **Per-model quotas** – enforces rate limits defined in `services/Gemini/rate_limit_data.py` for `flash`, `lite`, `pro`, and `embedding` model families.
+- **RPM throttling** – keeps rolling timestamps per key per model to avoid exceeding per-minute limits.
+- **Failure handling** – marks keys exhausted on fatal errors, escalates to email notifications (via `services.Email.email_service`) when every key is exhausted, and raises a terminating `RuntimeError`.
 
-Key benefits:
-- Scales to 500+ RPM effectively.
-- 99.9% uptime via fallbacks.
-- Cost-transparent: Tracks tokens per key/project.
-- Plug-and-play: No changes needed in calling code.
-
-## Architecture
-1. **Configuration**: Keys loaded from `data/gemini_cache/api_key_cache.json` or env vars.
-2. **Manager**: `services/Gemini/api_key_manager.py`:
-   - Initializes pool of `GeminiClient` instances.
-   - Selects next key via round-robin or least-used.
-   - Updates usage counters post-request.
-3. **Rate Limiting**: `services/Gemini/rate_limit_data.py` enforces soft limits (e.g., 50 RPM/key).
-4. **Fallbacks**: On 429/5xx, retry with next key (up to 3 attempts).
-5. **Integration**: `services/Gemini/gemini_service.py` wraps calls with balancing.
-6. **Caching**: Ties into `utils/Caching/enhanced_cache.py` for response dedup.
-7. **Monitoring**: Logs to `log_utils.py`; optional Firestore export.
-
-Components:
-- `gemini_api_keys.py`: Key validation and serialization.
-- `rate_limit_data.py`: In-memory/per-file tracking.
-- Env support: Fallback to single `GOOGLE_API_KEY`.
-
-## Setup and Configuration
-### 1. Obtain Keys
-- Create multiple Google Cloud projects.
-- Enable Vertex AI API per project.
-- Generate API keys (or service accounts for production).
-- Note quotas: Standard tier ~60 RPM/key.
-
-### 2. Configure Keys
-#### Option A: JSON File (Recommended for Multiple)
-Create/edit `data/gemini_cache/api_key_cache.json`:
+## Cache Layout
 ```json
 {
-  "keys": [
-    {
-      "api_key": "REDACTED_API_KEYC...abc123",
-      "project_id": "coursegen-prod-1",
-      "usage_today": 0,
-      "requests_today": 0,
-      "last_used": null,
-      "active": true,
-      "quota_rpm": 60,
-      "quota_rpd": 1500
-    },
-    {
-      "api_key": "REDACTED_API_KEYD...def456",
-      "project_id": "coursegen-prod-2",
-      "usage_today": 0,
-      "requests_today": 0,
-      "last_used": null,
-      "active": true,
-      "quota_rpm": 60,
-      "quota_rpd": 1500
+  "date": "2024-05-17",
+  "current_key_index": 2,
+  "keys": {
+    "AIza...123": {
+      "rpd": 87,
+      "total_tokens": 312000,
+      "exhausted": false,
+      "exhausted_reason": "",
+      "models": {
+        "flash": {"rpd": 40, "total_tokens": 210000},
+        "lite": {"rpd": 47, "total_tokens": 102000},
+        "pro": {"rpd": 0, "total_tokens": 0},
+        "embedding": {"rpd": 0, "total_tokens": 0}
+      }
     }
-  ],
-  "active_index": 0,
-  "fallback_provider": "ollama",  // Optional: ollama_service.py
-  "cache_ttl_hours": 24,
-  "max_retries": 3,
-  "rotate_on_error": true
+  }
 }
 ```
-- `usage_today`: Tokens used (auto-updated).
-- `active`: Disable problematic keys.
-- Add 5-10 keys for robustness.
+- Counters reset at midnight **America/Los_Angeles** unless `COURSEGEN_DISABLE_CACHE_DAILY_RESET=true`.
+- `exhausted_reason` provides context (quota exceeded, manual override, forced termination, etc.).
+- `current_key_index` is used for round-robin rotation across the configured key list.
 
-#### Option B: Environment Variables
-- Single key: `export GOOGLE_API_KEY="AIza..."`
-- Multiple: `GOOGLE_API_KEYS="key1,key2,key3"` (comma-separated; basic mode, no quotas).
+## Rate Limits (defaults from `rate_limit_data.py`)
+| Model family | Requests per minute | Requests per day |
+| --- | --- | --- |
+| `lite` | 15 | 1,000 |
+| `flash` | 10 | 250 |
+| `pro` | 5 | 25 |
+| `embedding` | 5 | 1,000 |
 
-### 3. Environment Variables
-- `GEMINI_RATE_LIMIT_RPM`: Global RPM cap per key (default 60).
-- `GEMINI_MAX_RETRIES`: Fallback attempts (default 3).
-- `GEMINI_CACHE_ENABLED`: Use enhanced cache (default 1).
-- `GEMINI_PROJECT_BILLING`: Track per-project costs (requires `BILLING_ENABLED=1`).
-- `OLLAMA_FALLBACK_URL`: For local fallback (default "http://localhost:11434").
+These gates are conservative starting points—adjust them in `rate_limit_data.py` if your project-specific quotas differ.
 
-### 4. Initialization
-Run once to validate keys:
-```
-python -c "from services.Gemini.api_key_manager import validate_keys; validate_keys()"
-```
-- Checks API access; updates cache.
+## Configuration Steps
+1. **List your keys** – edit `services/Gemini/gemini_api_keys.py`:
+   ```python
+   class GeminiApiKeys:
+       def __init__(self, api_keys: list[str] = None):
+           self.api_keys = api_keys or [
+               "REDACTED_API_KEY...first",
+               "REDACTED_API_KEY...second",
+               "..."
+           ]
+   ```
+   > Keep production keys out of source control. Consider loading them from environment variables or a secrets manager when running in deployed environments.
+2. **Persist cache directory** – ensure `OUTPUT_DATA2/data/gemini_cache` (or your override) is writable and mounted persistently in Docker/EC2 runs.
+3. **(Optional) Disable daily reset** – set `COURSEGEN_DISABLE_CACHE_DAILY_RESET=true` if you want counters to span multiple days (generally not recommended).
 
-## Usage
-### In Pipelines
-All Gemini calls in CourseGen (outlines, questions) automatically use the balancer via `gemini_service.py`:
+## Using the Manager
+Most pipelines instantiate `GeminiService` without worrying about the manager:
 ```python
-from services.Gemini.gemini_service import get_balanced_client
-
-client = get_balanced_client()
-response = client.generate_content("Prompt here")
+from services.Gemini.gemini_service import GeminiService
+service = GeminiService()  # Auto-wires ApiKeyManager + GeminiApiKeys
 ```
 
-### Manual/CLI Testing
+To customise behaviour:
 ```python
-from services.Gemini.api_key_manager import get_next_key
+from services.Gemini.api_key_manager import ApiKeyManager
+from services.Gemini.gemini_service import GeminiService
 
-key_info = get_next_key()
-print(f"Using key from project: {key_info['project_id']}")
+manager = ApiKeyManager(["REDACTED_API_KEY...1", "REDACTED_API_KEY...2"])
+service = GeminiService(api_key_manager=manager, model="gemini-2.5-flash")
+
+prompt = "Summarise Fourier series."
+response = service.generate(prompt)
 ```
 
-For batch jobs, set `--workers` in generators; balancer handles concurrency.
+## Inspecting Usage
+- **Read the cache file directly**:
+  ```bash
+  jq '.' OUTPUT_DATA2/data/gemini_cache/api_key_cache.json
+  ```
+- **Quick Python probe**:
+  ```python
+  from services.Gemini.api_key_manager import ApiKeyManager
+  mgr = ApiKeyManager()
+  print(mgr.cache_data["keys"])
+  ```
+- **Rotate manually**:
+  ```python
+  mgr.rotate_key(model="flash")
+  ```
 
-### Integration Example
-In custom script:
-```python
-from services.Gemini.gemini_service import generate_with_balancing
+## Exhaustion Handling
+- When a generation call fails with quota errors, the manager:
+  1. Marks the active key exhausted for the relevant model.
+  2. Attempts to rotate to the next available key.
+  3. If every key is exhausted, sets `exhausted_reason` for all keys, raises a `RuntimeError` (`🚨 ALL API KEYS EXHAUSTED - TERMINATING OPERATIONS 🚨`), and optionally triggers an email alert via `services.Email.email_service`.
+- Pipelines such as question generation capture this exception, flush any results already written, send email notifications, and halt further processing. Resume after new keys or quota resets becomes trivial—rerun the same command; the manager starts fresh the next day.
 
-prompt = "Generate a question on DSP."
-result = generate_with_balancing(prompt, max_tokens=200)
-print(result.text)
-```
+## Environment Hooks
+- `COURSEGEN_CACHE_ROOT` – base directory for cache files (defaults to `<repo>/OUTPUT_DATA2`).
+- `COURSEGEN_DISABLE_CACHE_DAILY_RESET` – skip the midnight reset (useful for testing, not production).
+- `COURSEGEN_DEBUG_DUMP_DIR` – controls where failed Gemini payloads land; indirectly useful when debugging key exhaustion because it co-locates with cache data.
 
-## Monitoring and Metrics
-- **Logs**: Each call logs: key used, tokens in/out, latency, errors.
-  Example: `[INFO] Gemini call #47: key=AIza... (proj1), tokens=150 in/50 out, 2.1s, success.`
-- **Cache File**: `data/gemini_cache/api_key_cache.json` updates in real-time.
-- **Billing**: If enabled, attributes costs per key/project in `billing_state.json`.
-- **Alerts**: Custom hook in `api_key_manager.py` for quota breaches (e.g., email/Slack).
-- **Dashboard**: Query logs or use `utils/progress_tracker.py` for usage graphs.
+## Integration Points
+- **Question generator** – checks `ApiKeyManager.all_keys_exhausted()` before each subtopic and aborts gracefully when true.
+- **OCR / Embedding fallbacks** – other pipelines can reuse the same manager to share quota knowledge across services.
+- **Email notifications** – `ApiKeyManager.force_terminate_if_all_exhausted()` invokes `EmailService.send_termination_notification` if available, providing the number of exhausted keys and the model family.
 
-View usage:
-```
-python -c "from services.Gemini.api_key_manager import print_usage; print_usage()"
-```
-Output:
-```
-Key 1 (proj1): 450/1500 RPM used today, 12000 tokens.
-Key 2 (proj2): 200/1500 RPM, 8000 tokens.
-Total: 20000 tokens, $0.40 estimated cost.
-```
+## Operational Tips
+- Keep at least **twice** the number of keys as you expect concurrent workers (e.g., 10 keys for 3–4 workers) to absorb bursts.
+- Rotate or invalidate compromised keys by editing `api_key_cache.json` (set `exhausted=true`) or removing them from `GeminiApiKeys`.
+- Back up `api_key_cache.json` before large runs if you need an audit trail of usage.
+- The manager does not mask keys in-memory; treat the cache directory as sensitive.
 
-## Error Handling and Fallbacks
-- **429 (Rate Limit)**: Switch to next key; exponential backoff (1s, 2s, 4s).
-- **401/403 (Invalid)**: Mark key inactive; log and fallback.
-- **5xx (Server Error)**: Retry same key up to 3x, then next.
-- **No Keys Available**: Raise `NoAvailableKeysError`; fallback to Ollama if configured.
-- **Cache Miss/Fail**: Proceed without cache; log warning.
-
-Tune in config: `"error_threshold": 5` (deactivate after 5 consecutive errors).
-
-## Performance and Scaling
-- **Throughput**: With 10 keys @60 RPM = 600 RPM total.
-- **Latency Overhead**: <50ms for rotation/caching.
-- **Memory**: In-memory tracking; persists to JSON every 10 calls.
-- **Concurrency**: Thread-safe; use `workers=4` for parallel.
-- **Cost Optimization**: Cache hits save 70-90% of API calls for repeated prompts.
-
-Benchmark:
-```
-# Test 100 calls
-python -c "from services.Gemini.gemini_service import benchmark_balancer; benchmark_balancer(100)"
-```
-Expected: ~95% success, avg 2.5s/call.
-
-## Security
-- **Secrets**: Never commit `api_key_cache.json` (.gitignore'd); use env for prod.
-- **Validation**: Keys tested on init; invalid ones skipped.
-- **Auditing**: Logs don't include full keys (masked: "AIza...123").
-- **Production**: Use service accounts over API keys for better security.
-
-## Troubleshooting
-- **All Keys Exhausted**: Add more keys; check quotas in Google Console.
-- **Fallback Not Triggering**: Verify `"rotate_on_error": true` in config.
-- **Cache Conflicts**: Set unique cache keys per call (e.g., hash(prompt + chunks)).
-- **High Latency**: Reduce `max_retries`; monitor network to Google APIs.
-- **Usage Not Updating**: Ensure write permissions on `data/gemini_cache/`.
-- **Ollama Fallback Fails**: Start Ollama server; check `OLLAMA_FALLBACK_URL`.
-- **Logs Missing**: Set `LOG_LEVEL=DEBUG` in `log_utils.py`.
-
-## Best Practices
-- **Key Pool**: Maintain 2x expected load (e.g., 10 keys for 300 RPM).
-- **Rotation**: Reset daily usage at midnight UTC (auto in manager).
-- **Monitoring**: Script daily usage checks; alert >80% quota.
-- **Testing**: Validate with small batches; simulate errors by disabling keys.
-- **Costs**: Monitor via Google Console + local billing; optimize prompts.
-- **Backup**: Sync keys to secure vault (e.g., AWS Secrets Manager).
-
-## Future Enhancements
-- Dynamic quota fetching from Google API.
-- ML-based key selection (e.g., predict best key by latency).
-- Multi-provider balancing (Gemini + OpenAI + Anthropic).
-- Web dashboard for key management.
-
-This balancer ensures uninterrupted AI generation at scale, critical for educational pipelines.
+With a healthy key pool and the persistent cache mounted, CourseGen can sustain high-throughput Gemini usage without hitting per-key limits or silently degrading throughput.

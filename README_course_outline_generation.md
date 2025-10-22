@@ -1,182 +1,161 @@
-# Course Outline Generation in CourseGen
+# Course Outline Generation Pipeline
 
-This module automates the creation of detailed, structured course outlines (syllabi) from processed educational documents. It uses retrieval-augmented generation (RAG) to query relevant content from ChromaDB embeddings and synthesizes hierarchical outlines using Gemini AI. Outlines include topics, subtopics, learning objectives, assessments, prerequisites, and references, tailored to specific courses (e.g., EEE 471 - Digital Signal Processing).
+`services/QuestionRag/pipelines/course_outline_generator.py` produces rich course outlines (description + 8–12 modules with 5 learning objectives each) from the embeddings stored in ChromaDB. It is the authoritative source for refreshing `courses.json` and for exporting per-course outline JSON files that downstream systems can consume.
 
-## Overview
-Course outlines are essential for educators but time-consuming to create manually, especially from legacy scanned PDFs. This pipeline:
-- Retrieves semantically relevant chunks filtered by metadata (e.g., course code, department, level).
-- Applies structured prompts to Gemini for coherent, markdown-formatted outputs.
-- Validates against Pydantic schemas (`course_model.py`, `course_outline.py`).
-- Supports batch generation for multiple courses from `data/courses.json`.
-- Integrates caching and load balancing for efficient, scalable processing.
+## What It Does
+- **Chroma-first retrieval** – scans metadata stored with embeddings to determine which courses are available and filters chunks by department, course code, and level.
+- **Structured prompting** – uses Gemini with deterministic prompts to generate markdown-ready outlines and validates the output with light schema checks.
+- **Subtopic refinement** – optional RAG pass refines each module to exactly five comprehensive learning objectives using additional embedding context.
+- **Resume-friendly orchestration** – caches which courses already have outlines, which are missing embeddings, and which encountered errors. Cache entries can have TTLs to force later reprocessing.
+- **courses.json integration** – updates the central catalog in place (with `.bak` backup) so question generation and other services can rely on up-to-date outlines.
+- **Bulk modes** – supports scanning every unique course folder present in Chroma or restricting work to a specific department.
 
-Key benefits:
-- Reduces manual effort by 80-90% for syllabus creation.
-- Ensures alignment with source materials via RAG.
-- Customizable for different disciplines (e.g., engineering, humanities) via prompt templates.
-- Resumable: Skips completed courses using progress trackers.
+## Components & Files
+| Role | Module / Path |
+| --- | --- |
+| Outline generation core | `GeminiQuestionGen` (same file) |
+| RAG retrieval | `ChromaQuery` & `MetaData` (`services/QuestionRag/utils/chromadb_query.py`) |
+| Course store | `CourseStore` (reads/writes `courses.json`, keeps `.bak`) |
+| Missing/present cache | `OutlineCache` → `OUTPUT_DATA2/cache/outline_cache_<DEPT>.json` |
+| Progress log | `OutlineProgress` → `OUTPUT_DATA2/cache/outline_progress_<DEPT>.json` |
+| Chroma-wide resume | `ChromaCourseProgress` → `CHROMA_OUT_DIR/chroma_progress.json` |
+| Per-course exports | `CHROMA_OUT_DIR/course_outline_<CODE>_<timestamp>.json` (default `OUTPUT_DATA2/cache/outlines_by_chroma`) |
 
-## Architecture
-1. **Input**: Embeddings in ChromaDB (from `convert_to_embeddings.py`), course metadata from `data/courses.json` or CLI args.
-2. **Retrieval**: `services/QuestionRag/utils/chromadb_query.py` performs hybrid search (semantic + keyword) with filters (e.g., `metadata['COURSE_CODE'] == 'EEE471'`).
-3. **Generation**: `services/QuestionRag/pipelines/course_outline_generator.py`:
-   - Loads prompts from `services/QuestionRag/resources/prompts_semiconductor-materials-and-properties.jsonl` (or custom).
-   - Calls Gemini via `gemini_service.py` with balanced keys.
-   - Structures output: Overview > Modules (Topics > Objectives > Activities) > Assessments > References.
-4. **Output**: Markdown files in `utils/course_outline/` (e.g., `course_outline_EEE471_20250922.md`), plus JSON for integration.
-5. **Caching**: Responses cached in `data/gemini_cache/`; metadata in `progress_store.py`.
-6. **Validation**: Uses `course_outline.py` to ensure completeness (e.g., all modules have objectives).
+## Execution Flow
+1. **Enumerate courses** – either by department code (`DepartmentRunner`) or via unique `COURSE_FOLDER` values found in Chroma (`ChromaCoursesRunner`).
+2. **Check caches** – skip courses that already have outline+description unless `--force-regenerate` is provided. Missing caches respect TTLs to avoid hammering empty datasets.
+3. **Retrieve context** – `ChromaQuery` runs hybrid semantic + lexical search and collects source IDs. When `allow_dept_fallback` is set, department-level material is used when course-specific hits are absent.
+4. **Generate outline** – prompts Gemini (thinking mode optional) and enforces a consistent structure (description, modules, sources). Subtopics are refined with extra RAG queries if enabled.
+5. **Persist** – writes back to `courses.json`, stores per-course JSON in `CHROMA_OUT_DIR`, and updates cache/progress manifests.
+6. **Delay** – pacing controls (`COURSE_DELAY_S`, `TOPIC_DELAY_S`) prevent overwhelming Gemini or Chroma.
 
-Dependencies:
-- ChromaDB collection (e.g., `pdfs_bge_m3_cloudflare`).
-- Gemini API keys.
-- Optional: Firestore for storing outlines (`firebase_service.py`).
+## Prerequisites
+- Up-to-date embeddings in ChromaDB (`convert_to_embeddings` pipeline) with metadata fields such as `DEPARTMENT`, `COURSE_FOLDER`, `LEVEL`, etc.
+- Gemini API keys configured (see `README_api_key_load_balancer.md`).
+- `courses.json` with basic course metadata (code, title, level) so generated outlines can be written back.
+- Optional: Firestore/other services if you extend the pipeline; current script writes locally only.
 
-## Usage
-### Prerequisites
-- Run embeddings pipeline first: See [Convert to Embeddings README](README_convert_to_embeddings.md).
-- Configure Gemini: Set `GOOGLE_API_KEY` or use load balancer.
-
-### CLI Command
-```
+## CLI Usage
+```bash
 python -m services.QuestionRag.pipelines.course_outline_generator [OPTIONS]
 ```
 
-#### Key Options
-- `--course-code STR`: Target course (e.g., "EEE471"). Required unless `--input-courses` used.
-- `--input-courses PATH`: JSON file with course list (e.g., `data/courses.json`). Batch mode.
-- `--collection STR`: Chroma collection name (default: "pdfs_bge_m3_cloudflare").
-- `--persist-dir PATH`: ChromaDB path (default: "chromadb_storage").
-- `--output-dir PATH`: Save outlines (default: "utils/course_outline").
-- `--top-k INT`: Retrieval chunks (default: 50; higher for comprehensive outlines).
-- `--prompt-file PATH`: Custom prompt JSONL (default: resources/prompts_...jsonl).
-- `--temperature FLOAT`: Gemini creativity (0.0-1.0; default 0.3 for structured output).
-- `--max-tokens INT`: Output length limit (default 4000).
-- `--workers INT`: Parallel generations (default 1; use with load balancer).
-- `--resume`: Skip completed courses.
-- `--with-firestore`: Upload to Firestore (requires config).
-- `--verbosity LEVEL`: Logging (debug/info/warn/error).
+| Flag | Description |
+| --- | --- |
+| `--scan_chroma_all / --no-scan_chroma_all` | Enumerate every course present in Chroma (default true). |
+| `--department_only` | Restrict processing to the department inferred from `--department_from`. |
+| `--department_from` | Seed course code used to derive the department prefix (e.g. `"EEE 315"` → `"EEE"`). |
+| `--courses_json` | Path to `courses.json` (defaults through `config.load_config()`). |
+| `--thinking` | Enable Gemini thinking model for richer outlines. |
+| `--variation` | Allow retrieval temperature / prompt variation for more diverse module coverage (default true). |
+| `--skip_existing` / `--no_skip_existing` | Skip courses that already have description + outline (default skip). |
+| `--allow_dept_fallback` | When a course lacks embeddings, fall back to department-level chunks instead of marking missing. |
+| `--missing_ttl_hours` | Expiration (hours) for missing-course cache markers when re-running departments. |
+| `--only_missing` | Process only courses currently flagged as missing (honours TTL). |
+| `--ignore_missing_cache` | Ignore cached missing flags and try again immediately. |
+| `--save_each_write` | Persist `courses.json`, cache, and progress after each course (default true). |
+| `--force_regenerate` | Rebuild outlines even if signatures match prior exports (Chroma scan mode). |
+| `--output_dir` | Directory for per-course JSON exports during Chroma scan (default `CHROMA_OUT_DIR`). |
+| `--dry_run` | Do retrieval, log hit counts, but do not call Gemini or write files. |
 
-#### Single Course Example
-```
-python -m services.QuestionRag.pipelines.course_outline_generator \
-  --course-code EEE471 \
-  --collection pdfs_bge_m3_cloudflare \
-  --persist-dir chromadb_storage \
-  --output-dir utils/course_outline \
-  --top-k 75 \
-  --temperature 0.2
-```
-Output: `utils/course_outline/course_outline_EEE471_YYYYMMDD_HHMMSS.md`
+### Command Examples
+- **Refresh every outlined course in Chroma (default mode):**
+  ```bash
+  python -m services.QuestionRag.pipelines.course_outline_generator --scan_chroma_all
+  ```
+- **Reprocess a single department with fallback to department-level embeddings:**
+  ```bash
+  python -m services.QuestionRag.pipelines.course_outline_generator \
+    --department_only \
+    --department_from "EEE 315" \
+    --allow_dept_fallback \
+    --missing_ttl_hours 24
+  ```
+- **Force regeneration for all courses regardless of cache:**
+  ```bash
+  python -m services.QuestionRag.pipelines.course_outline_generator \
+    --scan_chroma_all \
+    --force_regenerate \
+    --variation \
+    --thinking
+  ```
+- **Dry run to inspect retrieval coverage for a department:**
+  ```bash
+  python -m services.QuestionRag.pipelines.course_outline_generator \
+    --department_only \
+    --department_from "CVE 201" \
+    --dry_run \
+    --no_skip_existing
+  ```
 
-#### Batch Example (Multiple Courses)
-Populate `data/courses_batch.json`:
+## Output Structure
+- **courses.json** – updated in place with `description`, `outline`, and flattened `outline_sources` (a sorted list of chunk IDs).
+- **Outline cache** – `OUTPUT_DATA2/cache/outline_cache_<DEPT>.json` captures which courses have embeddings (`present`) or are missing (`missing`), including timestamps.
+- **Progress log** – `OUTPUT_DATA2/cache/outline_progress_<DEPT>.json` tracks status per course (`present`, `missing`, `error`, etc.) for visibility.
+- **Per-course JSON export** – under `CHROMA_OUT_DIR` (default `OUTPUT_DATA2/cache/outlines_by_chroma`), each outline is saved as `course_outline_<CODE>_<timestamp>.json` for external tooling.
+- **Backups** – the first run in a process writes `courses.json.bak` before modifying the file.
+
+### Sample Outline JSON
 ```json
-[
-  {"code": "EEE471", "department": "EEE", "level": "400"},
-  {"code": "MTH313", "department": "MTH", "level": "300"}
-]
-```
-```
-python -m services.QuestionRag.pipelines.course_outline_generator \
-  --input-courses data/courses_batch.json \
-  --workers 2 \
-  --resume
+{
+  "course": "EEE471",
+  "description": "Advanced DSP topics with emphasis on z-Transforms and filter design.",
+  "modules": [
+    {
+      "title": "Digital Signal Fundamentals",
+      "learning_objectives": [
+        "Explain discrete-time signal representations",
+        "Compare energy and power signals",
+        "Analyse sampling effects",
+        "Apply aliasing mitigation techniques",
+        "Relate time and frequency domain descriptions"
+      ],
+      "sources": ["EEE/400/1/EEE471/EEE471_textbook.pdf#chunk_42"]
+    }
+  ],
+  "sources": ["EEE/400/1/EEE471/EEE471_textbook.pdf#chunk_42", "..."]
+}
 ```
 
-### Programmatic Usage
+## Programmatic Usage
 ```python
-from services.QuestionRag.pipelines.course_outline_generator import generate_outline
+from pathlib import Path
+from services.QuestionRag.pipelines.course_outline_generator import GeminiQuestionGen
 
-outline = generate_outline(
+gen = GeminiQuestionGen(is_thinking=False)
+outline = gen.generate_outline_for_course(
+    course_title="Digital Signal Processing",
     course_code="EEE471",
-    collection="pdfs_bge_m3_cloudflare",
-    persist_dir="chromadb_storage",
-    top_k=50
+    department_code="EEE",
+    level="400",
+    department_str_for_prompt="Electrical Engineering",
+    variation=True,
+    allow_dept_fallback=True,
 )
-with open("outline.md", "w") as f:
-    f.write(outline)
+
+if outline:
+    # Persist or hand off to other services
+    print(outline["description"])
 ```
 
-## Prompt Engineering
-Prompts are JSONL files with templates like:
-```jsonl
-{"role": "system", "content": "You are an expert curriculum designer. Generate a detailed outline for {course_code} based on the provided chunks. Structure: # Title\n## Overview\n### Module 1: ...\n- Topics\n- Objectives\nEnsure alignment with engineering standards."}
-{"role": "user", "content": "Chunks: {retrieved_chunks}\nGenerate outline."}
-```
-- Customize for domains: Add Bloom's taxonomy levels, duration estimates, or rubrics.
-- Test prompts: Use `test_gemini_question_gen_cache.py` adapted for outlines.
-
-## Output Format
-Markdown structure:
-```
-# Course Outline: {COURSE_CODE} - {Title}
-
-## Course Information
-- **Code**: EEE471
-- **Department**: EEE
-- **Level**: 400
-- **Credits**: 3
-- **Prerequisites**: EEE313
-
-## Overview
-{Description from RAG synthesis}
-
-## Learning Modules
-### Module 1: Introduction to DSP (Weeks 1-3)
-- **Topics**: Signals, systems, Fourier analysis.
-- **Learning Objectives**:
-  - LO1: Define discrete-time signals (Bloom: Remember).
-  - LO2: Apply z-transforms to LTI systems (Bloom: Apply).
-- **Activities**: Lectures, MATLAB labs.
-- **Assessments**: Quiz 1 (10%).
-
-### Module 2: ...
-...
-
-## Assessments
-- Midterm: 30% (Topics 1-4)
-- Final Exam: 40%
-- Assignments: 20%
-- Participation: 10%
-
-## References
-- "Digital Signal Processing" by Proakis (EEE471_textbook.pdf, pages 1-50).
-- Lecture notes (EEE471_lectures.pdf).
-```
-- JSON export: Includes parsed sections for UI integration.
-
-## Integration
-- **With Question Generation**: Pipe outlines to `--input-outline` for targeted questions.
-- **With Firestore**: Store for web apps (`firebase_service.py`).
-- **With Courses Catalog**: Auto-generate from `data/courses.json` using `utils/courses.py`.
-- **Customization Hooks**: Override `get_retrieval_query(course)` in `course_outline_generator.py` for advanced filtering.
-
-## Testing and Validation
-- Unit Tests: `pytest tests/test_gemini_question_gen_cache.py` (adapt for outlines).
-- Integration: `test_chromadb_query.py` verifies retrieval.
-- Manual: Compare generated outline to source PDFs; check for hallucinations (low temperature helps).
-- Metrics: Coverage (e.g., % of modules with objectives), coherence score via secondary Gemini call.
+## Operational Notes
+- **Subtopic RAG** – controlled by `GEN_QG_SUBTOPIC_RAG` environment variable (on by default). When enabled, each topic triggers an extra retrieval pass to refine learning objectives.
+- **Chroma signatures** – `ChromaCoursesRunner` stores a signature (hashes, mtime counts) per course. If nothing changed, `--force_regenerate` is required to rebuild the outline.
+- **Pacing knobs** – `GEN_QG_COURSE_DELAY_S`, `GEN_QG_TOPIC_DELAY_S`, and `GEN_QG_QUERY_DELAY_S` manage throughput; values are pulled from `config.py` or env vars.
+- **Thinking mode** – `--thinking` swaps in the designated thinking model and uses `GEN_QG_THINK_BUDGET` tokens per request.
+- **Fallback strategy** – `allow_dept_fallback` is useful when course-specific PDFs are missing; it prevents gaps in `courses.json` while you work on ingestion gaps.
 
 ## Troubleshooting
-- **Poor Retrieval**: Increase `--top-k` or refine metadata filters in `path_meta.py`.
-- **Gemini Rate Limits**: Use load balancer; monitor `data/gemini_cache/api_key_cache.json`.
-- **Incomplete Outlines**: Adjust prompt for more structure; increase `--max-tokens`.
-- **Chroma Errors**: Ensure embeddings exist (`inspect_chroma.py`); check scalar metadata.
-- **Caching Issues**: Delete `data/gemini_cache/` and rerun with `--no-cache`.
-- **Logs**: Set `LOG_LEVEL=DEBUG` for query traces.
+- **“No embeddings” logs** – the course folder has no vectors. Run the embeddings pipeline or use `--allow_dept_fallback`.
+- **courses.json not updating** – ensure the script can write to the file; the process creates `.bak` and `.tmp` files next to it.
+- **Outline cache stuck** – delete `OUTPUT_DATA2/cache/outline_cache_<DEPT>.json` to clear state or use `--ignore_missing_cache`.
+- **Slow Chroma scans** – limit scope by department or by pre-filtering embeddings. The scan enumerates all metadata entries which can be large.
+- **Prompt drift** – use `--variation` to re-randomize when outlines feel repetitive; disable it for more deterministic results.
 
 ## Best Practices
-- Start with small `--top-k` (20) for testing, scale to 100+ for production.
-- Curate `data/courses.json` with accurate metadata for better filtering.
-- Review outputs manually initially; fine-tune prompts iteratively.
-- For large batches, monitor costs via billing ledger.
-- Version outlines with timestamps; use Git for tracking changes.
+- Schedule Chroma scans after large ingestion batches so new courses pick up outlines quickly.
+- Version control `courses.json` but ignore `OUTPUT_DATA2`—it contains runtime caches and should be mounted as a volume in production.
+- Monitor cache files; a high number of `missing` entries indicates upstream ingestion gaps.
+- Keep prompt templates under `services/QuestionRag/resources` consistent across environments for reproducibility.
 
-## Future Enhancements
-- Multi-language support (add tessdata for non-English).
-- Integration with LMS (e.g., Moodle export).
-- Auto-grading alignment for generated questions.
-- Visual diagrams in outlines (via PlantUML or Mermaid).
-
-This module transforms raw documents into structured educational blueprints, enabling rapid course development.
+The outline generator is the bridge between raw course materials and downstream artefacts (question generation, syllabi export, etc.). Keep the caches healthy, ensure embeddings stay fresh, and the pipeline will maintain accurate, classroom-ready outlines.

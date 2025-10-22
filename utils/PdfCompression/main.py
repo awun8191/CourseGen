@@ -295,7 +295,7 @@ def compress_pdf_with_pypdf(input_path: Path, output_path: Path) -> bool:
         writer = PdfWriter()
         for p in reader.pages:
             writer.add_page(p)
-        writer.compress_content_streams()
+        writer.compress_identical_objects()
         with open(output_path, "wb") as f:
             writer.write(f)
         return True
@@ -556,7 +556,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # PDF options
     p.add_argument("--pdf-method", choices=["ghostscript", "pypdf", "auto"], default="auto", help="PDF backend.")
-    p.add_argument("--pdf-resolution", type=int, default=120, help="Base target DPI for raster downsampling (GS).")
+    p.add_argument("--pdf-resolution", type=int, default=90, help="Base target DPI for raster downsampling (GS).")
     p.add_argument("--pdf-quality-base", type=int, default=85, help="JPEG quality when not image‑heavy (GS).")
     p.add_argument("--pdf-quality-image", type=int, default=90, help="JPEG quality when image‑heavy (GS).")
     p.add_argument("--pdf-image-threshold", type=float, default=0.50, help="Image‑heavy threshold ratio (0‑1).")
@@ -625,7 +625,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         mixed_quality=int(args.mixed_quality),
     )
 
-    pptx_cfg = PPTXConfig(image_quality=args.pptx_quality)
+    pptx_cfg = PPTXConfig(image_quality=args.typed_quality)
     run_cfg = RunConfig(
         input_path=input_path,
         output_folder=output_folder,
@@ -689,8 +689,4 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except Exception as e:
-        logger.exception("Fatal error: %s", e)
-        sys.exit(1)
+    main()

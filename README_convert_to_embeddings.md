@@ -1,248 +1,156 @@
-# Convert to Embeddings Pipeline in CourseGen
+# Convert-to-Embeddings Pipeline
 
-The `convert_to_embeddings.py` script is the core ingestion pipeline, transforming folders of PDFs (text-based or scanned) into searchable vector embeddings stored in ChromaDB. It handles OCR for non-extractable text, intelligent chunking, deduplication, metadata extraction, batch embedding, and resumable upserting. Designed for large-scale educational document processing (e.g., 1000+ PDFs), it emphasizes efficiency, cost tracking, and rich metadata for RAG applications.
+`services/RAG/convert_to_embeddings.py` converts large collections of PDFs into searchable vectors while capturing rich metadata, billing information, and resume state. It is opinionated around Cloudflare’s BGE-M3 embeddings and the CourseGen directory layout (`OUTPUT_DATA2`), but the code paths are modular enough for local experimentation.
 
-## Overview
-Processing legacy PDFs (e.g., scanned lecture notes, past questions) requires robust OCR and vectorization. This pipeline:
-- Recursively discovers PDFs/images.
-- Applies OCR with preprocessing (denoising, rotation) via Tesseract + OpenCV.
-- Chunks text semantically (paragraph-aware), deduplicates within/across files.
-- Extracts metadata (e.g., course code from path: "EEE/400/1/EEE471/file.pdf" → DEPARTMENT=EEE, LEVEL=400).
-- Embeds via Cloudflare BGE-M3 (or Ollama) in batches.
-- Upserts to persistent ChromaDB with scalar metadata.
-- Tracks progress, billing, and caches for resumability.
+## Highlights
+- **Auto-resume** – every run persists progress to `progress_state.json`; unfinished files are picked up automatically on the next invocation.
+- **Hybrid text extraction** – prefers native PDF text, falling back to Gemini OCR with optional EasyOCR hybrid mode when needed.
+- **Streaming embeddings** – chunks are deduped, embedded in controllable batches, and streamed straight to JSONL to avoid high memory usage.
+- **Chroma aware** – vectors are upserted into the configured Chroma collection immediately (can be skipped with `--no-chroma`).
+- **Cost visibility** – token counts feed `Billing` so estimated spend per file is recorded.
+- **Duplication control** – SHA-256 hashes keep per-run `seen_files.json` updated, preventing reprocessing the same binary.
 
-Key benefits:
-- Handles 10-50 PDFs/hour on modest hardware (multi-threaded).
-- 95%+ OCR accuracy with tuning.
-- Resumable: Interrupt and resume without reprocessing.
-- Cost-aware: Logs token usage (~$0.01-0.05 per PDF).
-- Metadata-rich: Enables filtered RAG (e.g., by semester/category).
+## Processing Flow
+1. **Discovery** – recursively walks `--input-dir`, skipping dot directories and non-PDF files.
+2. **Text extraction** – attempts direct text extraction via PyMuPDF; if insufficient text is detected or `--force-ocr` is set, delegates to `services/RAG/ocr_engine.ocr_pdf`.
+3. **Chunking & dedupe** – breaks text into 2-paragraph windows with sentence overlap (`chunk()`), then applies SHA1 + fuzzy dedup (`dedupe()`).
+4. **Embedding** – streams batches through Cloudflare’s BGE-M3 endpoint with adaptive batch sizes and token accounting; vectors are cached per chunk hash.
+5. **Export** – writes a per-PDF JSONL to the export directory and optionally upserts batches into Chroma (default) without loading the entire file into memory.
+6. **Progress update** – `progress_state.json` and `seen_files.json` are updated after each file, pairing with billing and cache directories to support restarts.
 
-## Architecture
-1. **Discovery**: Scans `--input-dir` recursively; filters PDFs/images.
-2. **OCR Engine** (`services/RAG/ocr_engine.py`):
-   - Detects text layer; falls back to OCR if missing/poor.
-   - Renders pages at DPI (300-600); detects rotation.
-   - Preprocesses: Grayscale, threshold, sharpen (OpenCV).
-   - Tesseract: PSM/OEM tuning; multi-page output.
-3. **Text Processing** (`chunking.py`, `utils/Remove Duplicates/remove_duplicates.py`):
-   - Splits into chunks (200-500 words, sentence boundaries).
-   - Dedups: SHA1 hashing + fuzzy matching (threshold 0.95).
-   - Cleans: Removes artifacts, normalizes whitespace.
-4. **Metadata Extraction** (`path_meta.py`, `metadata_extractor.py`):
-   - Parses paths for tags (DEPARTMENT, LEVEL, COURSE_CODE, etc.).
-   - PDF props: Title, creation/mod dates via PyMuPDF.
-   - Custom: "everytag" for universal chunks.
-5. **Embedding** (`cloudflare_service.py` or `ollama_service.py`):
-   - Batches chunks (≤96); embeds with BGE-M3 (1024 dim).
-   - Caches vectors by chunk hash.
-6. **Storage** (`chroma_store.py`):
-   - Exports JSONL to `--export-dir` (one file per PDF).
-   - Upserts to Chroma collection (`--collection`); persists to `--persist-dir`.
-   - Handles metadata as scalars (JSON-encodes lists/objects).
-7. **Tracking** (`progress_store.py`, `billing.py`):
-   - `progress_state.json`: File status (processed, embedded).
-   - `seen_files.json`: Global dedup.
-   - Billing: Tokens/costs per batch/file.
+## Prerequisites
+- Python dependencies from `requirements.txt` (PyMuPDF, Pillow, requests, numpy, opencv-python (optional), EasyOCR (optional), google-genai (for Gemini OCR)).
+- Environment variables:
+  - `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (required for embeddings).
+  - Optional Cloudflare tuning: `CF_EMBED_MAX_BATCH`, `CF_EMBED_MAX_TOKENS`, `CF_EMBED_MIN_BATCH`.
+  - OCR tuning: `OCR_LANG`, `OCR_ENGINE` (`gemini` \| `hybrid` \| `easyocr`), `OCR_GEMINI_FALLBACK_ENGINE`, `EASYOCR_GPU`, `OCR_MAX_IMAGE_BYTES`.
+  - Storage overrides: `COURSEGEN_OUTPUT_ROOT`, `COURSEGEN_CACHE_ROOT`.
+- Tesseract is **not** required for the default Gemini/EasyOCR flows, but can be used if you extend the OCR engine.
 
-Dependencies:
-- PyMuPDF (PDF handling), pytesseract, opencv-python.
-- Cloudflare Workers AI or Ollama.
-- ChromaDB (persistent mode).
+## Default Paths
+When environment overrides are not supplied, directories are rooted at `<repo>/OUTPUT_DATA2`:
+- Export JSONL + progress: `OUTPUT_DATA2/progress_report`
+- Cache (OCR artifacts, temporary text, failed payloads): `OUTPUT_DATA2/cache`
+- Chroma persistence: `OUTPUT_DATA2/emdeddings` (mounted volume in containers)
+- Billing state: `<persist-dir>/billing_state.json`
+- Dedup index: `<persist-dir>/seen_files.json`
 
-## Usage
-### Prerequisites
-- Install: `pip install -r requirements.txt`.
-- Tesseract: Install binary; set `TESSDATA_PREFIX`.
-- Secrets: Cloudflare env vars for embeddings.
-
-### CLI Command
-```
-python -m services.RAG.convert_to_embeddings [OPTIONS]
+## CLI Usage
+```bash
+python -m services.RAG.convert_to_embeddings --input-dir <PDF_ROOT> [options]
 ```
 
-#### Core Options
-- `-i, --input-dir PATH`: Root folder (recursive PDFs; required).
-- `--export-dir PATH`: JSONL outputs + progress (default "data/exported_data").
-- `--cache-dir PATH`: OCR/embed caches (default "data/ocr_cache").
-- `-c, --collection STR`: Chroma name (default "pdfs_bge_m3_cloudflare").
-- `-p, --persist-dir PATH`: Chroma path (default "chromadb_storage").
-- `--workers INT`: Parallel files (default 1; max CPU cores).
-- `--omp-threads INT`: OCR threads (default 4).
-- `--resume`: Skip completed (uses mtime/size; default false).
-- `--with-chroma`: Upsert to DB (default true).
-- `--force-ocr`: OCR all PDFs (ignore text layer).
-- `--dry-run`: Simulate without processing.
+### Frequently Used Flags
+| Flag | Description |
+| --- | --- |
+| `-i / --input-dir` | **Required.** Root directory containing PDFs (traversed recursively). |
+| `--export-dir` | Where JSONL + progress files live (default `OUTPUT_DATA2/progress_report`). |
+| `--cache-dir` | OCR + text cache root (default `OUTPUT_DATA2/cache`). |
+| `--with-chroma` / `--no-chroma` | Toggle Chroma upserts (default on). |
+| `-c / --collection` | Chroma collection name (default `course_embeddings`). |
+| `-p / --persist-dir` | Chroma persistence directory (default `OUTPUT_DATA2/emdeddings`). |
+| `--workers` | ProcessPool workers for PDF processing (default 2). |
+| `--omp-threads` | OpenMP threads exposed to OCR libraries (default 2). |
+| `--timeout` | Per-file processing timeout in seconds (default 1800). |
+| `--max-pdfs` | Limit number of files processed from the discovery list (0 = all). |
+| `--embed-batch` | Initial embedding batch size (bounded by `CF_EMBED_MAX_BATCH`, default 16). |
+| `--ocr-dpi` | Render DPI when OCR is needed (default 200). |
+| `--ocr-lang` | Language hint passed to OCR (`en` by default). |
+| `--engine` | OCR engine preference (`gemini`, `hybrid`, `easyocr`; default `gemini`). |
+| `--ocr-fallback-engine` | Local fallback used when Gemini returns empty text (`easyocr` or `hybrid`). |
+| `--no-gemini-fallback` | Disable automatic local OCR fallback. |
+| `--force-ocr` | Skip native text extraction even if the PDF has a text layer. |
+| `--memory-limit` | Soft limit in MB for worker processes (0 = disabled). |
+| `--retry-limit` | Max retry attempts per file (default 3). |
 
-#### OCR Options
-- `--tesseract-cmd PATH`: Tesseract exe (auto-detect if unset).
-- `--ocr-on-missing STR`: fallback/error/skip (default fallback).
-- `--ocr-dpi INT`: Render DPI (300/450/600; default 300).
-- `--ocr-psm INT`: Segmentation (3=auto,6=block; default 6).
-- `--ocr-oem INT`: Engine (1=LSTM; default 1).
-- `--ocr-extra-config STR`: e.g., "tessedit_char_whitelist=0123456789" (default none).
-- `--ocr-rotate`: Auto-rotation (default false).
-- `--ocr-preprocess`: OpenCV denoise/threshold (default false).
-- `--ocr-log-every INT`: Log progress every N pages (default 10).
+> Resume mode is always on. Deleting `progress_state.json` is the quickest way to restart a directory from scratch.
 
-#### Embedding/Billing Options
-- `--embed-provider STR`: cloudflare/ollama (default cloudflare).
-- `--embed-model STR`: e.g., "@cf/baai/bge-m3" (default).
-- `--batch-size INT`: Chunks per embed call (≤96; default 50).
-- `--billing-enabled`: Track costs (default true).
-- `--price-per-m-tokens FLOAT`: Provider rate (default 0.02 USD).
-- `--rebase-billing`: Recalculate historical costs.
+### Command Examples
+- **Standard run with Chroma upserts:**
+  ```bash
+  python -m services.RAG.convert_to_embeddings \
+    -i data/textbooks/EEE/400/1 \
+    --export-dir OUTPUT_DATA2/progress_report \
+    --cache-dir OUTPUT_DATA2/cache \
+    --collection pdfs_bge_m3_cloudflare \
+    --persist-dir OUTPUT_DATA2/emdeddings \
+    --workers 4 \
+    --embed-batch 32
+  ```
+- **OCR-heavy archive (high DPI, Gemini + EasyOCR hybrid):**
+  ```bash
+  python -m services.RAG.convert_to_embeddings \
+    -i data/textbooks/scanned \
+    --force-ocr \
+    --ocr-dpi 450 \
+    --engine hybrid \
+    --ocr-fallback-engine easyocr \
+    --workers 2 \
+    --embed-batch 16
+  ```
+- **Dry run on a limited subset:**
+  ```bash
+  python -m services.RAG.convert_to_embeddings \
+    -i data/textbooks/sample \
+    --max-pdfs 5 \
+    --no-chroma
+  ```
 
-#### Advanced
-- `--chunk-size INT`: Max words/chunk (default 400).
-- `--chunk-overlap INT`: Overlap words (default 50).
-- `--dedup-threshold FLOAT`: Fuzzy dedup sim (0.0-1.0; default 0.95).
-- `--metadata-tags FILE`: Custom tag mapping JSON.
-- `--filter-ext LIST`: e.g., ["pdf", "pptx"] (default pdf).
-- `--verbosity LEVEL`: Logging level.
+## Output Artifacts
+- **Per-PDF JSONL** – e.g. `OUTPUT_DATA2/progress_report/<stem>.jsonl.tmp` during processing, archived to `<stem>.jsonl` on completion.
+- **Chroma** – vectors immediately upserted to the target collection (if enabled).
+- **Progress files** – `progress_state.json` tracks file status (`pending`, `in_progress`, `completed`, `failed`, `skipped`); includes timing, chunk counts, duplicate counts, and Chroma status.
+- **Billing** – `billing_state.json` accumulates total tokens and cost estimates per file.
+- **Seen files** – `seen_files.json` stores SHA-256 prefixes to prevent duplicate ingestion.
+- **Cache** – OCR intermediates, text snapshots, and per-chunk embedding caches live under `cache_dir`.
 
-### Examples
-#### Basic Single Run
-```
-python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/COMPILATION/EEE/400/1 \
-  --export-dir data/exported_data \
-  --cache-dir data/ocr_cache \
-  --collection pdfs_bge_m3_cloudflare \
-  --persist-dir chromadb_storage \
-  --workers 4 \
-  --resume \
-  --ocr-dpi 450 \
-  --ocr-rotate \
-  --ocr-preprocess
-```
-
-#### High-Quality OCR for Scanned PDFs
-```
-python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/scanned \
-  --force-ocr \
-  --ocr-dpi 600 \
-  --ocr-psm 6 \
-  --ocr-oem 1 \
-  --ocr-extra-config "preserve_interword_spaces=1" \
-  --workers 2  # Lower for high DPI
-```
-
-#### Resume Interrupted Run
-After Ctrl+C, rerun same command with `--resume`; skips done files.
-
-#### Inspect Output
-```
-python services/RAG/inspect_chroma.py -c pdfs_bge_m3_cloudflare -p chromadb_storage --query "z-transform"
-```
-
-### Programmatic Usage
-```python
-from services.RAG.convert_to_embeddings import process_directory
-
-results = process_directory(
-    input_dir="data/textbooks/EEE",
-    export_dir="data/exported_data",
-    collection="pdfs_bge_m3_cloudflare",
-    persist_dir="chromadb_storage",
-    workers=4,
-    resume=True
-)
-print(f"Processed {results['files']}, embedded {results['chunks']} chunks")
-```
-
-## Output Schema
-### JSONL Files (Per PDF)
-`data/exported_data/EEE471_textbook.jsonl`:
+### Sample `progress_state.json` record
 ```json
 {
-  "id": "chunk_sha1_hash",
-  "text": "The z-transform is defined as Z{x[n]} = sum x[n] z^-n ...",
-  "metadata": {
-    "path": "EEE/400/1/EEE471/EEE471_textbook.pdf",
-    "abs_path": "/full/path/to/file.pdf",
-    "ext": ".pdf",
-    "file_size": 2457600,
-    "file_mtime": 1695286400,
-    "chunk_index": 12,
-    "total_chunks_in_doc": 150,
-    "file_hash": "sha1_of_pdf",
-    "chunk_hash": "sha1_of_text",
-    "DEPARTMENT": "EEE",
-    "LEVEL": "400",
-    "SEMESTER": "1",
-    "CATEGORY": "TEXTBOOK",
-    "COURSE_CODE": "EEE471",
-    "COURSE_NUMBER": "471",
-    "SUBCATEGORY": "",
-    "FILENAME": "EEE471_textbook.pdf",
-    "STEM": "EEE471_textbook",
-    "GROUP_KEY": "EEE_400_1",
-    "pdf_title": "Digital Signal Processing Notes",
-    "pdf_creation_date": "2023-01-15",
-    "pdf_modification_date": "2023-09-10",
-    "processing_method": "ocr",
-    "page_count": 120,
-    "word_count": 35000,
-    "is_duplicate": false,
-    "duplicate_of_index": null,
-    "everytag": false
-  },
-  "embedding": [0.123, -0.456, ..., 0.789],  // 1024 floats
-  "embedding_type": "cloudflare-bge-m3"
+  "files": {
+    "/abs/path/EEE471_textbook.pdf": {
+      "status": "completed",
+      "jsonl_name": "EEE471_textbook.jsonl",
+      "jsonl_archived": true,
+      "chroma_upserted": true,
+      "chunks": 152,
+      "duplicates": 12,
+      "file_size": 5242880,
+      "file_mtime": 1716400000,
+      "discovered_at": "2024-05-14T20:12:52+00:00",
+      "started_at": "2024-05-14T20:13:05+00:00",
+      "finished_at": "2024-05-14T20:17:41+00:00"
+    }
+  }
 }
 ```
 
-### Progress Files
-- `progress_state.json`: {"files": [{"path": "...", "status": "embedded", "chunk_count": 150}]}
-- `billing_state.json`: Cumulative tokens/costs.
-- `seen_files.json`: Global dedup hashes.
+## Resume Behaviour
+- Discoveries append to `progress_state.json` immediately, so ctrl+c mid-scan still records status.
+- Completed files are marked `skipped` on subsequent runs unless the size/mtime changes.
+- Failed Chroma upserts are retried the next time the script runs with `--with-chroma`, using existing JSONL files instead of reprocessing the PDF.
+- Duplicates (based on SHA-256 prefix) are tagged `file_duplicate` and skipped gracefully.
 
-## Performance Tuning
-- **Workers/Threads**: `--workers=CPU cores`, `--omp-threads=2-4` (balance I/O vs. CPU).
-- **DPI Tradeoff**: 300 fast/accurate for text; 600 slow/better for handwriting.
-- **Batch Size**: 50-96 for embeddings; monitor Cloudflare limits.
-- **Memory**: 4-8GB for 10+ workers; use `--workers=1` for low RAM.
-- **Resume Safety**: Relies on file mtime/size; avoid editing inputs mid-run.
-
-Benchmark: 50-page PDF @450 DPI: ~2-5 min (OCR+embed).
-
-## Testing and Validation
-- **Sanity Check**: `python run_ocr_sanity.py data/textbooks/.../file.pdf` (single file OCR).
-- **Unit Tests**: `pytest tests/test_chroma_revive.py`, `test_batch_utils.py`.
-- **Integration**: Process sample dir; query Chroma for recall.
-- **OCR Quality**: Compare output to ground truth; tune PSM/DPI.
-- **Deduplication**: Check `is_duplicate` flags; adjust threshold.
+## Performance Tuning Tips
+- **Workers vs. OCR** – high DPI OCR is CPU-intensive; keep `--workers` low (1–2) when using 450–600 DPI to avoid thrashing.
+- **Embedding batch size** – the script halves the batch on Cloudflare errors and ramps up when stable. Start with a moderate size (16–32) and tweak env vars to raise or lower the ceiling.
+- **OMP threads** – adjust `--omp-threads` to match available CPU cores; the script exports the value as `OMP_NUM_THREADS`.
+- **Timeouts** – use `--timeout` to prevent pathological files from hanging the pool (default 30 minutes per file).
 
 ## Troubleshooting
-- **Tesseract Not Found**: Set `--tesseract-cmd` and `TESSDATA_PREFIX`; verify `eng.traineddata`.
-- **Poor OCR**: Enable `--ocr-preprocess --ocr-rotate`; try PSM=3/4/6; higher DPI.
-- **Cloudflare Errors**: Check `CLOUDFLARE_ACCOUNT_ID/API_TOKEN`; reduce batch size.
-- **Chroma Metadata Issues**: Ensure scalars; pipeline auto-JSON-encodes.
-- **Out of Memory**: Lower `--workers`, DPI, or batch size.
-- **Resume Fails**: Delete corrupted `progress_state.json`; rerun without `--resume`.
-- **No Embeddings**: Verify provider creds; fallback to Ollama.
-- **Logs**: `run_logs/latest_run.log`; set `OCR_LOG_EVERY=1` for verbose.
+- **Missing text** – verify `--engine` and `--ocr-fallback-engine`; set `--force-ocr` if PDFs have broken text layers.
+- **Gemini OCR API errors** – network hiccups or quota issues bubble up as `processing_error`; the retry mechanism attempts three times before marking the file failed.
+- **Cloudflare rate limiting** – errors are logged and batch sizes shrink automatically; ensure account limits (`CF_EMBED_MAX_BATCH`, `CF_EMBED_MAX_TOKENS`) align with workload.
+- **Progress file corruption** – delete `progress_state.json` (or specific entries) to restart; resume safety depends on this file being writable.
+- **No vectors in Chroma** – confirm `--with-chroma` flag, collection name, and that the Chroma server can be created in the persist directory.
+- **Out-of-memory** – reduce `--workers`, lower DPI, or raise `OCR_MAX_IMAGE_BYTES` only when necessary.
 
-Common Errors:
-- "Language data not found": Fix `TESSDATA_PREFIX`.
-- "Batch too large": Set `CF_EMBED_MAX_BATCH=50`.
-- "Duplicate chunks": Tune `--dedup-threshold=0.98`.
+## Integrations
+- After ingestion, query Chroma with `services/RAG/inspect_chroma.py` to verify recall:
+  ```bash
+  python services/RAG/inspect_chroma.py -c pdfs_bge_m3_cloudflare -p OUTPUT_DATA2/emdeddings --query "z-transform"
+  ```
+- Downstream services (question generation, outline generation) expect consistent metadata keys (`DEPARTMENT`, `LEVEL`, `COURSE_CODE`, etc.) provided by `path_meta.parse_path_meta`.
+- The `Billing` log can be exported into monitoring dashboards or reconciled with Cloudflare usage for budgeting.
 
-## Best Practices
-- **Input Prep**: Organize folders by metadata (e.g., EEE/400/1/COURSE/file.pdf) for auto-tagging.
-- **Quality Control**: Spot-check OCR on 5% of files; preprocess noisy scans.
-- **Cost Management**: Run with `--billing-enabled`; rebase prices periodically.
-- **Storage**: Use SSD for `--persist-dir`; backup Chroma periodically.
-- **Everytag**: Set true only for universal docs (e.g., safety manuals); avoid overuse.
-- **Updates**: After new PDFs, run with `--resume` to append.
-
-## Future Enhancements
-- Multi-format support (PPTX, DOCX via converters).
-- Advanced chunking (semantic via embeddings).
-- Distributed processing (Ray/Celery).
-- Auto-metadata from content (NLP tagging).
-
-This pipeline is the backbone of CourseGen, enabling all downstream RAG features with high fidelity.
+The convert-to-embeddings pipeline is designed for unattended ingestion jobs—mount the `OUTPUT_DATA2` tree in production environments so billing, progress, and caches persist across container runs.
