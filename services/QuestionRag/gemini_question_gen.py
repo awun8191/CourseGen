@@ -103,7 +103,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Generate outlines or questions using Gemini and RAG.")
     parser.add_argument("--generate-questions", action="store_true", help="Run question generation instead of outlines")
-    parser.add_argument("--difficulty", choices=["easy", "medium", "hard"], default="medium", help="Difficulty level for questions")
+    parser.add_argument("--difficulty", choices=["easy", "medium", "hard"], default="easy", help="Difficulty level for questions")
     parser.add_argument("--dry-run", action="store_true", help="Dry run without API calls")
     parser.add_argument("--department_from", help='For outlines: e.g. "EEE 315"')
     # Add other outline args if needed, but pass unknown to outline_main
