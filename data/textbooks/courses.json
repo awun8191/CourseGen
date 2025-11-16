@@ -2947,7 +2947,184 @@
     "semesters": [
       "FIRST"
     ],
-    "is_elective": false
+    "is_elective": false,
+    "description": "CHE 311 is a foundational course in chemical engineering focusing on material and energy balances, essential for analyzing chemical processes. Students will learn to apply fundamental principles to solve complex engineering problems, including those involving multiple units, chemical reactions, and recycle streams. The course emphasizes problem-solving strategies, dimensional consistency, and the use of software tools alongside traditional calculation methods, preparing students for advanced chemical engineering coursework and professional practice.",
+    "outline": [
+      {
+        "title": "Introduction to Chemical Engineering & Dimensional Analysis",
+        "subtopics": [
+          "Apply dimensional analysis techniques to verify the consistency of equations and identify potential errors in chemical engineering calculations involving mass, energy, and momentum transfer.",
+          "Analyze complex engineering problems and formulate them into solvable material and energy balance equations, utilizing appropriate unit conversions and system definitions.",
+          "Evaluate the impact of different unit systems (e.g., SI, English) on calculation results and implement conversions to ensure accurate and comparable data analysis in chemical processes.",
+          "Design and interpret factor-label methods for solving multi-step conversion problems, demonstrating proficiency in manipulating units to obtain desired results with specified precision.",
+          "Construct and utilize dimensionless groups (e.g., Reynolds number, Froude number) to characterize fluid flow and heat transfer phenomena, and predict system behavior based on similarity principles."
+        ],
+        "sources": [
+          "S2",
+          "S15",
+          "S16"
+        ]
+      },
+      {
+        "title": "Material Balances: General Concepts & Strategies",
+        "subtopics": [
+          "Apply the general conservation of mass principle to analyze and solve material balance problems for both steady-state and unsteady-state processes, including systems with and without chemical reaction, demonstrating proficiency in defining system boundaries and accumulation terms.",
+          "Design and implement appropriate problem-solving strategies for material balance calculations involving multiple units and recycle streams, utilizing flowcharts and component balances to determine unknown process variables with at least 80% accuracy.",
+          "Evaluate the impact of different unit operations (e.g., mixing, separation, reaction) on material balance equations, and select the appropriate balance equations based on process conditions and available data.",
+          "Construct and interpret material balance diagrams for complex chemical processes, accurately representing process streams, unit operations, and key process variables, and identifying potential sources of error in balance calculations.",
+          "Differentiate between various methods for handling byproducts and waste streams in material balance calculations, and quantitatively assess the environmental impact of process inefficiencies based on material balance results."
+        ],
+        "sources": [
+          "S11",
+          "S13",
+          "S2"
+        ]
+      },
+      {
+        "title": "Material Balances Without Chemical Reaction",
+        "subtopics": [
+          "Apply the principles of mass balances to analyze steady-state processes involving multiple unit operations without chemical reaction, calculating unknown process streams given sufficient independent equations.",
+          "Design and implement material balance calculations for systems with recycle streams, utilizing appropriate techniques to solve for stream compositions and flow rates, demonstrating understanding of the impact of recycle on overall process performance.",
+          "Evaluate the validity of assumptions made during material balance calculations, such as constant density and complete mixing, and quantify the potential error introduced by these simplifications in real-world chemical processes.",
+          "Construct and interpret process flow diagrams (PFDs) to visually represent material flow in a chemical process, and utilize these diagrams to formulate material balance equations for component and overall mass balances.",
+          "Solve complex material balance problems involving distributed systems and variable flow rates by applying appropriate integration techniques and demonstrating proficiency in handling systems with limited mixing."
+        ],
+        "sources": [
+          "S2",
+          "S7"
+        ]
+      },
+      {
+        "title": "Material Balances Involving Chemical Reactions",
+        "subtopics": [
+          "Apply the principles of material balances to systems involving stoichiometric reactions, including limiting reactants and excess reactants, to quantitatively determine the required feed rates and product distributions for a given chemical process.",
+          "Analyze chemical reaction systems with multiple reactions occurring simultaneously, utilizing extent of reaction and component balances to calculate equilibrium compositions and conversions.",
+          "Design and implement a systematic approach for solving material balance problems involving recycle streams and chemical reactions, accounting for potential buildup or depletion of components within the recycle loop.",
+          "Evaluate the impact of reaction selectivity and conversion on the overall material balance of a chemical process, and interpret the results to optimize process performance and minimize waste generation.",
+          "Construct and interpret material balance tables for complex chemical processes with multiple unit operations and chemical reactions, demonstrating proficiency in handling variable conversion and component distributions."
+        ],
+        "sources": [
+          "S5",
+          "S7"
+        ]
+      },
+      {
+        "title": "Degrees of Freedom Analysis",
+        "subtopics": [
+          "Analyze chemical processes with multiple components and reactions to determine the number of independent variables (degrees of freedom) required for a complete specification of the system using principles of material and energy balances.",
+          "Evaluate the consistency of process data by applying degrees of freedom analysis, identifying potential errors or redundancies in provided information for systems involving stoichiometric relationships and phase equilibrium.",
+          "Design and implement a systematic approach to degrees of freedom analysis, including the identification of known and unknown variables, the formulation of independent equations, and the application of the general degrees of freedom equation (F = N - E).",
+          "Apply degrees of freedom analysis to solve problems involving recycle streams, bypass streams, and chemical reactions, demonstrating the ability to account for complex process configurations and constraints.",
+          "Interpret the results of degrees of freedom analysis to determine the minimum amount of additional information needed to uniquely define a chemical engineering system, and justify the selection of appropriate variables for process control and optimization."
+        ],
+        "sources": [
+          "S7",
+          "S11",
+          "S13"
+        ]
+      },
+      {
+        "title": "Energy Balances: Fundamentals & Concepts",
+        "subtopics": [
+          "Apply the First Law of Thermodynamics to analyze energy transfer as heat and work for closed and open systems, quantitatively determining changes in internal energy and enthalpy for various chemical engineering processes.",
+          "Construct and utilize energy balances, including terms for heat transfer, work, and changes in kinetic and potential energy, to evaluate the steady-state energy requirements of simple control volumes such as mixers, heat exchangers, and pumps.",
+          "Interpret and utilize property data, including specific heat capacities, enthalpies of formation, and phase transition enthalpies, to calculate energy changes associated with chemical and physical transformations in chemical processes.",
+          "Differentiate between adiabatic and isothermal processes and assess their impact on energy balance calculations, predicting temperature changes and energy transfer rates under these conditions.",
+          "Evaluate the limitations of ideal gas assumptions in energy balance calculations and implement appropriate corrections for real gas behavior using compressibility factors and other relevant thermodynamic properties."
+        ],
+        "sources": [
+          "S12",
+          "S2"
+        ]
+      },
+      {
+        "title": "Energy Balances: Applications & Calculations",
+        "subtopics": [
+          "Apply energy balance principles to analyze steady-state processes involving multiple energy streams, including heat transfer, work, and phase changes, and quantitatively determine unknown temperatures, heat duties, or flow rates with at least 80% accuracy.",
+          "Design and evaluate the energy efficiency of simple chemical processes, such as mixing, heating, and cooling operations, by performing energy balances and identifying potential areas for energy recovery or minimization of energy consumption.",
+          "Implement appropriate thermodynamic property data and correlations (e.g., heat capacities, enthalpy of vaporization) from steam tables and other sources to accurately calculate energy transfer in various chemical engineering systems.",
+          "Analyze open and closed systems undergoing transient processes, applying the energy balance equation to determine temperature changes over time and evaluate the impact of varying process conditions on energy storage and transfer.",
+          "Evaluate the limitations of ideal gas and liquid assumptions in energy balance calculations and determine when more rigorous approaches, such as using real fluid properties or accounting for non-ideal mixing, are necessary to achieve accurate results."
+        ],
+        "sources": [
+          "S12",
+          "S2"
+        ]
+      },
+      {
+        "title": "Material Balance Problems Involving Multiple Units",
+        "subtopics": [
+          "Apply the principles of material balances to analyze complex chemical processes consisting of multiple interconnected unit operations, accurately determining unknown process streams given specified input and output conditions.",
+          "Design and implement a systematic approach for solving material balance problems involving recycle streams, purge streams, and split streams within multi-unit processes, demonstrating proficiency in handling both steady-state and unsteady-state scenarios.",
+          "Evaluate the impact of different process configurations (e.g., series, parallel, bypass) on overall material balance calculations, quantitatively assessing the effect of changes in operating conditions on product yields and waste generation.",
+          "Construct and interpret degree-of-freedom analysis for multi-unit processes to determine the minimum amount of information required for a unique solution, identifying potential redundancies or inconsistencies in process data.",
+          "Solve material balance problems involving chemical reactions occurring within multiple units, utilizing stoichiometric relationships and conversion factors to accurately quantify the composition of process streams and reactor performance."
+        ],
+        "sources": [
+          "S3",
+          "S7"
+        ]
+      },
+      {
+        "title": "Introduction to Process Simulation & Software Tools",
+        "subtopics": [
+          "Apply fundamental chemical engineering principles, including material and energy balances, phase equilibrium, and reaction kinetics, to formulate mathematical models of simple chemical processes suitable for simulation.",
+          "Evaluate the strengths and weaknesses of different process simulation software tools (e.g., Aspen Plus, CHECAD) based on their capabilities for modeling specific unit operations and process types.",
+          "Design and implement a process simulation model for a given chemical process, including selecting appropriate thermodynamic models, specifying component properties, and defining process flowsheets.",
+          "Analyze simulation results to identify potential process bottlenecks, optimize operating conditions, and assess the impact of changes in process parameters on key performance indicators.",
+          "Interpret simulation outputs, including sensitivity analyses and convergence reports, to troubleshoot modeling errors and validate the accuracy of process simulation models against expected behavior or experimental data."
+        ],
+        "sources": [
+          "S1",
+          "S6"
+        ]
+      },
+      {
+        "title": "Data Sources & Professional Resources",
+        "subtopics": [
+          "Identify and differentiate between primary and secondary data sources commonly utilized in chemical engineering, specifically evaluating the relevance of textbooks like Himmelblau’s ‘Basic Principles and Calculations in Chemical Engineering’ (7th & 5th editions) and industry-specific resources such as ‘C & R Chemical Engineering Design’ for solving complex process design problems.",
+          "Analyze the scope and limitations of various chemical engineering handbooks and databases to effectively locate property data, process parameters, and equipment specifications required for preliminary design calculations and process simulations.",
+          "Evaluate the credibility and reliability of information obtained from diverse sources, including academic publications, professional organizations, and online databases, applying critical thinking skills to assess data accuracy and potential biases in chemical engineering applications.",
+          "Design a comprehensive literature search strategy utilizing relevant keywords and databases to gather information on a specific chemical process or unit operation, documenting the search process and evaluating the quality of retrieved resources.",
+          "Implement appropriate citation methods and referencing techniques for chemical engineering literature, demonstrating adherence to professional standards and avoiding plagiarism when compiling reports, designs, and research papers based on information from multiple data sources."
+        ],
+        "sources": [
+          "S5",
+          "S9",
+          "S10"
+        ]
+      },
+      {
+        "title": "Problem Solving Strategies & Verification",
+        "subtopics": [
+          "Apply systematic problem-solving methodologies, including material and energy balances, to analyze and quantitatively solve complex chemical engineering problems presented in diverse formats.",
+          "Evaluate the validity of solutions obtained for chemical engineering problems by performing dimensional analysis, order-of-magnitude estimations, and consistency checks to verify reasonableness and identify potential errors.",
+          "Design and implement appropriate solution strategies for problems involving multiple units and interconnected processes, demonstrating proficiency in process flow diagrams and equation formulation.",
+          "Interpret and utilize provided problem solutions, identifying key assumptions, limitations, and alternative approaches to enhance understanding and problem-solving skills.",
+          "Construct and utilize sensitivity analyses to assess the impact of variations in input parameters on solution accuracy and process performance, demonstrating an understanding of error propagation and uncertainty."
+        ],
+        "sources": [
+          "S14",
+          "S2"
+        ]
+      }
+    ],
+    "outline_sources": [
+      "S1",
+      "S10",
+      "S11",
+      "S12",
+      "S13",
+      "S14",
+      "S15",
+      "S16",
+      "S2",
+      "S3",
+      "S5",
+      "S6",
+      "S7",
+      "S9"
+    ]
   },
   {
     "code": "CHE 312",
@@ -2979,7 +3156,192 @@
     "semesters": [
       "FIRST"
     ],
-    "is_elective": false
+    "is_elective": false,
+    "description": "CHE 313, Transport Phenomena I: Fluid Flow, is a foundational course in chemical engineering focusing on the principles governing fluid behavior and transport. This course provides a comprehensive understanding of fluid statics, dynamics, and the application of these principles to the design and analysis of chemical engineering processes. Students will learn to apply fundamental concepts like density, viscosity, and pressure, alongside dimensional analysis, to solve practical problems related to fluid flow in pipes, channels, and around immersed bodies, as well as fluid metering techniques.",
+    "outline": [
+      {
+        "title": "Introduction to Fluid Properties and Behavior",
+        "subtopics": [
+          "Apply principles of fluid statics to calculate pressure variations within fluid systems, including utilizing manometers and accounting for fluid density differences, achieving at least 80% accuracy on related problem sets.",
+          "Analyze the relationship between fluid properties (density, viscosity, surface tension) and their impact on fluid behavior in static and dynamic conditions, demonstrating understanding through the interpretation of experimental data and case studies.",
+          "Evaluate the application of unit operations principles to fluid flow measurement, specifically designing and assessing the performance of orifice metering systems based on Bernoulli's equation and discharge coefficients.",
+          "Implement problem-solving strategies to determine fluid forces acting on submerged surfaces, including calculating hydrostatic forces and centers of pressure for various geometries with a minimum of 75% correctness.",
+          "Differentiate between various fluid behaviors (ideal vs. real fluids, Newtonian vs. non-Newtonian fluids) and predict their response to applied stresses, justifying selections with supporting theoretical concepts from transport phenomena."
+        ],
+        "sources": [
+          "S3",
+          "S9",
+          "S15"
+        ]
+      },
+      {
+        "title": "Fluid Statics and Pressure",
+        "subtopics": [
+          "Apply the principles of fluid statics to calculate pressure variations within fluids at rest, including hydrostatic pressure and its dependence on depth and fluid density, solving problems involving multiple immiscible fluid layers with at least 80% accuracy.",
+          "Analyze fluid behavior in U-tube manometers to determine pressure differences between two points, accounting for fluid densities and geometric configurations, and accurately interpret manometer readings to quantify pressure variations.",
+          "Evaluate the application of pressure measurement devices, such as manometers and orifice meters, to determine fluid pressures and flow rates, demonstrating an understanding of their operating principles and limitations through example calculations.",
+          "Design a system utilizing fluid statics principles to measure the pressure at a specific point within a closed vessel containing a liquid, specifying appropriate instrumentation and justifying design choices based on accuracy and safety considerations.",
+          "Implement problem-solving techniques to determine forces exerted by hydrostatic pressure on submerged surfaces, including planar and curved surfaces, and calculate the location of the center of pressure with a margin of error less than 5%."
+        ],
+        "sources": [
+          "S6",
+          "S7",
+          "S15"
+        ]
+      },
+      {
+        "title": "Fundamentals of Fluid Flow",
+        "subtopics": [
+          "Apply principles of fluid statics to calculate pressure distributions in fluid systems, including utilizing manometers and resolving problems involving fluids of varying densities as demonstrated through example problems.",
+          "Analyze flow measurement techniques, specifically oriface metering and U-tube manometers, to determine flow rates and understand the impact of fluid properties on measurement accuracy.",
+          "Evaluate the application of fundamental fluid flow concepts to solve practical chemical engineering problems, demonstrating proficiency in unit conversions and problem-solving methodologies.",
+          "Implement problem-solving strategies to determine hydrostatic forces acting on submerged surfaces and calculate the center of pressure for various geometries.",
+          "Design and interpret solutions for fluid static problems, incorporating concepts from provided course materials and practice questions to predict fluid behavior under different conditions."
+        ],
+        "sources": [
+          "S11",
+          "S3"
+        ]
+      },
+      {
+        "title": "Frictional Flow in Conduits",
+        "subtopics": [
+          "Apply the Darcy-Weisbach equation and Moody diagram to calculate the head loss and friction factor for fully developed flow in circular conduits, given fluid properties, pipe dimensions, and flow rate, with at least 80% accuracy.",
+          "Analyze the impact of relative roughness on friction factor and head loss in both laminar and turbulent flow regimes, differentiating between smooth and rough pipes and justifying the selection of appropriate correlations.",
+          "Evaluate the minor losses due to fittings, valves, and expansions in a piping system, quantifying their contribution to the total head loss and comparing different loss coefficient methods.",
+          "Design a piping network to deliver a specified flow rate of a given fluid, selecting appropriate pipe diameters and materials to minimize head loss and energy consumption while adhering to specified pressure drop limitations.",
+          "Implement the concept of equivalent length to analyze complex piping systems containing both straight pipe sections and fittings, calculating the total head loss and predicting the required pump power to overcome frictional resistance."
+        ],
+        "sources": [
+          "S11",
+          "S3"
+        ]
+      },
+      {
+        "title": "Flow Measurement Techniques: Orifice Metering",
+        "subtopics": [
+          "Apply the principles of fluid mechanics and Bernoulli's equation to analyze the pressure drop across an orifice meter and calculate the volumetric flow rate of a fluid, accounting for discharge coefficient variations based on Reynolds number and orifice geometry.",
+          "Design an orifice metering system for a specified flow rate and fluid properties, selecting appropriate orifice diameter, beta ratio, and flange tapping locations to minimize permanent pressure loss and ensure accurate measurement within a defined tolerance.",
+          "Evaluate the impact of non-ideal flow conditions, such as viscosity effects and compressibility, on the accuracy of orifice meter measurements and implement correction factors to improve measurement precision.",
+          "Interpret experimental data obtained from an orifice meter, including differential pressure readings and upstream conditions, to determine the actual flow rate and assess the performance of the metering device against theoretical predictions.",
+          "Compare and contrast orifice metering with other flow measurement techniques, such as U-tube manometers and other differential pressure devices, analyzing their respective advantages, limitations, and suitability for different industrial applications."
+        ],
+        "sources": [
+          "S1",
+          "S4",
+          "S3"
+        ]
+      },
+      {
+        "title": "Flow in Open Channels",
+        "subtopics": [
+          "Apply the energy equation and continuity equation to analyze steady, uniform flow in open channels, calculating flow rate and depth for given channel geometries and flow conditions.",
+          "Evaluate the impact of channel slope, roughness, and cross-sectional shape on the flow velocity and hydraulic radius using Manning’s equation and compare its applicability to different channel types.",
+          "Design open channel systems, including determining appropriate channel dimensions and slopes, to convey a specified flow rate while maintaining acceptable flow velocities and preventing erosion.",
+          "Implement methods for calculating gradually varied flow profiles in open channels, including the use of the dynamic wave equation and standard step method, to predict water surface elevations under varying flow conditions.",
+          "Analyze the occurrence and characteristics of critical flow and hydraulic jumps in open channels, determining the conditions for their formation and calculating energy losses associated with hydraulic jumps."
+        ],
+        "sources": [
+          "S3",
+          "S11"
+        ]
+      },
+      {
+        "title": "Flow Past Immersed Bodies",
+        "subtopics": [
+          "Apply the principles of fluid statics and dynamics, including pressure drop calculations across orifices and manometers, to analyze the drag force exerted on immersed bodies in both laminar and turbulent flow regimes.",
+          "Evaluate the impact of fluid properties (density, viscosity) and body geometry (shape, size) on the dimensionless drag coefficient and Reynolds number for flow past immersed bodies, utilizing experimental data and established correlations.",
+          "Design a system incorporating orifice metering to accurately measure the flow rate of a fluid past an immersed body, considering factors such as discharge coefficient and pressure differential.",
+          "Implement computational methods or utilize established correlations to predict the pressure distribution around an immersed body, and subsequently determine the lift and drag forces acting upon it.",
+          "Analyze heat transfer phenomena associated with flow past immersed bodies, applying principles of convection and conduction to calculate heat transfer rates and evaluate the thermal behavior of the system."
+        ],
+        "sources": [
+          "S3",
+          "S11"
+        ]
+      },
+      {
+        "title": "Compressible Flow Fundamentals",
+        "subtopics": [
+          "Apply the principles of fluid statics to analyze pressure variations in compressible fluids within confined systems, including utilizing manometers and orifice metering devices to accurately determine pressure differences and flow rates.",
+          "Evaluate the impact of compressibility on fluid flow behavior, differentiating between incompressible and compressible flow regimes and selecting appropriate governing equations based on Mach number.",
+          "Implement isentropic flow relations to calculate changes in pressure, density, and temperature for adiabatic, reversible flow processes in nozzles and diffusers, demonstrating proficiency with relevant thermodynamic properties.",
+          "Design and analyze compressible flow systems, such as pipelines and control valves, considering factors like friction, heat transfer, and shock waves to predict performance and optimize operational parameters.",
+          "Analyze the characteristics of compressible flow through orifices and utilize established metering equations to determine volumetric and mass flow rates, accounting for discharge coefficients and fluid properties."
+        ],
+        "sources": [
+          "S3",
+          "S11"
+        ]
+      },
+      {
+        "title": "Fluid Transportation and Metering",
+        "subtopics": [
+          "Apply principles of fluid statics to analyze pressure differences measured using U-tube manometers, calculating pressure drops and fluid densities with at least 80% accuracy given manometer readings and fluid properties.",
+          "Evaluate the performance of orifice metering devices by calculating flow rates using established equations, accounting for factors like coefficient of discharge and fluid properties, and comparing calculated values to experimental data with a maximum 10% error.",
+          "Design a fluid transportation system incorporating appropriate metering devices (e.g., orifice plates, manometers) to achieve a specified flow rate and pressure drop, justifying component selection based on fluid properties and operational constraints.",
+          "Implement calculations to determine the impact of fluid properties (density, viscosity) on the accuracy of both manometer and orifice meter readings, demonstrating an understanding of the limitations of each method under varying conditions.",
+          "Analyze real-world scenarios involving fluid flow measurement and transportation, selecting the most appropriate metering technique based on factors such as cost, accuracy requirements, and fluid characteristics, and justifying the selection with supporting calculations and reasoning."
+        ],
+        "sources": [
+          "S3",
+          "S11"
+        ]
+      },
+      {
+        "title": "Agitation and Mixing of Fluids",
+        "subtopics": [
+          "Analyze the power requirements for different types of agitators (e.g., propellers, turbines, paddles) in liquid mixing applications, considering fluid properties like viscosity and density, and impeller geometry to predict mixing performance.",
+          "Design a mixing system for a specified chemical process, selecting appropriate impeller type, tank geometry, and baffle configuration to achieve desired blending times and homogeneity based on process requirements and fluid characteristics.",
+          "Evaluate the impact of fluid flow regimes (laminar, transitional, turbulent) on mixing effectiveness and scale-up procedures, applying dimensionless numbers like Reynolds number and power number to characterize mixing performance.",
+          "Implement calculations to determine the gas dispersion characteristics in agitated tanks, including bubble size distribution and gas-liquid interfacial area, and assess the influence of agitation speed and gas flow rate on mass transfer processes.",
+          "Assess the performance of different mixing operations, such as blending of miscible liquids, suspension of solids, and emulsification, by applying relevant correlations and interpreting experimental data to optimize process conditions and troubleshoot mixing challenges."
+        ],
+        "sources": [
+          "S3"
+        ]
+      },
+      {
+        "title": "Pumps, Compressors, and Turbines",
+        "subtopics": [
+          "Apply fundamental principles of fluid mechanics and thermodynamics to analyze the performance characteristics of centrifugal pumps, including head-capacity curves, efficiency, and power requirements, given pump geometry and fluid properties.",
+          "Evaluate the impact of different impeller designs and operating conditions on the performance of axial and centrifugal compressors, calculating compression ratios, adiabatic efficiency, and surge margin using provided performance maps and thermodynamic relationships.",
+          "Design a piping system incorporating a pump or compressor, selecting appropriate equipment based on required flow rate, pressure head, fluid properties, and system head loss calculations, justifying choices with supporting calculations.",
+          "Implement energy balance equations to determine the work output of turbines (e.g., Pelton, Francis, Kaplan) under steady-state conditions, accounting for fluid properties, head loss, and turbine efficiency, and assess the impact of varying operating parameters.",
+          "Analyze the similarities and differences between pumps, compressors, and turbines in terms of their energy transfer mechanisms, performance parameters, and typical applications, and critically evaluate the limitations of applying ideal gas assumptions in real-world scenarios."
+        ],
+        "sources": [
+          "S3",
+          "S11"
+        ]
+      },
+      {
+        "title": "Mechanical Separations",
+        "subtopics": [
+          "Apply principles of fluid mechanics and differential pressure to analyze flow measurement using U-tube manometers and orifice meters, calculating flow rates given pressure drops and geometric parameters with at least 80% accuracy.",
+          "Evaluate the performance of different mechanical separation techniques, such as filtration and centrifugation, by comparing their efficiency, capacity, and suitability for separating mixtures with particle sizes ranging from 1 to 1000 μm.",
+          "Design a filtration system for a given process stream, specifying filter media, size, and operating conditions to achieve a target product purity of at least 95% while minimizing pressure drop and operating costs.",
+          "Implement calculations to determine the settling velocity of particles in a fluid, considering factors like particle density, fluid viscosity, and particle size, and predict the effectiveness of gravity settling for a given separation application.",
+          "Analyze the impact of various operating parameters (e.g., rotational speed, density difference) on the performance of centrifuges, predicting separation efficiency and clarifying the relationship between these parameters and separation outcomes."
+        ],
+        "sources": [
+          "S8",
+          "S13"
+        ]
+      }
+    ],
+    "outline_sources": [
+      "S1",
+      "S11",
+      "S13",
+      "S15",
+      "S3",
+      "S4",
+      "S6",
+      "S7",
+      "S8",
+      "S9"
+    ]
   },
   {
     "code": "CHE 314",
@@ -3011,7 +3373,177 @@
     "semesters": [
       "FIRST"
     ],
-    "is_elective": false
+    "is_elective": false,
+    "description": "CHE 315, Chemical Engineering Thermodynamics I, provides a foundational understanding of thermodynamic principles and their application to chemical engineering processes. This course covers fundamental concepts such as energy balances, entropy, phase equilibrium, and solution thermodynamics, equipping students with the tools to analyze and design chemical processes. The course emphasizes both theoretical understanding and practical problem-solving skills, preparing students for advanced studies and professional practice in the field. It builds a strong base for understanding and applying thermodynamic principles to real-world chemical engineering challenges.",
+    "outline": [
+      {
+        "title": "Fundamental Definitions and the First Law of Thermodynamics",
+        "subtopics": [
+          "Apply the First Law of Thermodynamics to analyze closed and open systems undergoing various processes, quantifying changes in internal energy, enthalpy, and work, and demonstrating proficiency with state functions and path functions.",
+          "Define and differentiate between key thermodynamic properties such as temperature, pressure, volume, and density, and utilize these definitions to evaluate system states and perform unit conversions with at least 90% accuracy.",
+          "Construct and interpret property tables and charts (e.g., steam tables, compressibility charts) to determine thermodynamic properties of pure fluids, and assess the limitations of these resources for different applications.",
+          "Evaluate the concept of energy and its various forms, including kinetic, potential, and thermal energy, and implement energy balances to solve practical engineering problems involving heat transfer and work.",
+          "Design and analyze thermodynamic processes, including isothermal, isobaric, isochoric, and adiabatic processes, calculating changes in state variables and evaluating the efficiency or performance of these processes based on First Law principles."
+        ],
+        "sources": [
+          "S1",
+          "S2"
+        ]
+      },
+      {
+        "title": "The Second Law of Thermodynamics and Entropy",
+        "subtopics": [
+          "Apply the Second Law of Thermodynamics to analyze the feasibility and maximum theoretical efficiency of various thermodynamic processes, including heat engines, refrigerators, and heat pumps, quantifying performance limitations based on entropy generation.",
+          "Calculate entropy changes for ideal and real processes (reversible and irreversible) involving pure substances and mixtures, utilizing property data and thermodynamic relationships, and interpret the results in terms of process reversibility and spontaneity.",
+          "Evaluate the thermodynamic consistency of experimental data using entropy as a state function, identifying potential errors or inconsistencies in measurements and applying appropriate corrections or validation techniques.",
+          "Design and interpret T-S diagrams for closed and open systems undergoing various processes, demonstrating the ability to visually represent entropy changes, identify areas of irreversibility, and predict process outcomes.",
+          "Implement the concept of entropy generation to quantify the irreversibility of real-world processes, correlating it with factors such as friction, heat transfer across finite temperature differences, and mixing, and propose strategies to minimize entropy generation in chemical engineering systems."
+        ],
+        "sources": [
+          "S1",
+          "S2"
+        ]
+      },
+      {
+        "title": "Thermodynamic Properties of Fluids",
+        "subtopics": [
+          "Apply the principles of corresponding states to estimate thermodynamic properties, such as compressibility factor and fugacity, for fluids when experimental data is limited, achieving an accuracy of within 5% for common engineering fluids.",
+          "Evaluate the thermodynamic consistency of experimental VLE (Vapor-Liquid Equilibrium) data using the criteria of the Gibbs phase rule and identify potential errors or inconsistencies in the provided datasets.",
+          "Analyze the behavior of real fluids using equations of state (e.g., Van der Waals, Redlich-Kwong, Soave-Redlich-Kwong) and determine the impact of intermolecular forces on PVT properties.",
+          "Design a process to calculate enthalpy and entropy changes for fluid mixtures undergoing phase transitions, utilizing data from thermodynamic property tables and applying appropriate mixing rules with a maximum error of 2% in energy balance calculations.",
+          "Implement methods for determining fugacity and fugacity coefficients for pure components and mixtures, and interpret their significance in predicting phase equilibrium and chemical potential for systems at high pressures."
+        ],
+        "sources": [
+          "S2",
+          "S9",
+          "S10",
+          "S11",
+          "S15"
+        ]
+      },
+      {
+        "title": "Thermodynamic Theory and Fundamental Property Relations",
+        "subtopics": [
+          "Apply the fundamental definitions of thermodynamic properties (e.g., pressure, temperature, volume, internal energy, enthalpy, entropy) to analyze the state of pure fluids and mixtures, quantitatively determining property changes during processes.",
+          "Evaluate the validity and limitations of various equations of state (e.g., ideal gas law, virial equation, cubic equations of state) for predicting the thermodynamic behavior of real fluids, and select the most appropriate equation for a given system and conditions.",
+          "Implement the relationships between partial molar properties and mixture properties to calculate thermodynamic properties of mixtures, including activity coefficients, and assess deviations from ideal solution behavior.",
+          "Design and interpret phase diagrams for single-component and multi-component systems, utilizing thermodynamic principles to predict phase equilibria and compositions under varying temperature and pressure conditions.",
+          "Analyze the implications of the First and Second Laws of Thermodynamics for chemical processes, quantitatively determining energy and entropy balances for open and closed systems, and evaluating process feasibility and efficiency."
+        ],
+        "sources": [
+          "S3",
+          "S8"
+        ]
+      },
+      {
+        "title": "Ideal Gas Mixtures",
+        "subtopics": [
+          "Apply Dalton’s Law of Partial Pressures to calculate the partial pressure of each component in an ideal gas mixture given the total pressure and mole fractions of each component, achieving at least 80% accuracy on quantitative problems.",
+          "Evaluate the volumetric composition of an ideal gas mixture using Amagat’s Law, demonstrating the ability to convert between mole fractions, partial pressures, and volumes with a maximum error of 5% in calculations.",
+          "Analyze the thermodynamic properties (internal energy, enthalpy, entropy, and Gibbs free energy) of an ideal gas mixture as a function of temperature and composition, utilizing appropriate equations of state and demonstrating proficiency in applying these concepts to solve mixture property estimation problems.",
+          "Design a process involving the mixing of ideal gases, specifying operating conditions (temperature, pressure, and feed compositions) to achieve a desired product composition, and justifying the design based on thermodynamic principles.",
+          "Implement and interpret the concept of ideal solution behavior as a limiting case of real gas mixtures, differentiating between ideal and non-ideal mixing scenarios and predicting deviations from ideality based on intermolecular interactions."
+        ],
+        "sources": [
+          "S3"
+        ]
+      },
+      {
+        "title": "Real Gas Mixtures and Equations of State",
+        "subtopics": [
+          "Apply virial equations of state to calculate the compressibility factor and thermodynamic properties of real gas mixtures, demonstrating proficiency in handling non-ideal gas behavior and mixture composition.",
+          "Evaluate the accuracy of different equations of state (e.g., van der Waals, Redlich-Kwong, Soave-Redlich-Kwong) in predicting the PVT behavior of real gas mixtures across a range of temperatures, pressures, and compositions, justifying the selection of an appropriate equation for a given system.",
+          "Design a process for separating a real gas mixture utilizing principles of equations of state to accurately predict phase equilibria and optimize separation conditions, considering the impact of mixture non-ideality.",
+          "Analyze fugacity and fugacity coefficient calculations for components in real gas mixtures using various equations of state, interpreting the results to assess deviations from ideal gas behavior and their influence on chemical potential.",
+          "Implement mixing rules for equations of state to determine the parameters for real gas mixtures, critically assessing the limitations of different mixing rules and their effect on the accuracy of predicted thermodynamic properties."
+        ],
+        "sources": [
+          "S3"
+        ]
+      },
+      {
+        "title": "Solution Thermodynamics: Ideal Solutions",
+        "subtopics": [
+          "Apply Raoult’s Law and Henry’s Law to calculate the vapor pressure of components in ideal liquid mixtures, quantitatively predicting deviations from ideal behavior based on composition.",
+          "Evaluate the thermodynamic properties (e.g., enthalpy, entropy, Gibbs free energy) of mixing for ideal solutions, demonstrating an understanding of the concept of ideal mixing and its implications for solution behavior.",
+          "Analyze phase diagrams for binary ideal solutions, interpreting lever rule calculations to determine the composition and amount of each phase present at equilibrium for a given temperature and overall composition.",
+          "Design and implement calculations to determine the activity and activity coefficient of components in a solution, recognizing the conditions under which ideal solution behavior is assumed and when deviations necessitate further analysis.",
+          "Differentiate between ideal and non-ideal solutions, explaining the underlying molecular interactions that contribute to deviations from ideality and predicting the qualitative effect of these interactions on solution properties."
+        ],
+        "sources": [
+          "S3",
+          "S8"
+        ]
+      },
+      {
+        "title": "Solution Thermodynamics: Non-Ideal Solutions",
+        "subtopics": [
+          "Apply thermodynamic definitions and models, including activity, activity coefficients, and excess properties, to quantitatively assess deviations from ideal solution behavior for binary liquid mixtures.",
+          "Evaluate the accuracy of different models for representing non-ideal solution behavior (e.g., Margules, van Laar, Wilson, NRTL, UNIQUAC) by comparing predicted properties to experimental data and justifying model selection based on system characteristics.",
+          "Analyze phase equilibrium data (VLE, LLE) for non-ideal solutions using thermodynamic models and graphical methods (e.g., T-xy diagrams, equilibrium triangles) to determine composition and temperature at equilibrium.",
+          "Design and implement calculations to determine the thermodynamic properties (e.g., enthalpy, entropy, Gibbs free energy) of mixing for non-ideal solutions, accounting for heat of mixing and excess volume.",
+          "Predict the impact of intermolecular interactions on solution properties and correlate these interactions to the behavior of activity coefficients, demonstrating an understanding of the physical significance of model parameters."
+        ],
+        "sources": [
+          "S3",
+          "S8"
+        ]
+      },
+      {
+        "title": "Phase Equilibrium: Vapor-Liquid Equilibrium (VLE)",
+        "subtopics": [
+          "Apply Raoult’s Law and Henry’s Law to calculate vapor pressures and compositions for ideal and non-ideal binary mixtures, demonstrating proficiency in interpreting deviations from ideality using activity coefficients.",
+          "Construct and interpret P-T-x and T-x-y diagrams for binary systems, utilizing these diagrams to determine bubble point, dew point, and composition changes during isothermal vaporization or condensation processes.",
+          "Evaluate the suitability of various VLE models (e.g., ideal solution, modified Raoult’s Law, Wilson, NRTL) for representing specific binary or multi-component systems based on system characteristics and available data.",
+          "Design and analyze a simple distillation column for separating a binary mixture, calculating theoretical stages required to achieve a specified separation, and identifying key parameters influencing column performance.",
+          "Implement thermodynamic principles and phase equilibrium data to solve practical chemical engineering problems involving vapor-liquid equilibrium, such as flash vaporization, absorption, and stripping, demonstrating the ability to perform material and energy balances."
+        ],
+        "sources": [
+          "S3",
+          "S7"
+        ]
+      },
+      {
+        "title": "Chemical-Reaction Equilibrium",
+        "subtopics": [
+          "Apply the concept of chemical potential to analyze the criteria for chemical reaction equilibrium at constant temperature and pressure, quantitatively predicting equilibrium compositions for simple reactions given initial conditions and equilibrium constants.",
+          "Evaluate the effect of temperature and pressure on the equilibrium constant using thermodynamic data (ΔH, ΔS, Cp) and predict the shift in equilibrium position based on Le Chatelier’s principle for both single and multiple reaction systems.",
+          "Design a reactor system to achieve a specified conversion for a given reversible reaction, considering equilibrium limitations and utilizing appropriate equilibrium calculations to determine optimal operating conditions.",
+          "Implement Gibbs free energy minimization techniques to determine the equilibrium composition of complex reacting systems involving multiple species and reactions, utilizing software or computational tools to solve for equilibrium constants and mole fractions.",
+          "Interpret phase equilibrium data in conjunction with chemical reaction equilibrium to analyze systems where reactions occur simultaneously with phase transitions, and assess the impact of these interactions on overall system behavior."
+        ],
+        "sources": [
+          "S3",
+          "S8"
+        ]
+      },
+      {
+        "title": "Applications of Thermodynamics to Chemical Engineering Processes",
+        "subtopics": [
+          "Apply the first and second laws of thermodynamics to analyze energy balances and entropy changes in open and closed systems relevant to chemical processes, quantitatively determining process efficiency and identifying potential irreversibilities.",
+          "Design and evaluate thermodynamic property estimation methods, including equations of state (e.g., ideal gas law, van der Waals, Soave-Redlich-Kwong) and corresponding states principles, to predict phase behavior and thermophysical properties of pure components and mixtures.",
+          "Implement phase equilibrium calculations (vapor-liquid, liquid-liquid, solid-liquid) using graphical and analytical methods (e.g., Raoult’s Law, Henry’s Law, activity coefficient models) to determine composition and extent of phase separation in chemical engineering systems.",
+          "Analyze the performance of common chemical engineering unit operations (e.g., distillation, absorption, heat exchangers, reactors) by applying thermodynamic principles to determine energy and material requirements, optimize operating conditions, and evaluate process feasibility.",
+          "Evaluate the impact of deviations from ideal behavior on thermodynamic properties and process performance, utilizing concepts like fugacity, activity, and excess properties to accurately model real-world chemical engineering applications and predict process outcomes."
+        ],
+        "sources": [
+          "S3",
+          "S13"
+        ]
+      }
+    ],
+    "outline_sources": [
+      "S1",
+      "S10",
+      "S11",
+      "S13",
+      "S15",
+      "S2",
+      "S3",
+      "S7",
+      "S8",
+      "S9"
+    ]
   },
   {
     "code": "CHE 316",
@@ -3043,7 +3575,197 @@
     "semesters": [
       "FIRST"
     ],
-    "is_elective": false
+    "is_elective": false,
+    "description": "CHE 317 is an upper-level undergraduate course focusing on the intersection of biochemical engineering principles and chemical reactor engineering. The course explores fundamental biochemical processes like enzyme kinetics, metabolic pathways (specifically glycolysis), and fermentation, alongside advanced computational modeling techniques for analyzing and designing chemical reactors. Students will learn to apply these concepts to solve real-world problems in bioprocessing, reactor design, and biochemical systems analysis, including turbulent and multiphase flow regimes.",
+    "outline": [
+      {
+        "title": "Introduction to Biochemical Engineering & Biotechnology",
+        "subtopics": [
+          "Analyze the fundamental principles of glycolysis, including enzymatic reactions and metabolic pathways, to predict the yield of ATP and key intermediate metabolites under varying conditions.",
+          "Evaluate the application of computational flow modelling techniques in chemical reactor engineering to optimize bioreactor design and performance for enhanced biochemical production.",
+          "Design a biochemical process, integrating principles from biochemical engineering, to convert a specific substrate into a desired product, considering factors like reaction kinetics, mass transfer, and reactor configuration.",
+          "Implement strategies for modelling and simulating biochemical reactions and systems, utilizing appropriate software tools and computational methods to predict process behavior and optimize operating parameters.",
+          "Assess the role of biotechnology in biochemical engineering, differentiating between various bioprocesses and evaluating their potential for industrial applications, including fermentation, enzyme catalysis, and biotransformation."
+        ],
+        "sources": [
+          "S5",
+          "S7"
+        ]
+      },
+      {
+        "title": "Enzyme Kinetics and Mechanisms",
+        "subtopics": [
+          "Apply Michaelis-Menten kinetics to quantitatively determine the parameters Km and Vmax from experimental enzyme reaction data, and interpret their significance in relation to enzyme-substrate binding and catalytic efficiency.",
+          "Analyze the impact of different types of enzyme inhibition (competitive, non-competitive, uncompetitive) on reaction kinetics, including the derivation of modified Michaelis-Menten equations and the prediction of inhibitor effects on Vmax and Km.",
+          "Evaluate the limitations of Michaelis-Menten kinetics and explain the rationale behind alternative kinetic models, such as allosteric enzyme kinetics, considering cooperativity and regulatory mechanisms.",
+          "Design a controlled experiment to investigate the effect of temperature, pH, and substrate concentration on enzyme activity, and interpret the results in terms of enzyme stability and optimal reaction conditions.",
+          "Implement computational methods to model enzyme reaction kinetics, utilizing software or programming tools to simulate reaction rates, predict product formation, and assess the influence of various parameters on enzyme performance."
+        ],
+        "sources": [
+          "S4",
+          "S5",
+          "S6"
+        ]
+      },
+      {
+        "title": "Glycolysis and Metabolic Pathways",
+        "subtopics": [
+          "Analyze the ten enzymatic steps of glycolysis, detailing the reactants, products, and cofactors involved in each reaction, and predict the impact of enzyme deficiencies on pathway flux.",
+          "Evaluate the regulatory mechanisms controlling glycolysis, including allosteric regulation and hormonal control, and quantitatively assess their effects on metabolic rate under varying physiological conditions.",
+          "Design a biochemical engineering process to maximize glycolytic ATP production in a bioreactor, considering factors such as substrate concentration, pH, temperature, and enzyme immobilization techniques.",
+          "Compare and contrast glycolysis with other central metabolic pathways (e.g., gluconeogenesis, pentose phosphate pathway, citric acid cycle) by constructing metabolic maps and identifying key points of integration and regulation.",
+          "Implement stoichiometric analysis on the glycolysis pathway to determine theoretical ATP yield from glucose, accounting for the costs of ATP consumption in the early stages and evaluating the efficiency of anaerobic versus aerobic conditions."
+        ],
+        "sources": [
+          "S1",
+          "S3",
+          "S9",
+          "S14"
+        ]
+      },
+      {
+        "title": "Biochemical Reactor Design: Batch & Plug Flow",
+        "subtopics": [
+          "Apply principles of chemical kinetics and mass transfer to analyze the performance of batch reactors for single and multiple reactant systems, predicting conversion and selectivity as a function of time and operating conditions.",
+          "Design a plug flow reactor (PFR) for a given biochemical reaction, specifying reactor volume and operating conditions to achieve a desired conversion rate, considering potential limitations due to axial dispersion and non-ideal flow.",
+          "Implement computational modeling techniques, utilizing software tools, to simulate the dynamic behavior of batch and PFR systems, evaluating the impact of process parameters on reactor performance and product distribution.",
+          "Evaluate the advantages and disadvantages of batch and PFR configurations for specific biochemical processes, justifying reactor selection based on factors such as reaction kinetics, scale of production, and cost considerations.",
+          "Assess the influence of reactor design and operating conditions on the metabolic pathways within a biochemical reactor, specifically relating reactor characteristics to the progression of glycolysis and other relevant biochemical processes."
+        ],
+        "sources": [
+          "S5"
+        ]
+      },
+      {
+        "title": "Continuous Stirred-Tank Reactors (CSTRs) for Biochemical Reactions",
+        "subtopics": [
+          "Analyze the impact of mixing characteristics, determined through computational flow modeling, on conversion and selectivity in CSTRs performing enzymatic reactions, quantifying the effect of impeller design and agitation speed on residence time distribution.",
+          "Design a CSTR system for a given biochemical reaction (e.g., glycolysis) including determination of reactor volume, feed flow rate, and operating conditions to achieve a specified product yield, considering kinetic parameters and substrate inhibition.",
+          "Implement and interpret mass balance equations for multiple reactants and products in a CSTR system, accounting for reaction kinetics (Michaelis-Menten, etc.) and dilution effects, to predict steady-state concentrations and reactor performance.",
+          "Evaluate the performance of a CSTR compared to other reactor configurations (e.g., plug flow reactor) for a specific biochemical process, considering factors such as conversion, selectivity, cost, and operational complexity, justifying the optimal reactor choice.",
+          "Apply enzyme nomenclature and kinetic data to model and predict the behavior of a CSTR containing immobilized enzymes, assessing the influence of enzyme loading, support material characteristics, and mass transfer limitations on reactor productivity."
+        ],
+        "sources": [
+          "S5"
+        ]
+      },
+      {
+        "title": "Inhibition Kinetics and Reactor Performance",
+        "subtopics": [
+          "Analyze the impact of different types of enzyme inhibition (competitive, non-competitive, uncompetitive) on reaction kinetics, quantitatively determining inhibition constants (Ki) from experimental data and predicting reaction rates under varying inhibitor concentrations.",
+          "Evaluate the effect of substrate and inhibitor concentrations on the performance of various reactor types (batch, continuous stirred-tank reactor (CSTR), plug flow reactor (PFR)) considering enzyme inhibition, calculating conversion and space-time requirements for specified process constraints.",
+          "Design a biochemical reactor system, incorporating strategies to mitigate the effects of substrate or product inhibition, justifying design choices based on kinetic parameters and reactor performance criteria.",
+          "Implement mathematical models describing enzyme kinetics with inhibition, utilizing computational tools to simulate reactor behavior and predict the optimal operating conditions for maximizing product formation while accounting for inhibitory effects.",
+          "Differentiate between various enzyme nomenclature systems and apply this knowledge to interpret kinetic parameters related to inhibition, accurately identifying enzymes and inhibitors involved in a given biochemical pathway and predicting their impact on reactor performance."
+        ],
+        "sources": [
+          "S6",
+          "S15"
+        ]
+      },
+      {
+        "title": "Introduction to Computational Fluid Dynamics (CFD)",
+        "subtopics": [
+          "Apply fundamental principles of fluid mechanics and heat transfer to formulate mathematical models suitable for CFD simulations of chemical reactors, demonstrating proficiency in defining governing equations and boundary conditions.",
+          "Implement discretization techniques, such as finite volume or finite element methods, to solve fluid flow and transport phenomena within chemical reactors using CFD software, achieving a minimum accuracy of 90% compared to analytical solutions for benchmark problems.",
+          "Analyze CFD simulation results, including velocity fields, temperature distributions, and concentration profiles, to evaluate reactor performance metrics like conversion, selectivity, and residence time distribution, and identify potential areas for optimization.",
+          "Evaluate the impact of different turbulence models (e.g., k-epsilon, k-omega) on the accuracy and computational cost of CFD simulations for complex reactor geometries and flow regimes, justifying model selection based on specific application requirements.",
+          "Design and execute a CFD study for a simplified chemical reactor system (e.g., a continuous stirred-tank reactor or plug flow reactor) to predict the influence of operating conditions and reactor design parameters on reaction kinetics and overall reactor efficiency, presenting findings in a comprehensive technical report."
+        ],
+        "sources": [
+          "S2",
+          "S8",
+          "S10"
+        ]
+      },
+      {
+        "title": "CFD Modeling of Bubble Column Reactors",
+        "subtopics": [
+          "Apply fundamental principles of fluid dynamics and mass transfer to develop a mathematical model representing gas-liquid flow and interfacial phenomena within a bubble column reactor, utilizing concepts from CHE 317’s Computational Flow Modelling and Biochemical Engineering materials.",
+          "Implement a computational fluid dynamics (CFD) simulation of a bubble column reactor using appropriate turbulence models (e.g., k-epsilon, k-omega) and interfacial tracking techniques, demonstrating proficiency with software tools discussed in CHE 317’s Computational Flow Modelling course.",
+          "Analyze the impact of key operating parameters (e.g., gas flow rate, liquid properties, column diameter) on bubble size distribution, gas holdup, and liquid circulation patterns within a bubble column reactor, interpreting CFD results to predict reactor performance based on CHE 317 Biochemical Engineering principles.",
+          "Evaluate the accuracy and limitations of different CFD modeling approaches for simulating bubble column reactors, comparing simulation results with experimental data or analytical solutions, and justifying model selection based on the specific application and available resources as covered in CHE 317’s course materials.",
+          "Design a CFD study to investigate the effect of reactor internals (e.g., baffles, distributors) on bubble column reactor performance, formulating a clear research question, selecting appropriate boundary conditions, and interpreting results to optimize reactor design for a specific biochemical process like glycolysis, integrating knowledge from CHE 317’s glycolysis and Biochemical Engineering resources."
+        ],
+        "sources": [
+          "S8",
+          "S11"
+        ]
+      },
+      {
+        "title": "CFD Modeling of Fluidized Bed Reactors",
+        "subtopics": [
+          "Apply fundamental principles of fluid dynamics and heat transfer to develop governing equations for simulating gas-solid flow behavior within a fluidized bed reactor using computational fluid dynamics (CFD) software.",
+          "Implement appropriate turbulence models (e.g., k-ε, k-ω) and interphase momentum transfer correlations within a CFD framework to accurately predict the hydrodynamics of Geldart particle groups in a fluidized bed reactor.",
+          "Analyze CFD simulation results, including velocity profiles, particle distributions, and pressure fluctuations, to evaluate reactor performance characteristics such as mixing efficiency, bubble formation, and solids holdup.",
+          "Design a CFD study for a specific fluidized bed reactor configuration, including mesh generation, boundary condition specification, and solver selection, justifying choices based on reactor geometry and operating conditions.",
+          "Evaluate the limitations of different CFD modeling approaches for fluidized bed reactors, considering factors such as computational cost, model accuracy, and the impact of simplifying assumptions on simulation results, and propose strategies for model improvement."
+        ],
+        "sources": [
+          "S8",
+          "S12"
+        ]
+      },
+      {
+        "title": "Multiphase and Reactive Flow Modeling",
+        "subtopics": [
+          "Apply computational fluid dynamics (CFD) techniques to model and simulate the behavior of multiphase flows, specifically identifying and addressing challenges related to interface tracking and phase interaction in chemical reactor systems.",
+          "Analyze the impact of chemical kinetics and mass transfer phenomena on reactive multiphase flow systems, utilizing appropriate models and boundary conditions within a CFD framework to predict reactor performance.",
+          "Design a CFD simulation workflow for a given multiphase reactive flow scenario, including mesh generation, solver selection, and post-processing techniques to extract meaningful insights into reactor behavior.",
+          "Evaluate the accuracy and limitations of different multiphase flow models (e.g., Euler-Euler, Euler-Lagrange) and reactive flow approaches (e.g., surface reaction, bulk reaction) for specific chemical reactor applications, justifying model selection based on system characteristics.",
+          "Implement and validate a CFD model for a biochemical reactor system, such as a bioreactor undergoing gas-liquid mass transfer with simultaneous enzymatic reactions, comparing simulation results with experimental data or analytical solutions to assess model fidelity."
+        ],
+        "sources": [
+          "S2",
+          "S8",
+          "S15"
+        ]
+      },
+      {
+        "title": "Fixed Bed and Other Reactor Types",
+        "subtopics": [
+          "Analyze the pressure drop characteristics in fixed bed reactors, quantifying the impact of particle size, bed voidage, and superficial velocity using Ergun’s equation and applying this knowledge to predict reactor performance under varying flow conditions.",
+          "Design a fixed bed reactor for a given chemical reaction, specifying key parameters such as bed dimensions, particle diameter, and flow rate to achieve a desired conversion, considering both ideal and non-ideal flow behavior.",
+          "Evaluate the performance of different reactor types (e.g., packed bed, fluidized bed, trickle bed) for a specific reaction system, comparing their advantages and disadvantages based on factors like mass transfer limitations, heat removal capabilities, and catalyst utilization.",
+          "Implement computational flow modeling techniques, utilizing software tools, to simulate fluid dynamics and reaction kinetics within a fixed bed reactor, validating model predictions against experimental data and identifying potential reactor design improvements.",
+          "Assess the impact of non-ideal flow patterns (e.g., channeling, bypassing) in fixed bed reactors on conversion and selectivity, employing residence time distribution analysis and dispersion models to quantify these effects and propose mitigation strategies."
+        ],
+        "sources": [
+          "S8",
+          "S13"
+        ]
+      },
+      {
+        "title": "Biomass Production and Growth Kinetics",
+        "subtopics": [
+          "Analyze the Monod equation and other common growth kinetic models to predict specific growth rate and biomass concentration in chemostat and batch reactor systems, given substrate concentration and kinetic parameters.",
+          "Evaluate the impact of substrate inhibition and product inhibition on biomass growth rates and product formation, utilizing appropriate mathematical models and interpreting experimental data.",
+          "Design a fed-batch bioreactor strategy to maximize biomass production, considering limitations imposed by substrate feed rate, oxygen transfer, and product inhibition, and justifying design choices based on kinetic parameters.",
+          "Implement stoichiometric analysis to determine biomass yield coefficients and predict the consumption of substrates and production of byproducts during microbial growth, applying mass balance principles to bioreactor systems.",
+          "Compare and contrast different methods for measuring biomass concentration and specific growth rate, including optical density, dry cell weight, and metabolic rate measurements, and assess the accuracy and limitations of each technique."
+        ],
+        "sources": [
+          "S15"
+        ]
+      }
+    ],
+    "outline_sources": [
+      "S1",
+      "S10",
+      "S11",
+      "S12",
+      "S13",
+      "S14",
+      "S15",
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8",
+      "S9"
+    ]
   },
   {
     "code": "CHE 318",
@@ -3075,7 +3797,177 @@
     "semesters": [
       "FIRST"
     ],
-    "is_elective": false
+    "is_elective": false,
+    "description": "CHE 319: Polymer Processing Engineering is a foundational course designed to equip students with the principles and practices of polymer processing techniques. The course covers a broad spectrum of processing methods, including injection molding, extrusion, compression molding, calendaring, and thermoforming, emphasizing the relationship between polymer properties, processing parameters, and final product characteristics. Students will gain an understanding of polymerization mechanisms, material behavior, and the practical considerations involved in transforming raw polymers into useful products, preparing them for roles in the chemical and petroleum industries.",
+    "outline": [
+      {
+        "title": "Introduction to Polymer Science and Engineering",
+        "subtopics": [
+          "Analyze the relationship between polymer molecular weight, chain structure, and resulting bulk properties such as tensile strength, elasticity, and glass transition temperature, utilizing data from provided material characterization techniques.",
+          "Evaluate the advantages and disadvantages of common polymerization techniques – including addition, condensation, and ring-opening polymerization – and design a polymerization process to achieve a specific polymer architecture with targeted molecular weight and functionality.",
+          "Implement a comprehensive understanding of polymer processing methods, specifically compression molding, transfer molding, calendaring, and thermoforming, to predict the final product characteristics based on process parameters and material selection.",
+          "Differentiate between thermoplastic and thermosetting polymers based on their chemical structure and resulting behavior under varying temperature and stress conditions, and justify material selection for specific engineering applications.",
+          "Compare and contrast the principles of polymer degradation, including thermal, oxidative, and photochemical mechanisms, and propose strategies to enhance polymer stability and extend service life in diverse environments."
+        ],
+        "sources": [
+          "S2",
+          "S5",
+          "S15"
+        ]
+      },
+      {
+        "title": "Polymerization Mechanisms",
+        "subtopics": [
+          "Analyze the fundamental differences between addition and condensation polymerization mechanisms, detailing the impact of monomer functionality and reaction conditions on polymer molecular weight and structure.",
+          "Evaluate the kinetics of free radical, cationic, and anionic polymerization, calculating polymerization rates and predicting molecular weight distributions based on initiator concentration and monomer reactivity ratios.",
+          "Design a polymerization process for a specific polymer, selecting appropriate initiators, monomers, and reaction conditions to achieve a target molecular weight and desired polymer properties.",
+          "Implement a comprehensive understanding of living polymerization techniques, including ATRP and RAFT, and explain their advantages in controlling polymer architecture and producing polymers with narrow molecular weight distributions.",
+          "Compare and contrast step-growth and chain-growth polymerization mechanisms, identifying the characteristic features of each and predicting the resulting polymer properties based on the chosen mechanism."
+        ],
+        "sources": [
+          "S9",
+          "S15"
+        ]
+      },
+      {
+        "title": "Fundamentals of Rheology in Polymer Processing",
+        "subtopics": [
+          "Analyze the relationship between polymer molecular weight, structure, and melt viscosity to predict processing behavior in common polymer processing techniques like compression molding, calendaring, and thermoforming.",
+          "Evaluate the impact of shear rate and temperature on polymer viscosity, utilizing constitutive equations such as the power-law model, to optimize processing parameters for specific polymer materials.",
+          "Design a polymer processing operation, considering rheological properties, to achieve desired product dimensions and mechanical properties, justifying material and process selections based on flow analysis.",
+          "Implement methods for characterizing polymer rheological behavior, including capillary rheometry and dynamic mechanical analysis, and interpret the resulting data to determine key material properties.",
+          "Compare and contrast different polymer processing methods (compression, transfer, calendaring, thermoforming) based on their rheological requirements and limitations, assessing their suitability for producing specific polymer products."
+        ],
+        "sources": [
+          "S4",
+          "S14"
+        ]
+      },
+      {
+        "title": "Injection Molding",
+        "subtopics": [
+          "Analyze the key process parameters in injection molding – including melt temperature, mold temperature, injection pressure, and cooling time – and predict their impact on part quality characteristics such as shrinkage, warpage, and mechanical properties.",
+          "Design a gating system for a specified plastic part, considering factors like material viscosity, part geometry, and desired flow characteristics to minimize defects and ensure complete mold filling.",
+          "Evaluate the advantages and disadvantages of different injection molding machine types (hydraulic, electric, hybrid) based on production volume, part complexity, and energy efficiency requirements.",
+          "Implement strategies for troubleshooting common injection molding defects, such as short shots, flash, sink marks, and weld lines, by systematically identifying root causes and adjusting process parameters.",
+          "Compare and contrast injection molding with other polymer processing techniques like compression molding, transfer molding, and thermoforming, assessing their suitability for different applications based on material properties, part geometry, and production scale."
+        ],
+        "sources": [
+          "S7",
+          "S8",
+          "S11",
+          "S12"
+        ]
+      },
+      {
+        "title": "Extrusion Processing",
+        "subtopics": [
+          "Analyze the influence of process parameters such as screw design, die geometry, and temperature profile on the melt flow characteristics and final product quality in extrusion processes.",
+          "Evaluate the different types of extruders (e.g., single-screw, twin-screw) and select the most appropriate extruder configuration for processing specific polymer materials based on their rheological properties and desired output.",
+          "Design a complete extrusion process, including material selection, pre-processing steps, extrusion conditions, and post-processing operations, to manufacture a specified polymeric product meeting defined dimensional and mechanical property requirements.",
+          "Implement calculations to determine the pressure drop, heat transfer rate, and shear stress distribution within an extrusion die, utilizing principles of fluid mechanics and heat transfer.",
+          "Compare and contrast the advantages and disadvantages of various extrusion techniques, including film blowing, sheet extrusion, and profile extrusion, and assess their suitability for different applications based on economic and performance considerations."
+        ],
+        "sources": [
+          "S14"
+        ]
+      },
+      {
+        "title": "Compression and Transfer Molding",
+        "subtopics": [
+          "Analyze the key process parameters in compression and transfer molding, including temperature, pressure, and time, and predict their influence on the final part properties based on polymer characteristics.",
+          "Compare and contrast the advantages and disadvantages of compression, transfer, and injection molding techniques, evaluating their suitability for producing parts with varying geometries and material requirements.",
+          "Design a mold layout for a given part utilizing compression or transfer molding, specifying appropriate venting, gating, and runner systems to ensure complete material flow and minimize defects.",
+          "Evaluate the impact of polymer rheology and curing kinetics on the molding process, calculating cycle times and predicting potential issues like incomplete fill or excessive flash.",
+          "Implement strategies for troubleshooting common defects encountered in compression and transfer molding, such as voids, warpage, and surface imperfections, relating these defects to specific process variables and material properties."
+        ],
+        "sources": [
+          "S3"
+        ]
+      },
+      {
+        "title": "Calendaring and Thermoforming",
+        "subtopics": [
+          "Analyze the process parameters in calendaring, including roll temperature, gap setting, and polymer rheology, to predict the final thickness and surface finish of a polymeric film with at least 80% accuracy.",
+          "Evaluate the advantages and disadvantages of different thermoforming methods (vacuum, pressure, drape, snap-back) based on part geometry, material properties, and production volume requirements, justifying the selection for a given application.",
+          "Design a thermoforming process for a specified plastic part, considering material selection, heating profiles, forming pressures, and cooling rates to minimize web distortion and achieve desired dimensional tolerances within +/- 0.5mm.",
+          "Implement a comparative analysis of calendaring and thermoforming techniques, identifying the specific polymer types and applications where each method is most effectively utilized, supported by examples from industrial practices.",
+          "Predict the impact of polymer molecular weight, branching, and crystallinity on the processability and final properties of materials undergoing calendaring or thermoforming, demonstrating an understanding of structure-property relationships."
+        ],
+        "sources": [
+          "S3"
+        ]
+      },
+      {
+        "title": "Polymer Characterization and Molecular Weight Determination",
+        "subtopics": [
+          "Analyze various spectroscopic techniques, including but not limited to NMR, IR, and UV-Vis, to identify functional groups and structural features within polymer chains and correlate these findings to macroscopic material properties.",
+          "Determine the number-average molecular weight (Mn), weight-average molecular weight (Mw), and polydispersity index (PDI) of a given polymer sample using techniques such as gel permeation chromatography (GPC) and light scattering, interpreting the resulting chromatograms and data sets.",
+          "Evaluate the impact of molecular weight and molecular weight distribution on the physical and mechanical properties of polymers, specifically relating these parameters to tensile strength, viscosity, and glass transition temperature.",
+          "Design an experimental procedure to characterize the molecular weight of a synthesized polymer, selecting appropriate analytical techniques and justifying the choice based on the polymer's chemical structure and expected molecular weight range.",
+          "Implement data analysis methods to convert raw data from GPC or light scattering experiments into molecular weight distributions and calculate relevant statistical parameters, assessing the accuracy and limitations of each method."
+        ],
+        "sources": [
+          "S4",
+          "S5",
+          "S10"
+        ]
+      },
+      {
+        "title": "Thermal Properties of Polymers",
+        "subtopics": [
+          "Analyze the relationship between polymer chain structure (including tacticity, branching, and crosslinking) and resulting thermal properties such as glass transition temperature (Tg), melting temperature (Tm), and crystallinity, applying this knowledge to predict the behavior of different polymer types under varying temperature conditions.",
+          "Evaluate the impact of processing techniques – specifically compression molding, transfer molding, calendaring, and thermoforming – on the thermal characteristics and final properties of polymeric materials, considering factors like cooling rates and applied pressure.",
+          "Design experiments to determine the glass transition temperature (Tg) and melting temperature (Tm) of unknown polymer samples using techniques like Differential Scanning Calorimetry (DSC) and interpret the resulting thermograms to identify polymer composition and potential additives.",
+          "Implement a quantitative understanding of heat capacity, thermal conductivity, and thermal expansion coefficients in polymers to calculate heat transfer rates and predict dimensional changes in polymeric components subjected to thermal stresses.",
+          "Compare and contrast the thermal degradation mechanisms of different polymer classes (e.g., polyolefins, polyesters, polyamides) and assess the effectiveness of various stabilization strategies in enhancing their thermal stability for specific engineering applications."
+        ],
+        "sources": [
+          "S5"
+        ]
+      },
+      {
+        "title": "Mechanical Properties of Polymers",
+        "subtopics": [
+          "Analyze the relationship between polymer chain structure (including molecular weight, branching, and crosslinking) and resulting mechanical properties such as tensile strength, modulus, and elongation at break, applying concepts from provided course materials to predict behavior.",
+          "Evaluate the impact of temperature and strain rate on the viscoelastic behavior of polymers, differentiating between glassy, rubbery, and viscous regions and quantifying these effects using relevant mechanical testing data discussed in CHE 319 resources.",
+          "Design a polymer material selection strategy for a specific engineering application, considering required mechanical properties, processing constraints (e.g., calendaring, thermoforming, compression molding), and cost factors as detailed in course notes and supplementary readings.",
+          "Implement calculations to determine key mechanical properties (e.g., Young’s modulus, Poisson’s ratio) from stress-strain curves, interpreting the data to assess material performance and identify potential failure mechanisms based on course content.",
+          "Compare and contrast the mechanical behavior of different polymer types (thermoplastics, thermosets, elastomers) based on their molecular structures and processing methods, justifying material choices for specific applications using principles outlined in CHE 319 study materials."
+        ],
+        "sources": [
+          "S5"
+        ]
+      },
+      {
+        "title": "Polymer Processing Troubleshooting and Optimization",
+        "subtopics": [
+          "Analyze common defects in polymer processing techniques such as compression molding, transfer molding, calendaring, and thermoforming, identifying root causes related to material properties, processing parameters, and equipment limitations.",
+          "Evaluate the impact of polymer molecular weight, branching, and crystallinity on processability and final product properties, and design modifications to polymer formulations to optimize performance in specific processing methods.",
+          "Implement strategies for troubleshooting issues related to flow behavior, heat transfer, and solidification during polymer processing, utilizing principles of rheology and thermodynamics to predict and mitigate defects.",
+          "Design and interpret process control charts for key parameters in polymer processing operations (e.g., temperature, pressure, flow rate) to identify and address process variability and ensure consistent product quality.",
+          "Optimize polymer processing parameters, including temperature profiles, pressure settings, and cooling rates, to achieve desired mechanical properties, dimensional accuracy, and surface finish in manufactured polymer products, justifying selections based on fundamental polymer engineering principles."
+        ],
+        "sources": [
+          "S4",
+          "S14"
+        ]
+      }
+    ],
+    "outline_sources": [
+      "S10",
+      "S11",
+      "S12",
+      "S14",
+      "S15",
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S9"
+    ]
   },
   {
     "code": "CHE 320",
@@ -3107,7 +3999,197 @@
     "semesters": [
       "FIRST"
     ],
-    "is_elective": false
+    "is_elective": false,
+    "description": "CHE 321: Process Instrumentation is a core course for Chemical Engineering students, focusing on the principles and applications of instrumentation used to measure and control process variables. The course covers a wide range of measuring instruments for levels, pressure, flow, temperature, and chemical composition, alongside essential concepts in process control and data analysis. Students will gain a foundational understanding of instrumentation diagrams, analytical techniques like gas chromatography and mass spectrometry, and the electrical principles underpinning many measurement devices, preparing them for practical application in the chemical process industries.",
+    "outline": [
+      {
+        "title": "Introduction to Process Instrumentation & Measurement Fundamentals",
+        "subtopics": [
+          "Analyze the fundamental principles of process measurement, including accuracy, precision, resolution, and sensitivity, and evaluate their impact on overall process control system performance.",
+          "Differentiate between various types of sensors and transducers commonly used in chemical engineering processes, specifically relating their operating principles to the measurement of process variables like temperature, pressure, flow, and level.",
+          "Implement signal conditioning techniques, such as amplification, filtering, and linearization, to optimize sensor signals for accurate data acquisition and control system integration.",
+          "Design a basic process instrumentation loop, selecting appropriate sensors, transmitters, controllers, and final control elements to maintain a specified process variable within a defined operating range.",
+          "Evaluate the sources of error in process measurements and apply appropriate calibration methods to minimize uncertainty and ensure the reliability of instrumentation systems."
+        ],
+        "sources": [
+          "S1",
+          "S4",
+          "S6"
+        ]
+      },
+      {
+        "title": "Level and Pressure Measurement",
+        "subtopics": [
+          "Analyze the operating principles, advantages, and disadvantages of various level measurement techniques including differential pressure, ultrasonic, radar, and capacitance, and select the most appropriate technique for a given industrial process scenario considering factors like fluid properties, vessel geometry, and cost.",
+          "Evaluate the sources of error and uncertainty associated with different pressure measurement devices such as Bourdon tubes, diaphragms, and strain gauges, and implement calibration procedures to minimize measurement inaccuracies within acceptable tolerances.",
+          "Design a level measurement system for a chemical process unit, specifying the necessary instrumentation, signal conditioning, and control logic to maintain a desired liquid level setpoint while accounting for process dynamics and potential disturbances.",
+          "Compare and contrast the application of static and dynamic pressure measurements in process control, and determine the appropriate pressure tapping locations and instrumentation for accurate flow rate determination using differential pressure flow meters.",
+          "Implement troubleshooting strategies for common issues encountered with level and pressure transmitters, including signal loss, drift, and sensor failure, and interpret diagnostic data to identify root causes and recommend corrective actions."
+        ],
+        "sources": [
+          "S1",
+          "S8"
+        ]
+      },
+      {
+        "title": "Flow Measurement Techniques",
+        "subtopics": [
+          "Analyze the principles of operation, advantages, and disadvantages of various flow measurement devices including differential pressure flow meters (e.g., orifice plates, venturi meters, flow nozzles), positive displacement meters, and turbine meters, quantifying their suitability for specific industrial applications based on fluid properties and process conditions.",
+          "Evaluate the impact of fluid properties (density, viscosity, compressibility) and installation effects on the accuracy of flow measurement techniques, calculating correction factors and assessing the associated uncertainties in flow rate determination.",
+          "Design a flow measurement system for a given chemical process, selecting appropriate instrumentation and specifying necessary piping configurations to minimize errors and ensure reliable flow rate measurement within defined process constraints.",
+          "Implement and interpret calibration procedures for flow meters, utilizing traceable standards and applying statistical methods to determine meter performance characteristics and establish appropriate maintenance schedules.",
+          "Compare and contrast the operational principles and applications of different flow rate measurement technologies, such as ultrasonic flow meters, Coriolis flow meters, and thermal mass flow meters, justifying the selection of a specific technology based on cost, accuracy, and process compatibility."
+        ],
+        "sources": [
+          "S7",
+          "S8"
+        ]
+      },
+      {
+        "title": "Temperature Measurement and Control",
+        "subtopics": [
+          "Analyze the principles of operation, advantages, and disadvantages of various temperature sensors including thermocouples, RTDs, and thermistors, and select the most appropriate sensor for a given chemical engineering process application considering factors like temperature range, accuracy, and response time.",
+          "Evaluate the impact of lead resistance and compensation techniques on the accuracy of thermocouple measurements, and implement appropriate correction methods to minimize measurement errors in industrial settings.",
+          "Design and interpret temperature measurement schemes incorporating concepts of radiation, conduction, and convection to accurately determine the temperature of fluids and surfaces within chemical process equipment.",
+          "Implement signal conditioning techniques, such as cold junction compensation and linearization, to improve the reliability and precision of temperature signals for process control applications.",
+          "Compare and contrast different temperature control strategies, including on-off control, proportional control, and PID control, and determine the optimal control parameters to maintain a desired temperature setpoint while minimizing overshoot and settling time in a simulated process."
+        ],
+        "sources": [
+          "S1",
+          "S9",
+          "S8"
+        ]
+      },
+      {
+        "title": "Chemical Composition Analysis: Fundamentals",
+        "subtopics": [
+          "Apply stoichiometric principles and chemical reaction equations to quantitatively analyze the composition of reacting systems, calculating limiting reactants, percent conversion, and theoretical/actual yields with at least 80% accuracy.",
+          "Evaluate and compare different analytical techniques for determining chemical composition, including gravimetric analysis, titrimetry, and spectroscopic methods, identifying the appropriate technique based on sample properties and desired precision.",
+          "Design and implement a process for determining the concentration of a specific component in a multi-component mixture using principles of mass balance and appropriate analytical instrumentation, documenting the procedure and potential sources of error.",
+          "Analyze experimental data obtained from chemical composition analysis, utilizing statistical methods to assess data quality, calculate confidence intervals, and determine the significance of observed variations.",
+          "Interpret process instrumentation signals related to chemical composition, such as pH, conductivity, and concentration measurements, to evaluate process performance and implement control strategies for maintaining desired product quality within specified tolerances."
+        ],
+        "sources": [
+          "S1",
+          "S4",
+          "S5"
+        ]
+      },
+      {
+        "title": "Gas Chromatography (GC) Principles and Applications",
+        "subtopics": [
+          "Analyze the fundamental principles of gas chromatography, including stationary and mobile phase interactions, to predict the separation of different chemical species based on their physical and chemical properties.",
+          "Evaluate the impact of key GC parameters – such as column type, temperature programming, and carrier gas flow rate – on resolution, retention time, and peak shape, justifying parameter selections for specific separation challenges.",
+          "Implement qualitative and quantitative analysis techniques using GC data, including peak identification, calibration curve generation, and determination of component concentrations in complex mixtures.",
+          "Design a GC experimental setup, selecting appropriate detectors (e.g., FID, TCD, MS) and columns based on the target analytes and desired sensitivity, while considering safety protocols and instrument limitations.",
+          "Differentiate between various GC applications in chemical engineering, such as process monitoring, quality control, and environmental analysis, and assess the advantages and disadvantages of GC compared to other analytical techniques for each application."
+        ],
+        "sources": [
+          "S1",
+          "S3",
+          "S13"
+        ]
+      },
+      {
+        "title": "Mass Spectrometry (MS) Fundamentals",
+        "subtopics": [
+          "Analyze the fundamental principles of mass spectrometry, including ionization methods (e.g., electron ionization, chemical ionization, electrospray ionization) and mass analyzers (e.g., quadrupole, time-of-flight, ion trap) to predict the fragmentation patterns of simple organic molecules.",
+          "Evaluate the impact of different mass spectrometer components on resolution, sensitivity, and mass accuracy, and select appropriate instrument configurations for specific analytical challenges in chemical engineering process monitoring and control.",
+          "Implement data interpretation techniques for mass spectra, including identifying molecular ions, isotopic peaks, and characteristic fragment ions, to determine the molecular weight and structural information of unknown compounds.",
+          "Design a qualitative analysis workflow utilizing mass spectrometry to identify and quantify key components in a complex mixture relevant to chemical process streams, considering potential interferences and matrix effects.",
+          "Compare and contrast the advantages and limitations of various mass spectrometry techniques (e.g., GC-MS, LC-MS, ICP-MS) for applications in process analytical chemistry, specifically relating their capabilities to the measurement and control of chemical processes."
+        ],
+        "sources": [
+          "S1",
+          "S5"
+        ]
+      },
+      {
+        "title": "Sampling Systems and Process Instrumentation Diagrams (PIDs)",
+        "subtopics": [
+          "Analyze the components of a representative sampling system, including sample taps, transport lines, and analytical instruments, to determine potential sources of error and propose mitigation strategies for accurate process monitoring.",
+          "Design a Process Instrumentation Diagram (PID) for a specified chemical process unit, accurately depicting control loops, instrumentation symbols, and process equipment, adhering to industry standards and demonstrating understanding of signal flow.",
+          "Evaluate the selection criteria for different types of process analyzers (e.g., gas chromatographs, pH meters, spectrophotometers) based on process requirements such as accuracy, response time, and cost, justifying the chosen analyzer for a given application.",
+          "Implement a systematic approach to interpreting PIDs, identifying key process variables, control strategies, and safety interlocks, and predicting system behavior under various operating conditions.",
+          "Differentiate between various sampling techniques (e.g., grab sampling, continuous sampling, composite sampling) and assess their suitability for different process streams and analytical requirements, considering factors like homogeneity and representativeness."
+        ],
+        "sources": [
+          "S1",
+          "S5"
+        ]
+      },
+      {
+        "title": "Electrical Components and Circuits for Instrumentation",
+        "subtopics": [
+          "Analyze basic electrical circuits (series, parallel, series-parallel) commonly used in instrumentation systems, calculating voltage, current, and resistance using Ohm’s Law and Kirchhoff’s Laws with at least 80% accuracy on quantitative problems.",
+          "Evaluate the characteristics of common electrical components – resistors, capacitors, inductors, diodes, and transistors – and select appropriate components for specific instrumentation applications, justifying component choices based on performance specifications.",
+          "Design and implement signal conditioning circuits, including voltage dividers, amplifiers, and filters, to convert sensor outputs into usable signals for control systems, demonstrating functionality through simulation or breadboard prototyping.",
+          "Explain the principles of grounding and shielding techniques to minimize electrical noise and interference in instrumentation systems, and assess the impact of improper grounding on signal accuracy and system reliability.",
+          "Troubleshoot basic electrical faults in instrumentation circuits using appropriate test equipment (multimeters, oscilloscopes) and interpret circuit diagrams to identify and resolve component failures or wiring errors with a documented troubleshooting process."
+        ],
+        "sources": [
+          "S6",
+          "S8",
+          "S11"
+        ]
+      },
+      {
+        "title": "Advanced Sensors: Humidity, Density, Viscosity, and pH",
+        "subtopics": [
+          "Analyze the operating principles of capacitive, resistive, and optical humidity sensors, evaluating their suitability for specific process control applications based on accuracy, response time, and environmental limitations.",
+          "Design a density measurement system utilizing differential pressure transmitters or vibrating element densitometers, calculating expected performance characteristics given fluid properties and process conditions.",
+          "Implement signal conditioning techniques for viscosity sensors (e.g., rotameters, capillary viscometers) to improve measurement accuracy and compensate for temperature variations, demonstrating understanding of relevant calibration procedures.",
+          "Evaluate the impact of temperature and ionic strength on pH measurements, selecting appropriate pH electrodes and buffer solutions for accurate process monitoring and control in chemical engineering systems.",
+          "Compare and contrast the advantages and disadvantages of various advanced sensors (humidity, density, viscosity, pH) in terms of cost, maintenance, and integration with distributed control systems (DCS), justifying sensor selection for a given chemical process scenario."
+        ],
+        "sources": [
+          "S11"
+        ]
+      },
+      {
+        "title": "Fluidisation and Particle Technology",
+        "subtopics": [
+          "Apply fundamental principles of fluid dynamics and particle mechanics to analyze the behavior of fluidized beds, predicting minimum fluidization velocity and bed expansion ratio for given particle and fluid properties.",
+          "Evaluate the performance characteristics of different types of fluidization regimes (e.g., bubbling, slugging, turbulent, fast fluidization) based on operating conditions and physical properties, justifying the selection of an appropriate regime for a specific chemical engineering process.",
+          "Design a fluidized bed reactor for a given chemical reaction, considering factors such as particle size distribution, gas velocity, heat transfer requirements, and pressure drop, and assessing its potential advantages and disadvantages compared to other reactor types.",
+          "Implement and interpret techniques for characterizing particle properties relevant to fluidization, including particle size analysis, shape factor determination, and density measurement, relating these properties to fluidization behavior.",
+          "Assess the impact of fluidization on mass transfer and reaction rates in chemical processes, utilizing relevant correlations and models to predict performance and troubleshoot potential operational issues related to particle attrition, elutriation, and backmixing."
+        ],
+        "sources": [
+          "S10",
+          "S12"
+        ]
+      },
+      {
+        "title": "Process Control and Reactor Design Considerations",
+        "subtopics": [
+          "Analyze the dynamic behavior of chemical processes, including first and second-order systems, utilizing transfer function representations and evaluating time-domain specifications like settling time and overshoot to assess system stability and performance.",
+          "Design and implement Proportional-Integral-Derivative (PID) controllers for single-loop control systems, selecting appropriate controller parameters based on process characteristics and performance objectives, and predicting the impact of parameter tuning on system response.",
+          "Evaluate the impact of reactor dynamics, including residence time distribution (RTD) and non-ideal flow patterns, on reactor performance metrics such as conversion and selectivity, applying concepts from C&R Chemical Engineering Solutions to solve related problems.",
+          "Apply fundamental principles of process instrumentation to select appropriate sensors and transmitters for measuring key process variables (e.g., temperature, pressure, flow) and integrate them into a control system architecture, considering accuracy, range, and reliability.",
+          "Differentiate between various reactor design considerations, such as batch, continuous stirred-tank (CSTR), and plug flow reactors (PFR), and analyze their respective control challenges, utilizing unit operations principles to optimize reactor operation and stability."
+        ],
+        "sources": [
+          "S12",
+          "S14"
+        ]
+      }
+    ],
+    "outline_sources": [
+      "S1",
+      "S10",
+      "S11",
+      "S12",
+      "S13",
+      "S14",
+      "S3",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8",
+      "S9"
+    ]
   },
   {
     "code": "CHE 323",

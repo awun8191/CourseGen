@@ -253,7 +253,7 @@ class ModelClient:
 # =========================
 # Prompt builders (Outline first)
 # =========================
-def _format_rag_block_numbered(hits: List[Dict[str, Any]], max_items: int = 16) -> Tuple[str, List[str]]:
+def _format_rag_block_numbered(hits: List[Dict[str, Any]], max_items: int = 30) -> Tuple[str, List[str]]:
     if not hits:
         return "### STUDY MATERIAL CONTEXT\nNo study material context found.", []
     lines = ["### STUDY MATERIAL CONTEXT"]
@@ -266,7 +266,7 @@ def _format_rag_block_numbered(hits: List[Dict[str, Any]], max_items: int = 16) 
         page = meta.get("page")
         snippet = (it.get("snippet") or it.get("document") or "").strip()
         src = path + (f" [{cf}]" if cf else "") + (f" (p.{page})" if page is not None else "")
-        snippet = re.sub(r"\s+", " ", snippet)[:900]
+        snippet = re.sub(r"\s+", " ", snippet)[:1200]  # Increased from 900 to 1200
         lines.append(f"- [{sid}] Source: {src}")
         lines.append(f"  Snippet: {snippet}")
         ids.append(sid)
@@ -277,33 +277,34 @@ def _prompt_outline(rag_block: str, source_ids: List[str], course_title: str, de
     return f"""
 {rag_block}
 
-You are to produce a comprehensive course description and a detailed 8-12 topic outline using ALL available context.
-Return a single JSON OBJECT and nothing else.
+Generate a comprehensive course outline using ALL available context above.
+Return ONLY a valid JSON object.
 
 REQUIREMENTS:
 - Course: "{course_title}" | Department: "{department_str}" | Level: "{level}"
-- "description": 3-4 sentences that thoroughly describe the course content, objectives, and scope based on all available context.
-- "topics": 8-12 comprehensive topics that cover ALL major areas of the course, each:
-- "title": specific and descriptive topic title
-- "subtopics": EXACTLY 5 detailed learning objectives or key concepts (be specific and comprehensive)
-- "sources": at least 1 valid ID from: {", ".join(source_ids)} (use multiple if different sources cover different aspects)
+- "description": 3-4 sentences describing course content, objectives, and scope
+- "topics": 8-12 topics covering ALL major course areas, each with:
+  - "title": Clear, specific topic name (3-8 words)
+  - "subtopics": EXACTLY 5 SHORT subtopic titles (2-5 words each, NOT full sentences)
+  - "sources": Valid IDs from: {", ".join(source_ids)}
+
+SUBTOPIC FORMAT (SHORT TITLES ONLY):
+✓ CORRECT: "Molecular Weight Distribution", "GPC Analysis", "Polydispersity Index"
+✗ WRONG: "Analyze various spectroscopic techniques to identify...", "Determine the number-average molecular weight using..."
 
 SCHEMA:
 {{
-"description": "string covering course overview, objectives, and scope",
+"description": "course overview in 3-4 sentences",
 "topics": [
 {{
-  "title": "specific topic name",
-  "subtopics": ["detailed learning objective 1","detailed learning objective 2","detailed learning objective 3","detailed learning objective 4","detailed learning objective 5"],
+  "title": "Topic Name",
+  "subtopics": ["Short Title 1","Short Title 2","Short Title 3","Short Title 4","Short Title 5"],
   "sources": ["S1","S3"]
 }}
 ]
 }}
 
-VALIDATION:
-- No prose outside the JSON object.
-- Every "sources" entry must be a valid ID from the list above.
-- Topics should cover the ENTIRE course comprehensively.
+CRITICAL: Subtopics must be SHORT TITLES (2-5 words), not descriptions or learning objectives.
 - Subtopics should be specific learning objectives or key concepts, not just phrases.
 - Use 8-12 topics to ensure complete coverage of all course material.
 """.strip()
@@ -329,40 +330,38 @@ class GeminiQuestionGen:
         level: str,
         variation: bool = True,
         allow_dept_fallback: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> Tuple[List[Dict[str, Any]], int]:
         cq = self._cq
-        # Focused outline queries
+        # Expanded queries for better document coverage
         queries = [
-            f"\"{course_title}\" syllabus, outline, modules, topics, subtopics, objectives",
-            f"{course_title} {department_code} Level {level} table of contents, overview, summary, learning outcomes",
+            f"\"{course_title}\" syllabus outline modules topics subtopics objectives",
+            f"{course_title} {department_code} Level {level} table of contents overview summary learning outcomes",
             f"{course_title} outline topics subtopics {department_code} objectives",
+            f"{course_title} course content chapters sections {department_code}",
+            f"{course_title} {level} curriculum structure learning goals",
         ]
         hits_dept: List[Dict[str, Any]] = []
         hits_course: List[Dict[str, Any]] = []
 
-        # Stage 1: Course-specific queries (comprehensive retrieval)
-        # IMPORTANT: In our metadata, COURSE_CODE holds only the department code (e.g., "EEE"),
-        # while COURSE_FOLDER is the full course identifier (e.g., "EEE 315").
-        # Filtering by COURSE_CODE=course_code ("EEE 315") would never match.
-        # Use COURSE_FOLDER for course-specific retrieval, optionally also scoping by DEPARTMENT.
+        # Stage 1: Course-specific queries with increased retrieval
         where_course = MetaData(DEPARTMENT=department_code, COURSE_FOLDER=course_code).to_where()
         for i, q in enumerate(queries):
             try:
-                # Get more comprehensive results for outline generation
+                # Retrieve more documents for comprehensive coverage
                 if variation and (i % 2 == 1):
-                    res = cq.search_with_temperature(q, topk=max(RAG_TOPK_PER_QUERY, 20), final_k=20, tau=RAG_TAU, min_sim=RAG_MIN_SIM, where=where_course, show_snippet=True)
+                    res = cq.search_with_temperature(q, topk=30, final_k=25, tau=RAG_TAU, min_sim=max(RAG_MIN_SIM - 0.05, 0.5), where=where_course, show_snippet=True)
                 else:
-                    res = cq.search(q, k=max(RAG_TOPK_PER_QUERY, 20), where=where_course, show_snippet=True)
+                    res = cq.search(q, k=25, where=where_course, show_snippet=True)
                 hits_course.extend(res or [])
             except Exception as e:
                 logger.warning("[RAG course] %s", e)
             finally:
                 _sleep_with_jitter(QUERY_DELAY_S)
 
-        # Stage 2: Department-only fallback (only if requested and course has no hits)
+        # Stage 2: Department-only fallback
         if allow_dept_fallback and not hits_course:
             where_dept = MetaData(DEPARTMENT=department_code).to_where()
-            for i, q in enumerate(queries):
+            for i, q in enumerate(queries[:3]):  # Use fewer queries for dept fallback
                 try:
                     if variation and (i % 2 == 0):
                         res = cq.search_with_temperature(q, topk=RAG_TOPK_PER_QUERY, final_k=10, tau=RAG_TAU, min_sim=RAG_MIN_SIM, where=where_dept, show_snippet=True)
@@ -374,10 +373,7 @@ class GeminiQuestionGen:
                 finally:
                     _sleep_with_jitter(QUERY_DELAY_S)
 
-        # Prefer specific hits; if empty, we still return dept hits so the caller can decide to skip or use dept-wide
-        # BUT: the user wants to keep track of courses without embeddings and skip them → we treat "no course hits" as missing.
-        # We still return combined for transparency.
-        # Merge with dedupe by (path, chunk_index, snippet head)
+        # Deduplicate by (path, chunk_index, snippet head)
         def key(it):
             m = it.get("meta") or it.get("metadata") or {}
             return (m.get("path") or m.get("FILENAME") or "", m.get("chunk_index"), (it.get("snippet") or it.get("document") or "")[:64])
@@ -392,7 +388,8 @@ class GeminiQuestionGen:
                 seen.add(k)
                 out.append(it)
 
-        return out[:RAG_MAX_TOTAL], len(hits_course)  # return combined and count of course-specific hits
+        # Return more documents for better coverage
+        return out[:min(len(out), 50)], len(hits_course)
 
     # Topic-level retrieval for subtopic refinement
     def _retrieve_topic_hits(
@@ -456,16 +453,21 @@ class GeminiQuestionGen:
         return f"""
 {rag_block}
 
-Using ALL the study material snippets above, produce 5 comprehensive learning objectives for the topic:
-Topic: "{topic_title}" (Course: "{course_title}" | Level: "{level}")
+Generate 5 SHORT subtopic titles for: "{topic_title}" (Course: "{course_title}" | Level: "{level}")
 
-Each learning objective should be:
-- Specific and measurable
-- Related to the course content
-- At the appropriate academic level
-- Action-oriented (use verbs like: analyze, design, implement, evaluate, etc.)
+CRITICAL REQUIREMENTS:
+- Each subtopic: 2-5 WORDS maximum
+- Concrete concept names (NOT full sentences or descriptions)
+- Based on the study material above
 
-Return a single JSON ARRAY of EXACTLY 5 detailed learning objective strings. No numbering, no markdown, no extra text.
+CORRECT FORMAT:
+["Molecular Weight", "Polydispersity Index", "GPC Analysis", "Light Scattering", "Chain Distribution"]
+
+WRONG FORMAT (DO NOT USE):
+["Analyze spectroscopic techniques to identify functional groups and structural features"]
+["Determine the number-average molecular weight using gel permeation chromatography"]
+
+Return ONLY a JSON array of 5 short strings (2-5 words each).
 """.strip()
 
     def _format_topic_rag(self, hits: List[Dict[str, Any]]) -> str:
@@ -512,30 +514,31 @@ Return a single JSON ARRAY of EXACTLY 5 detailed learning objective strings. No 
                 prompt = self._prompt_subtopics(rag_block, title, course_title, level)
                 cand = self.mc.generate_json(prompt)
                 if isinstance(cand, list):
-                    # Coerce to 5 detailed learning objectives
                     out = []
                     for x in cand:
                         s = str(x or "").strip()
-                        if s and len(s) > 10:  # Ensure meaningful length
+                        # Enforce short titles: truncate if too long
+                        if len(s) > 50 or len(s.split()) > 8:
+                            s = " ".join(s.split()[:5]).rstrip(".,;:")
+                        if s and len(s) > 3:  # Minimum meaningful length
                             out.append(s)
                         if len(out) >= 5:
                             break
                     if out:
-                        # Ensure we have exactly 5 comprehensive learning objectives
                         while len(out) < 5:
-                            out.append(f"Analyze and apply {title} concepts in practical scenarios")
+                            out.append(f"{title} Concepts")
                         t["subtopics"] = out[:5]
-                        logger.info("[Subtopic RAG] Refined '%s' → %d comprehensive learning objectives", title, len(out))
+                        logger.info("[Subtopic RAG] Refined '%s' → %d short subtopics", title, len(out))
                     else:
-                        # Fallback: generate comprehensive learning objectives
+                        # Fallback: short subtopic titles
                         t["subtopics"] = [
-                            f"Understand and explain the fundamental concepts of {title}",
-                            f"Apply {title} principles to solve practical problems",
-                            f"Analyze different approaches and methodologies in {title}",
-                            f"Evaluate the effectiveness of various {title} techniques",
-                            f"Design and implement solutions using {title} knowledge"
+                            f"{title} Fundamentals",
+                            f"{title} Applications",
+                            f"{title} Analysis",
+                            f"{title} Techniques",
+                            f"Advanced {title}"
                         ]
-                        logger.info("[Subtopic RAG] Used fallback learning objectives for '%s'", title)
+                        logger.info("[Subtopic RAG] Used fallback subtopics for '%s'", title)
             except Exception as e:
                 logger.warning("[Subtopic RAG] '%s' — %s", title, e)
             finally:
@@ -570,7 +573,7 @@ Return a single JSON ARRAY of EXACTLY 5 detailed learning objective strings. No 
                 logger.info("[Outline] No course-specific embeddings for %s — skipping", course_code)
                 return None
 
-        rag_block, source_ids = _format_rag_block_numbered(hits, max_items=16)
+        rag_block, source_ids = _format_rag_block_numbered(hits, max_items=30)
         prompt = _prompt_outline(rag_block, source_ids, course_title, department_str_for_prompt, level)
         data = self.mc.generate_json(prompt)
         if not isinstance(data, dict):
@@ -584,13 +587,30 @@ Return a single JSON ARRAY of EXACTLY 5 detailed learning objective strings. No 
             logger.warning("[Outline] Missing fields for %s", course_code)
             return None
 
-        # Ensure 8-12 topics, 5 comprehensive learning objectives each, keep sources as-is
-        topics = topics[:12] + []  # Allow up to 12 topics
-        while len(topics) < 8:  # Minimum 8 topics
-            topics.append({"title": "Additional Course Topic", "subtopics": ["Analyze course concepts and applications", "Apply theoretical knowledge to practical problems", "Evaluate different approaches and methodologies", "Design solutions using course principles", "Synthesize information from multiple sources"] * 5, "sources": source_ids[:1]})
+        # Ensure 8-12 topics, 5 short subtopics each
+        topics = topics[:12]
+        while len(topics) < 8:
+            topics.append({"title": "Additional Course Topic", "subtopics": ["Core Concepts", "Practical Applications", "Analytical Methods", "Design Principles", "Advanced Topics"], "sources": source_ids[:1]})
+        
+        # Clean up subtopics: ensure they're short (2-5 words)
         for t in topics:
             subs = t.get("subtopics") or []
-            t["subtopics"] = (subs[:5] + ["Learning objective TBD"] * 5)[:5]
+            cleaned_subs = []
+            for sub in subs[:5]:
+                sub_str = str(sub).strip()
+                # If subtopic is too long (>50 chars or >8 words), extract key phrase
+                if len(sub_str) > 50 or len(sub_str.split()) > 8:
+                    # Try to extract first meaningful phrase
+                    words = sub_str.split()[:5]
+                    sub_str = " ".join(words).rstrip(".,;:")
+                    logger.debug("[Outline] Shortened subtopic: %s... → %s", sub[:30], sub_str)
+                cleaned_subs.append(sub_str)
+            
+            # Ensure exactly 5 subtopics
+            while len(cleaned_subs) < 5:
+                cleaned_subs.append("Additional Topic")
+            t["subtopics"] = cleaned_subs[:5]
+            
             if not t.get("sources"):
                 t["sources"] = source_ids[:1]
 

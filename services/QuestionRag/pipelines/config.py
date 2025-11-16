@@ -118,6 +118,11 @@ class QuestionBatchConfig:
         return self._central_config.gemini_model
 
     @property
+    def gemini_calc_model(self) -> str:
+        """Model to use specifically for calculation questions."""
+        return self._central_config.gemini_calc_model
+
+    @property
     def gemini_temperature(self) -> float:
         if self.gemini_temperature_override is not None:
             return float(self.gemini_temperature_override)

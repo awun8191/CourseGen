@@ -788,6 +788,9 @@ class QuestionGenerator:
             thinking_budget=config.thinking_budget,
         )
 
+        # Use separate model for calculation questions
+        model = config.gemini_calc_model if request.kind == "calculation" else config.gemini_model
+
         if self.use_structured:
             # Request structured output directly from Gemini when possible
             gen_config.response_schema = GeminiQuestionBatch
@@ -796,7 +799,7 @@ class QuestionGenerator:
             try:
                 response = self.gemini.generate(
                     prompt,
-                    model=config.gemini_model,
+                    model=model,
                     generation_config=gen_config,
                     response_model=GeminiQuestionBatch,
                 )
@@ -808,7 +811,7 @@ class QuestionGenerator:
                 gen_config.response_schema = None
                 response = self.gemini.generate(
                     prompt,
-                    model=config.gemini_model,
+                    model=model,
                     generation_config=gen_config,
                 )
         else:
@@ -816,7 +819,7 @@ class QuestionGenerator:
             gen_config.response_schema = None
             response = self.gemini.generate(
                 prompt,
-                model=config.gemini_model,
+                model=model,
                 generation_config=gen_config,
             )
 

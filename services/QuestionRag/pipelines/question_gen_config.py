@@ -11,6 +11,7 @@ class QuestionGenerationConfig:
 
     # Model settings
     gemini_model: str = "gemini-2.5-flash-lite"
+    gemini_calc_model: str = "gemini-2.5-flash"  # Separate model for calculation questions
     gemini_temperature: float = 0.8
     gemini_top_p: float = 0.9
     gemini_top_k: int = 50
@@ -83,6 +84,7 @@ class QuestionGenerationConfig:
         return cls(
             # Model settings
             gemini_model=str(getattr(config, "gemini_default_model", defaults.gemini_model)),
+            gemini_calc_model=str(getattr(config, "gemini_calc_model", defaults.gemini_calc_model)),
             gemini_temperature=_coerce_float(getattr(config, "gemini_temperature", defaults.gemini_temperature), defaults.gemini_temperature),
             gemini_top_p=_coerce_float(getattr(config, "gemini_top_p", defaults.gemini_top_p), defaults.gemini_top_p),
             gemini_top_k=_coerce_int(getattr(config, "gemini_top_k", defaults.gemini_top_k), defaults.gemini_top_k),
