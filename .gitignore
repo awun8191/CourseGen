@@ -117,3 +117,12 @@ OUTPUT_DATA2
 
 
 .cache
+
+###########################
+# Secrets & Credentials (purge)
+###########################
+*.service_account.json
+api_key_cache*.json
+data/gemini_cache/
+*.csv
+*.jsonl
