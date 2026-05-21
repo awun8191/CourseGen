@@ -41,14 +41,10 @@ class CloudflareBGEService:
         self.logger = get_rag_logger("CloudflareBGEService")
         self.model = model
 
-        # set CLOUDFLARE_ACCOUNT_ID=c1719c3cf4696ae260e6a5f57b1f3100
-        # set CLOUDFLARE_API_TOKEN=U7hBTssgt-8DAi1cyr3GnwihAVKqLUa37Su2q_-e
+        # Set credentials via environment variables or constructor args
         
-
-# $env:CLOUDFLARE_ACCOUNT_ID='c1719c3cf4696ae260e6a5f57b1f3100'; $env:CLOUDFLARE_API_TOKEN="U7hBTssgt-8DAi1cyr3GnwihAVKqLUa37Su2q_-e"; $env:CF_EMBED_MAX_BATCH='100'; $env:OCR_MAX_IMAGE_BYTES='67108864'; $env:TESSERACT_CMD='C:\Program Files\Tesseract-OCR\tesseract.exe'; $env:PADDLE_LANG='en'; $env:BILLING_ENABLED='1'; $env:OMP_NUM_THREADS='4'; python -c "import os;import sys;sys.exit(0 if (os.getenv('CLOUDFLARE_ACCOUNT_ID') and os.getenv('CLOUDFLARE_API_TOKEN')) else 1)"; if ($LASTEXITCODE -ne 0) { Write-Error 'Missing CLOUDFLARE_* envs'; } else { python src/services/RAG/convert_to_embeddings.py -i 'C:\Users\awun8\Documents\SCHOOL\COMPILATION\EEE' --export-dir data/exported_data --cache-dir data/gemini_cache --persist-dir chroma_db_bge_m3 --resume --workers 4 --omp-threads 4 --ocr-dpi 200 --embed-batch 100 --ocr-on-missing fallback }
-
-        self.account_id = account_id or os.getenv("CLOUDFLARE_ACCOUNT_ID") or "c1719c3cf4696ae260e6a5f57b1f3100"
-        self.api_token  = api_token  or os.getenv("CLOUDFLARE_API_TOKEN")  or "U7hBTssgt-8DAi1cyr3GnwihAVKqLUa37Su2q_-e"
+        self.account_id = account_id or os.getenv("CLOUDFLARE_ACCOUNT_ID")
+        self.api_token  = api_token  or os.getenv("CLOUDFLARE_API_TOKEN")
 
         if not self.account_id or not self.api_token:
             raise RuntimeError("Cloudflare credentials missing. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.")

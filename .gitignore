@@ -87,7 +87,8 @@ coverage.xml
 ###########################
 # Textbooks
 ###########################
-TEXTBOOKS/COMPILATION/
+# Data directories
+data/exports/
 TEXTBOOKS/**/*.pdf
 
 ###########################
@@ -126,3 +127,7 @@ api_key_cache*.json
 data/gemini_cache/
 *.csv
 *.jsonl
+
+# Runtime caches
+services/data/gemini_cache/
+**/api_key_cache*.json

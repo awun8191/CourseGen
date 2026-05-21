@@ -25,7 +25,7 @@ print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 HOST_SHORT=$(hostname -s 2>/dev/null || hostname)
 HOST_FULL=$(hostname -f 2>/dev/null || echo "$HOST_SHORT")
 
-IMAGE_NAME="888429341445.dkr.ecr.us-east-1.amazonaws.com/rag"
+IMAGE_NAME="YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 FULL_IMAGE_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
 

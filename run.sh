@@ -10,7 +10,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="888429341445.dkr.ecr.us-east-1.amazonaws.com/rag"
+IMAGE_NAME="YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag"
 IMAGE_TAG="latest"
 FULL_IMAGE_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
 DEFAULT_THEORY_COUNT=10
@@ -53,7 +53,7 @@ check_prerequisites() {
     # Check if AWS CLI is available for ECR authentication
     if ! command -v aws &> /dev/null; then
         print_warning "AWS CLI not found. You'll need to authenticate with ECR manually:"
-        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
     else
         print_status "AWS CLI found - will authenticate with ECR automatically"
     fi
@@ -66,24 +66,24 @@ check_prerequisites() {
         if command -v aws &> /dev/null; then
             # Authenticate with ECR using alternative methods
             print_status "Authenticating with AWS ECR..."
-            if echo "Logging into AWS ECR..." && aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com 2>/dev/null; then
+            if echo "Logging into AWS ECR..." && aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com 2>/dev/null; then
                 print_success "Successfully authenticated with ECR"
             else
                 print_warning "Direct login failed, trying alternative method..."
                 AWS_PASSWORD=$(aws ecr get-login-password --region us-east-1)
                 if [ $? -eq 0 ] && [ -n "$AWS_PASSWORD" ]; then
-                    if echo "$AWS_PASSWORD" | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com; then
+                    if echo "$AWS_PASSWORD" | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com; then
                         print_success "Successfully authenticated with ECR"
                     else
                         print_error "Failed to authenticate with ECR"
                         print_status "Please authenticate manually:"
-                        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+                        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
                         exit 1
                     fi
                 else
                     print_error "Failed to get ECR login password"
                     print_status "Please authenticate manually:"
-                    echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+                    echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
                     exit 1
                 fi
             fi

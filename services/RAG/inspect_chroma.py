@@ -11,7 +11,7 @@ Inspect and export a ChromaDB collection.
 - Export compact metadata CSV
 
 Examples (PowerShell):
-  $PERSIST = r"/home/user/Documents/Recursive-PDF-EXTRACTION-AND-RAG/COURSEGEN/OUTPUT_DATA2/emdeddings"
+  $PERSIST = "./chromadb_storage"
   $COLL    = "course_embeddings"
 
   # list collections
@@ -47,10 +47,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Client helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
 def build_client(persist_dir: str):
     pdir = str(Path(persist_dir))
     logger.info(f"Building ChromaDB client for persist directory: {pdir}")
@@ -80,10 +76,6 @@ def list_collections(client) -> List[str]:
     logger.info(f"Collected {len(names)} collection names")
     return names
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Utilities
-# ──────────────────────────────────────────────────────────────────────────────
 
 def safe_len(x: Any) -> int:
     try:
@@ -207,10 +199,6 @@ def stream_all(col, *, batch: int = 1000, include: Iterable[str] = ("metadatas",
             break
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Pretty printing / sampling
-# ──────────────────────────────────────────────────────────────────────────────
-
 def print_sample(col, n: int = 5) -> None:
     # DO NOT request "ids" in include
     r = col.get(limit=n, include=["documents", "metadatas"])
@@ -248,10 +236,6 @@ def print_sample(col, n: int = 5) -> None:
                     md_preview[k] = md.get(k)
             print(f"  meta: {json.dumps(md_preview, ensure_ascii=False)}")
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Exports
-# ──────────────────────────────────────────────────────────────────────────────
 
 def numpy_to_list(v: Any) -> Any:
     try:
@@ -323,10 +307,6 @@ def export_csv(col, path: Path, keys: Optional[List[str]] = None, batch: int = 2
                 n += 1
     return n
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# CLI
-# ──────────────────────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(description="Inspect/export a ChromaDB collection")

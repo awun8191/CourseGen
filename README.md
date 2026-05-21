@@ -1,8 +1,9 @@
 # CourseGen: Recursive PDF Extraction, RAG, and Automated Course Content Generation
 
-CourseGen is a comprehensive, modular pipeline for processing educational materials (PDFs, images, textbooks) through OCR, embedding, retrieval-augmented generation (RAG), and automated content creation. It supports generating course outlines, interactive questions, and more, with features like resumable processing, multi-provider API integration (Gemini, Cloudflare, Ollama), robust caching, cost tracking, and scalable architecture.
+CourseGen is a modular pipeline for processing educational materials (PDFs, images, textbooks) through OCR, embedding, retrieval-augmented generation (RAG), and automated content creation. It supports generating course outlines, interactive questions, and more, with resumable processing, multi-provider API integration (Gemini, Cloudflare, Ollama), robust caching, cost tracking, and scalable architecture.
 
 ## Key Features
+
 - **End-to-End Pipeline**: From raw PDFs to searchable embeddings and AI-generated educational content.
 - **Robust OCR**: Handles scanned documents with preprocessing, rotation detection, and tunable Tesseract parameters.
 - **Intelligent RAG**: Semantic search over ChromaDB with metadata filtering (e.g., by course code, department).
@@ -16,29 +17,68 @@ CourseGen is a comprehensive, modular pipeline for processing educational materi
 
 The project is organized into `services/` (core pipelines), `data_models/` (Pydantic schemas), `utils/` (helpers), `data/` (inputs/outputs, gitignored), and `tests/` (PyTest suite).
 
-## Project Structure Overview
-- `services/RAG/`: PDF ingestion, OCR, chunking, embedding, and ChromaDB storage. See [detailed README](README_convert_to_embeddings.md).
-- `services/QuestionRag/`: RAG-based course outline and question generation. See [Course Outline README](README_course_outline_generation.md) and [Question Generation README](README_question_generation.md).
-- `services/Gemini/`: API client with key load balancing. See [API Key Load Balancer README](README_api_key_load_balancer.md).
-- `services/{Cloudflare, Ollama, Firestore}/`: Provider-specific clients.
-- `utils/`: Caching, data cleaning, progress tracking, and more.
-- `data_models/`: Typed models for courses, questions, documents, etc.
-- `data/`: Sample textbooks, courses.json, caches (gitignored).
-- `specs/` and `steering/`: Design documents and high-level architecture.
-- `tests/`: Unit/integration tests.
+## Project Structure
 
-## Docker Setup
-Use `docker-compose.yml` for containerized runs with **persistent volumes** that survive container rebuilds. The setup mounts embeddings, caches, and data directories to preserve your work across updates.
+```
+services/
+├── RAG/                     # PDF ingestion, OCR, chunking, embedding, ChromaDB storage
+├── QuestionRag/             # Course outline and question generation
+│   ├── pipelines/           # course_outline_generator.py, question_generator.py
+│   └── utils/               # chromadb_query.py, batch_utils.py, cache.py, courses.py
+├── Gemini/                  # API client with key load balancing
+├── Cloudflare/              # BGE-M3 embedding client
+├── Ollama/                  # Local embedding fallback
+└── Firestore/               # Cloud storage for outlines/questions
+utils/                       # Caching, data cleaning, PDF/image tools, progress tracking
+data_models/                 # Pydantic schemas for courses, questions, documents
+data/                        # Sample textbooks, courses.json, caches (gitignored)
+  └── textbooks/             # Course PDFs organized by department
+specs/                       # Design documents
+steering/                    # High-level architecture
+tests/                       # Unit/integration tests (PyTest)
+```
 
-### 🚀 Quick Start with Persistent Volumes
+---
+
+## Setup
+
+### Prerequisites
+
+- **Python 3.10+** (virtualenv recommended)
+- **Docker** (for containerized runs) with at least 4 GB RAM and 10 GB free disk space
+- **API Keys** for Google Gemini and Cloudflare Workers AI
+- **Tesseract OCR** (only for local runs; install via your package manager)
+- **AWS CLI** (optional, for ECR deployment)
+
+### Environment Configuration
+
 ```bash
-# Build the optimized Docker image with persistent volume support
+cp .env.example .env
+```
+
+Edit `.env` with your API keys:
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_API_KEY` | Gemini API key(s); comma-separated for multiple keys |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID for embeddings |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token |
+| `TESSDATA_PREFIX` | Path to Tesseract data (local runs) |
+
+### Docker Setup (Recommended)
+
+Use `docker-compose.yml` for containerized runs with **persistent volumes** that survive container rebuilds.
+
+#### Quick Start with Persistent Volumes
+
+```bash
+# Build the optimized Docker image
 ./build.sh
 
 # Start with persistent volumes (recommended)
 docker-compose up
 
-# Or run specific service with volumes
+# Or run specific service
 docker-compose up coursegen-questions
 
 # Generate questions for all courses (20 per subtopic: 10 theory + 10 calculation)
@@ -48,52 +88,37 @@ docker-compose run --rm coursegen --theory-per-request 10 --calc-per-request 5
 docker-compose run --rm coursegen --course-code "AAE 101" --theory-per-request 10 --calc-per-request 5
 ```
 
-### ☁️ AWS ECR Deployment
-Deploy your CourseGen application to AWS Elastic Container Registry for production use:
+#### Persistent Data Directories
 
-```bash
-# Fix Docker credential issues (if needed)
-./build.sh --fix-credentials
+Only cache and course metadata are mounted from the host at runtime:
 
-# Build and deploy to AWS ECR
-./build.sh --deploy
+- `./OUTPUT_DATA2/cache/` — question generation caches that survive between runs
+- `./data/` — course inputs, outlines, and configuration files
 
-# Run from ECR with persistent volumes
-./run.sh --course-code "EEE 315"
+> Embeddings live inside the Docker image at `/app/OUTPUT_DATA2/emdeddings`. When you refresh them locally, rebuild (and optionally redeploy) the image so every environment picks up the new bundle.
 
-# Manual ECR authentication (if needed)
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com
-```
+#### Updating Embeddings
 
-**ECR Repository**: `888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest`
-
-### 📁 Persistent Data Directories
-Only the cache and course metadata are mounted from the host when the container runs:
-- `./OUTPUT_DATA2/cache/` – question generation caches that survive between runs
-- `./data/` – course inputs, outlines, and configuration files
-
-> ℹ️ Embeddings live inside the Docker image at `/app/OUTPUT_DATA2/emdeddings`. When you refresh them locally, rebuild (and optionally redeploy) the image so every environment picks up the new bundle.
-
-### 🔄 Updating Embeddings
 1. **Regenerate embeddings on the host** so `OUTPUT_DATA2/emdeddings` contains the new Chroma database:
 
    ```bash
    python -m services.RAG.convert_to_embeddings \
-     -i data/textbooks/COMPILATION/EEE \
+     -i data/textbooks/EEE \
      --with-chroma \
      -c pdfs_bge_m3_cloudflare \
      --workers 4 \
      --resume
    ```
 
-2. **Rebuild (and optionally deploy) the Docker image** to bake those embeddings into the container:
+2. **Rebuild (and optionally deploy) the Docker image** to bake embeddings into the container:
 
    ```bash
    ./build.sh --cleanup    # rebuild locally
    ./build.sh --deploy     # push to ECR when ready
    ```
--
-### 🔧 Advanced Usage
+
+#### Advanced Docker Usage
+
 ```bash
 # Interactive shell with persistent volumes
 docker-compose run --rm coursegen bash
@@ -101,7 +126,7 @@ docker-compose run --rm coursegen bash
 # Custom environment file with volumes
 docker-compose --env-file .env.production up
 
-# Run with specific settings (volumes automatically mounted)
+# Run with specific settings
 docker-compose run --rm coursegen \
   --course-code "AAE 101" \
   --theory-per-request 10 \
@@ -118,176 +143,344 @@ docker-compose run --rm coursegen \
   --request-delay 2
 ```
 
-### Available Courses
-Check available courses in `data/textbooks/courses.json`:
-```bash
-# List all available course codes
-grep '"code"' data/textbooks/courses.json | head -10
+### Local Development Setup
 
-# Example courses: "AAE 101", "AAE 331", "AAE 335", etc.
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+pip install -r requirements.txt
 ```
 
-### Question Generation Troubleshooting
-- **"Course code not found"**: Check available courses in `data/textbooks/courses.json`
-- **"No RAG context found"**: Regenerate embeddings and rebuild the image so `/app/OUTPUT_DATA2/emdeddings` is up to date
-- **API errors**: Verify API keys in `.env` file are valid and have sufficient quota
-- **0 questions generated**: Course may not have sufficient RAG context or outlines
-- **Resume stuck on a subtopic**: Check `OUTPUT_DATA2/cache/course_progress/` for the course manifest; delete a single file to reset one course or fix any `state: "error"` entries.
-- **Memory issues**: Reduce `--theory-per-request` and `--calc-per-request` values
-- **Volume permission errors**: Ensure host directories have proper permissions (775 recommended)
-- **Firestore errors**: Check Firebase credentials and network connectivity
+Install Tesseract OCR and set `TESSDATA_PREFIX` env var. For OCR-heavy archives, install optional dependencies:
 
-### Docker & AWS ECR Troubleshooting
-- **"Error saving credentials"**: Run `./build.sh --fix-credentials` to resolve credential helper issues
-- **ECR authentication failed**: Check AWS CLI configuration and permissions
-- **Image not found locally**: The run script will automatically pull from ECR if available
-- **Permission denied on volumes**: Ensure host directories have proper permissions (775 recommended)
-- **Build fails with "invalid tag"**: Use the fixed build script with correct ECR URI format
-- **AWS CLI not found**: Install AWS CLI or authenticate manually with `aws ecr get-login-password`
-
-### Embeddings-Specific Troubleshooting
-- **"No RAG context found"**: Regenerate embeddings locally and rebuild the image so `/app/OUTPUT_DATA2/emdeddings` is refreshed.
-- **"ChromaDB connection failed"**: Ensure you rebuilt after uploading the latest SQLite bundle; during local generation confirm `OUTPUT_DATA2/emdeddings` exists before building.
-- **"Permission denied on embeddings"**: This can happen while regenerating locally—make sure `OUTPUT_DATA2/emdeddings` is writable (`chmod`/`chown`) before running the converter.
-- **"Embeddings outdated"**: Follow the two-step refresh (`convert_to_embeddings` → `./build.sh --cleanup` → optional `--deploy`).
-- **"Disk space full"**: Embedding databases are large; check available space with `df -h` before regenerating.
-- **"ChromaDB locked"**: Stop any process (local script or container) using the database, then retry the generation.
-
-### 🚀 Recent Improvements
-- ✅ **AWS ECR Deployment**: Full integration with AWS Elastic Container Registry
-- ✅ **Cache Volumes**: Cache/data directories persist while embeddings ship with the image
-- ✅ **Enhanced Reliability**: Added retry logic for network failures during build
-- ✅ **Fixed Dependencies**: Resolved numpy/albumentations version conflicts
-- ✅ **Better Error Handling**: Improved build script with debugging capabilities
-- ✅ **Path Consistency**: Fixed typos and ensured consistent directory paths
-- ✅ **Improved Health Checks**: Container now verifies ChromaDB embeddings directory exists
-- ✅ **Optimized Docker Compose**: Cleaner configuration with better defaults
-- ✅ **Docker Credential Helper Fix**: Automatic resolution of credential helper issues
-- ✅ **Question Generation Fix**: Resolved "missing solution steps" error for calculation questions
-- ✅ **Enhanced Scripts**: Added deployment, credential fixing, and debugging options
-- ✅ **Automated Embeddings Update**: One-command workflow to regenerate embeddings and rebuild/deploy the image
-- ✅ **Comprehensive Documentation**: Complete guide for all features and troubleshooting
-
-### Build Script Features
-The `./build.sh` script now includes:
-- **System Resource Checks**: Validates disk space and Docker daemon status
-- **Retry Logic**: Automatically retries failed builds with exponential backoff
-- **Debug Mode**: Provides detailed system information for troubleshooting
-- **Cleanup Options**: Removes old images and containers to free space
-- **Verbose Logging**: Shows detailed build progress and error information
-- **AWS ECR Deployment**: Automated push to AWS Elastic Container Registry
-- **Credential Helper Fix**: Resolves Docker credential helper configuration issues
-- **Multiple Build Targets**: Support for full and minimal Dockerfiles
-- **Health Verification**: Validates built images can run successfully
-
-### Dockerfile Optimizations
-- **Multi-layer Caching**: Optimized layer structure for faster rebuilds
-- **Network Resilience**: Automatic retry logic for apt-get operations
-- **Security**: Non-root user with proper permissions
-- **Health Checks**: Built-in monitoring and health verification
-- **Resource Optimization**: Configured for optimal memory and CPU usage
-- **Host Volume Support**: Proper permissions and ownership for cache/data mounts
-- **Directory Structure**: Ensures all required directories exist with correct permissions
-
-### Run Script Features
-The `./run.sh` script provides enhanced container execution with:
-- **AWS ECR Integration**: Automatic authentication and image pulling from ECR
-- **Cache Volume Management**: Automatically binds cache/data directories needed at runtime
-- **Flexible Configuration**: Support for custom environment files and parameters
-- **Interactive/Background Modes**: Choose between interactive and detached execution
-- **Smart Prerequisites**: Validates Docker image availability and pulls from ECR if needed
-- **Error Recovery**: Graceful handling of authentication and network issues
-
-### 📋 Prerequisites
-- **API Keys**: Ensure `.env` has valid API keys for Gemini, Cloudflare, and Firestore
-- **Persistent Data**: Cache outputs live in `OUTPUT_DATA2/cache/` and course configs in `data/`; regenerate embeddings locally and rebuild the image when they change.
-- **Course Data**: Verify `data/textbooks/courses.json` contains your course outlines
-- **AWS ECR (Optional)**: For deployment, ensure AWS CLI is configured with proper permissions
-
-### Enhanced Script Usage
-The enhanced build and run scripts provide powerful deployment and management features:
-
-#### Build Script (`./build.sh`)
 ```bash
-# ONE COMMAND: Update embeddings in volume, rebuild image, and deploy to AWS
-./build.sh --update-embeddings
+pip install easyocr      # local OCR fallback
+pip install opencv-python  # image preprocessing
+```
 
-# Basic build
-./build.sh
+---
 
-# Build with cleanup
-./build.sh --cleanup
+## Pipeline
+
+### Convert to Embeddings
+
+`services/RAG/convert_to_embeddings.py` converts collections of PDFs into searchable vectors with rich metadata, billing information, and resume state. It uses Cloudflare's BGE-M3 embeddings and the CourseGen directory layout (`OUTPUT_DATA2`), with modular code paths for local experimentation.
+
+#### Processing Flow
+
+1. **Discovery** — recursively walks `--input-dir`, skipping dot directories and non-PDF files.
+2. **Text extraction** — attempts direct text via PyMuPDF; delegates to OCR (Gemini, EasyOCR, or hybrid) if insufficient text or `--force-ocr` is set.
+3. **Chunking & dedupe** — breaks text into 2-paragraph windows with sentence overlap, then applies SHA1 + fuzzy dedup.
+4. **Embedding** — streams batches through Cloudflare's BGE-M3 endpoint with adaptive batch sizes and token accounting; vectors cached per chunk hash.
+5. **Export** — writes per-PDF JSONL and optionally upserts batches into Chroma (default).
+6. **Progress update** — `progress_state.json` and `seen_files.json` updated after each file for resumability.
+
+#### CLI Usage
+
+```bash
+python -m services.RAG.convert_to_embeddings -i <PDF_ROOT> [options]
+```
+
+**Frequently Used Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `-i, --input-dir` | **Required.** Root directory containing PDFs (traversed recursively). |
+| `--export-dir` | Where JSONL + progress files live (default `OUTPUT_DATA2/progress_report`). |
+| `--cache-dir` | OCR + text cache root (default `OUTPUT_DATA2/cache`). |
+| `--with-chroma` / `--no-chroma` | Toggle Chroma upserts (default on). |
+| `-c, --collection` | Chroma collection name (default `course_embeddings`). |
+| `-p, --persist-dir` | Chroma persistence directory (default `OUTPUT_DATA2/emdeddings`). |
+| `--workers` | ProcessPool workers for PDF processing (default 2). |
+| `--ocr-dpi` | Render DPI when OCR is needed (default 200). |
+| `--engine` | OCR engine: `gemini`, `hybrid`, `easyocr` (default `gemini`). |
+| `--force-ocr` | Skip native text extraction even if the PDF has a text layer. |
+| `--resume` | Always on; delete `progress_state.json` to restart from scratch. |
+
+**Examples:**
+
+```bash
+# Standard run with Chroma upserts
+python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/EEE \
+  --collection pdfs_bge_m3_cloudflare \
+  --persist-dir OUTPUT_DATA2/emdeddings \
+  --workers 4
+
+# OCR-heavy archive (high DPI, Gemini + EasyOCR hybrid)
+python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/scanned \
+  --force-ocr \
+  --ocr-dpi 450 \
+  --engine hybrid \
+  --workers 2
+
+# Dry run on a limited subset
+python -m services.RAG.convert_to_embeddings \
+  -i data/textbooks/sample \
+  --max-pdfs 5 \
+  --no-chroma
+```
+
+#### Output Artifacts
+
+- **Per-PDF JSONL** — `OUTPUT_DATA2/progress_report/<stem>.jsonl`
+- **Chroma** — vectors upserted to target collection
+- **Progress** — `progress_state.json` (file status, timing, chunk counts)
+- **Billing** — `billing_state.json` (token counts and cost estimates)
+- **Dedup index** — `seen_files.json` (SHA-256 prefixes)
+- **Cache** — OCR intermediates, text snapshots, per-chunk embedding caches
+
+#### Performance Tuning
+
+- Keep `--workers` low (1–2) for high-DPI OCR to avoid thrashing.
+- Start embedding batch size at 16–32; the script adapts based on Cloudflare responses.
+- Use `--timeout` (default 30 min) to prevent pathological files from hanging the pool.
+
+#### Verify Embeddings
+
+```bash
+python services/RAG/inspect_chroma.py \
+  -c pdfs_bge_m3_cloudflare \
+  -p OUTPUT_DATA2/emdeddings \
+  --query "z-transform"
+```
+
+---
+
+### Course Outline Generation
+
+`services/QuestionRag/pipelines/course_outline_generator.py` produces rich course outlines (description + 8–12 modules with 5 learning objectives each) from ChromaDB embeddings. It is the authoritative source for refreshing `courses.json` and exporting per-course outline JSON files.
+
+#### What It Does
+
+- **Chroma-first retrieval** — scans metadata to determine available courses; filters chunks by department, code, and level.
+- **Structured prompting** — uses Gemini with deterministic prompts to generate markdown-ready outlines with schema validation.
+- **Subtopic refinement** — optional RAG pass refines each module to exactly five comprehensive learning objectives.
+- **Resume-friendly orchestration** — caches which courses have outlines, missing embeddings, or errors; TTL support for forced reprocessing.
+- **courses.json integration** — updates the central catalog in place (with `.bak` backup).
+- **Bulk modes** — scan every unique course folder in Chroma or restrict to a specific department.
+
+#### Components
+
+| Role | Module / Path |
+|------|---------------|
+| Outline generation core | `services/QuestionRag/pipelines/course_outline_generator.py` |
+| RAG retrieval | `services/QuestionRag/utils/chromadb_query.py` |
+| Course store | `CourseStore` (reads/writes `courses.json`) |
+| Outline cache | `OUTPUT_DATA2/cache/outline_cache_<DEPT>.json` |
+| Progress log | `OUTPUT_DATA2/cache/outline_progress_<DEPT>.json` |
+| Per-course exports | `OUTPUT_DATA2/cache/outlines_by_chroma/course_outline_<CODE>_<timestamp>.json` |
+
+#### CLI Usage
+
+```bash
+python -m services.QuestionRag.pipelines.course_outline_generator [OPTIONS]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--scan_chroma_all` | Enumerate every course present in Chroma (default true). |
+| `--department_only` | Restrict to department inferred from `--department_from`. |
+| `--department_from` | Seed course code for department prefix (e.g., `"EEE 315"` → `"EEE"`). |
+| `--thinking` | Enable Gemini thinking model for richer outlines. |
+| `--variation` | Allow retrieval temperature / prompt variation for diverse coverage. |
+| `--skip_existing` / `--no_skip_existing` | Skip courses with existing description + outline (default skip). |
+| `--allow_dept_fallback` | Fall back to department-level chunks when course embeddings are absent. |
+| `--force_regenerate` | Rebuild outlines even if signatures match prior exports. |
+| `--dry_run` | Do retrieval, log hit counts, but skip Gemini calls and file writes. |
+
+**Examples:**
+
+```bash
+# Refresh every outlined course in Chroma
+python -m services.QuestionRag.pipelines.course_outline_generator --scan_chroma_all
+
+# Reprocess a single department with fallback
+python -m services.QuestionRag.pipelines.course_outline_generator \
+  --department_only \
+  --department_from "EEE 315" \
+  --allow_dept_fallback
+
+# Force regeneration with thinking mode
+python -m services.QuestionRag.pipelines.course_outline_generator \
+  --scan_chroma_all \
+  --force_regenerate \
+  --thinking
+
+# Dry run for retrieval coverage
+python -m services.QuestionRag.pipelines.course_outline_generator \
+  --department_only \
+  --department_from "CVE 201" \
+  --dry_run \
+  --no_skip_existing
+```
+
+#### Programmatic Usage
+
+```python
+from services.QuestionRag.pipelines.course_outline_generator import GeminiQuestionGen
+
+gen = GeminiQuestionGen(is_thinking=False)
+outline = gen.generate_outline_for_course(
+    course_title="Digital Signal Processing",
+    course_code="EEE471",
+    department_code="EEE",
+    level="400",
+    department_str_for_prompt="Electrical Engineering",
+    variation=True,
+    allow_dept_fallback=True,
+)
+```
+
+#### Operational Notes
+
+- **Subtopic RAG** — controlled by `GEN_QG_SUBTOPIC_RAG` env var (on by default). When enabled, each topic triggers an extra retrieval pass to refine learning objectives.
+- **Pacing knobs** — `GEN_QG_COURSE_DELAY_S`, `GEN_QG_TOPIC_DELAY_S`, `GEN_QG_QUERY_DELAY_S` manage throughput.
+- **Fallback strategy** — `allow_dept_fallback` prevents gaps when course-specific PDFs are missing.
+
+---
+
+### Question Generation
+
+`services/QuestionRag/pipelines/question_generator.py` produces **20 fully grounded questions per subtopic** (10 theory + two 5-question calculation batches) across every course that has an outline in `courses.json`. It retrieves context from ChromaDB, calls Gemini through the API key balancer, and persists progress for resume safety.
+
+#### Key Components
+
+| Concern | Module |
+|---------|--------|
+| RAG retrieval | `services/QuestionRag/utils/chromadb_query.py` |
+| Prompt assembly | `services/QuestionRag/pipelines/prompt_utils.py` |
+| Gemini orchestration | `services/Gemini/gemini_service.py` |
+| Batch parsing | `services/QuestionRag/pipelines/json_utils.py` |
+| Progress + cache | `services/QuestionRag/utils/course_progress.py`, `cache.py` |
+| Topic parallelism | `services/QuestionRag/pipelines/worker_pool.py` |
+| Firestore (optional) | `services/Firestore/firebase_service.py` |
+
+#### Architecture
+
+1. **Outline discovery** — loads `courses.json` and filters courses with `outline` blocks.
+2. **Per-topic fan out** — `TopicWorkerPool` assigns topics to workers (default 3 threads).
+3. **RAG retrieval** — `ChromaQuery` fetches candidates, prunes with similarity thresholds, slices into context windows.
+4. **Prompt construction** — assembles request metadata (difficulty, Bloom level, request kind) and RAG snippets.
+5. **Gemini call** — `GeminiService` selects a key via `ApiKeyManager`, applies structured output or thinking mode, retries on failure.
+6. **Validation + caching** — responses parsed into `Question` Pydantic models, stored in `QuestionCache`, progress counters updated.
+7. **Persistence** — Firestore updates after both calculation batches succeed; optional JSONL export.
+
+#### Batch Semantics
+
+Every subtopic always attempts three batches:
+
+1. `theory-1` → 10 MCQs
+2. `calculation-1` → 5 calculation MCQs with LaTeX solutions
+3. `calculation-2` → another 5 calculation MCQs (total 10 calculations)
+
+#### CLI Usage
+
+```bash
+python -m services.QuestionRag.pipelines.question_generator [OPTIONS]
+```
+
+| Flag | Purpose / Default |
+|------|-------------------|
+| `--course-code STR` | Course code (`"all"` processes every outlined course). |
+| `--courses-json PATH` | Override course catalog location. |
+| `--rag-topk`, `--rag-final-k`, `--rag-tau`, `--rag-min-sim` | Retrieval tuning knobs. |
+| `--rag-where JSON` | Extra metadata filter, e.g. `'{"LEVEL": {"$eq": "400"}}'`. |
+| `--theory-per-request`, `--calc-per-request` | Targets per Gemini request. |
+| `--structured-output` / `--no-structured-output` | Toggle Gemini schema-based parsing. |
+| `--thinking`, `--thinking-budget` | Enable Gemini thinking mode. |
+| `--request-delay`, `--delay-jitter` | Back pressure between API calls. |
+| `--request-attempts`, `--rag-attempts` | Retry counts for Gemini and retrieval. |
+| `--topics`, `--subtopics` | Case-insensitive filters. |
+| `--output-jsonl PATH` | Dump all questions to a single JSONL file. |
+| `--disable-parallel` | Force sequential topic processing. |
+| `--skip-firestore`, `--no-resume`, `--no-latex-wrap` | Opt-out flags. |
+
+**Examples:**
+
+```bash
+# Default full run (all courses)
+python -m services.QuestionRag.pipelines.question_generator
+
+# Single course with structured output
+python -m services.QuestionRag.pipelines.question_generator \
+  --course-code "EEE 471" \
+  --structured-output \
+  --request-delay 2.0 \
+  --output-jsonl OUTPUT_DATA2/questions_EEE471.jsonl
+
+# Target specific subtopics with metadata filter
+python -m services.QuestionRag.pipelines.question_generator \
+  --course-code "MTH 313" \
+  --topics "Complex Analysis" \
+  --subtopics "Residue Calculus" \
+  --rag-where '{"CATEGORY": {"$in": ["TEXTBOOK", "PAST_QUESTIONS"]}}'
+
+# Disable parallel workers (debugging)
+python -m services.QuestionRag.pipelines.question_generator --disable-parallel
+```
+
+#### Caching & Progress
+
+- **Question cache** — `OUTPUT_DATA2/cache/question_gen/cache.json` indexes per-request payloads and metadata.
+- **Course progress** — `OUTPUT_DATA2/cache/course_progress/{course}.json` records theory/calculation counters, state, and timestamps.
+- **Error dumps** — failed Gemini payloads at `OUTPUT_DATA2/cache/failed_responses/`.
+- **Resume workflow** — interrupted batches marked `in_progress`; next run upgrades them to `interrupted`, clears stale cache entries, and retries.
+
+#### Programmatic Usage
+
+```python
+from services.QuestionRag.pipelines.config import QuestionBatchConfig
+from services.QuestionRag.pipelines.question_generator import QuestionBatchRunner, QuestionGenerator
+from services.Gemini.gemini_service import GeminiService
+from services.Gemini.api_key_manager import ApiKeyManager
+from services.Gemini.gemini_api_keys import GeminiApiKeys
+
+api_keys = GeminiApiKeys().get_keys()
+generator = QuestionGenerator(
+    gemini_service=GeminiService(api_key_manager=ApiKeyManager(api_keys)),
+    use_structured=True,
+)
+
+config = QuestionBatchConfig(
+    course_code="EEE 471",
+    courses_json_path=Path("data/textbooks/courses.json"),
+    cache_dir=Path("OUTPUT_DATA2/cache"),
+    resume=True,
+    store_firestore=False,
+)
+
+runner = QuestionBatchRunner(generator)
+questions = runner.run_parallel(config)
+```
+
+---
+
+## Deployment
+
+### AWS ECR Deployment
+
+Deploy CourseGen to AWS Elastic Container Registry for production use:
+
+```bash
+# Fix Docker credential issues (if needed)
+./build.sh --fix-credentials
 
 # Build and deploy to AWS ECR
 ./build.sh --deploy
 
-# Fix Docker credential issues
-./build.sh --fix-credentials
-
-# Debug build issues
-./build.sh --debug
-
-# Build minimal version
-./build.sh --minimal
-
-# Show all options
-./build.sh --help
-```
-
-#### Run Script (`./run.sh`)
-```bash
-# Basic usage
-./run.sh
-
-# Run specific course
+# Run from ECR with persistent volumes
 ./run.sh --course-code "EEE 315"
 
-# Custom question counts
-./run.sh --theory-per-request 5 --calc-per-request 3
-
-# Interactive mode
-./run.sh -i --course-code "AAE 101"
-
-# Background mode
-./run.sh -b --course-code "EEE 315"
-
-# Debug mode
-./run.sh --debug --course-code "AAE 101"
-
-# Custom environment file
-./run.sh --env-file .env.production --course-code "EEE 471"
-
-# Show all options
-./run.sh --help
+# Manual ECR authentication
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
 ```
 
-#### Docker Compose Commands
-```bash
-# Start all services
-docker-compose up
+**ECR Repository:** `YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag:latest`
 
-# Run question generation
-docker-compose run --rm coursegen --course-code "EEE 315"
+#### Embeddings Management Workflow
 
-# Update embeddings (with proper command override)
-docker-compose run --rm \
-  -e PYTHONPATH=/app \
-  coursegen \
-  python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/COMPILATION/EEE \
-  --with-chroma \
-  -c pdfs_bge_m3_cloudflare \
-  --workers 4 \
-  --resume
-
-# Run tests
-docker-compose run --rm coursegen pytest tests/ -v
-```
-
-### Embeddings Management
-Manage ChromaDB embeddings independently of the main application:
-
-#### Complete Workflow: Update Both Local Volume AND AWS Image
 ```bash
 # ONE COMMAND: Update embeddings, rebuild image, and deploy to AWS
 ./build.sh --update-embeddings
@@ -297,9 +490,9 @@ Manage ChromaDB embeddings independently of the main application:
 docker run --rm \
   -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
   -v $(pwd)/data:/app/data \
-  888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest \
+  YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag:latest \
   python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/COMPILATION/EEE \
+  -i data/textbooks/EEE \
   --with-chroma \
   -c pdfs_bge_m3_cloudflare \
   --workers 4 \
@@ -312,206 +505,371 @@ docker run --rm \
 ./build.sh --deploy
 ```
 
-#### Generate/Update Embeddings (Local Volume Only)
-```bash
-# Using docker run with persistent volumes (recommended)
-docker run --rm \
-  -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
-  -v $(pwd)/data:/app/data \
-  888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest \
-  python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/COMPILATION/EEE \
-  --with-chroma \
-  -c pdfs_bge_m3_cloudflare \
-  --workers 4 \
-  --resume
+#### Host vs Image Embeddings
 
-# Using docker-compose (alternative)
+- **Host directory** (`OUTPUT_DATA2/emdeddings/`): Where regeneration writes during development; rebuild after updating it.
+- **Image embeddings**: Copied into the Docker image at `/app/OUTPUT_DATA2/emdeddings` during `./build.sh`.
+- **AWS ECR image**: The pushed artifact — rebuild & deploy whenever you refresh embeddings locally.
+
+### EC2 Helper Script
+
+`./ec2_execution.sh` wraps an ECR-hosted container, syncs textbook data + embeddings onto the host, mounts persistent volumes (`~/OUTPUT_DATA2/...`), and mirrors the Gemini cache so key rotation survives container churn. Use flags like `--course-code`, `--structured-output`, `--background`, `--skip-sync`, or `--env-file` as needed.
+
+### Build Script Features
+
+`./build.sh` includes:
+
+- **System Resource Checks** — validates disk space and Docker daemon status
+- **Retry Logic** — automatically retries failed builds with exponential backoff
+- **Debug Mode** — detailed system information for troubleshooting
+- **Cleanup Options** — removes old images and containers
+- **AWS ECR Deployment** — automated push to AWS Elastic Container Registry
+- **Credential Helper Fix** — resolves Docker credential helper issues
+- **Multiple Build Targets** — support for full and minimal Dockerfiles
+- **Health Verification** — validates built images can run successfully
+
+| Flag | Action |
+|------|--------|
+| `--update-embeddings` | Regenerate embeddings, rebuild image, deploy to ECR (one command) |
+| `--cleanup` | Rebuild locally with cleanup |
+| `--deploy` | Build and deploy to AWS ECR |
+| `--fix-credentials` | Resolve Docker credential helper issues |
+| `--debug` | Debug build issues |
+| `--minimal` | Build minimal version |
+| `--help` | Show all options |
+
+### Run Script Features
+
+`./run.sh` provides:
+
+- **AWS ECR Integration** — automatic authentication and image pulling from ECR
+- **Cache Volume Management** — binds cache/data directories needed at runtime
+- **Flexible Configuration** — custom environment files and parameters
+- **Interactive/Background Modes** — `-i` for interactive, `-b` for detached
+- **Smart Prerequisites** — validates Docker image availability
+
+```bash
+./run.sh                                          # Show help
+./run.sh --course-code "EEE 315"                  # Specific course
+./run.sh --theory-per-request 5 --calc-per-request 3  # Custom counts
+./run.sh -i --course-code "AAE 101"               # Interactive mode
+./run.sh -b --course-code "EEE 315"               # Background mode
+./run.sh --debug --course-code "AAE 101"          # Debug mode
+./run.sh --env-file .env.production               # Custom env
+```
+
+### Docker Compose Commands
+
+```bash
+# Start all services
+docker-compose up
+
+# Run question generation
+docker-compose run --rm coursegen --course-code "EEE 315"
+
+# Update embeddings
 docker-compose run --rm \
   -e PYTHONPATH=/app \
   coursegen \
   python -m services.RAG.convert_to_embeddings \
-  -i data/textbooks/COMPILATION/EEE \
+  -i data/textbooks/EEE \
   --with-chroma \
   -c pdfs_bge_m3_cloudflare \
   --workers 4 \
   --resume
+
+# Run tests
+docker-compose run --rm coursegen pytest tests/ -v
 ```
 
-#### Verify Embeddings
+### Production Deployment
+
+**Docker Swarm:**
 ```bash
-# Check embeddings directory exists and has content
-ls -la OUTPUT_DATA2/emdeddings/
-
-# Verify ChromaDB is accessible
-docker-compose run --rm coursegen \
-  python -c "from services.RAG.chroma_store import ChromaStore; print('ChromaDB accessible')"
+docker stack deploy -c docker-compose.yml coursegen
 ```
 
-#### Backup/Restore Embeddings
+**Kubernetes:**
 ```bash
-# Create backup
-tar -czf embeddings_backup_$(date +%Y%m%d_%H%M%S).tar.gz OUTPUT_DATA2/emdeddings/
-
-# Restore from backup
-tar -xzf embeddings_backup_20250101_120000.tar.gz
+kompose convert
+kubectl apply -f .
 ```
 
-#### Understanding Host vs Image Embeddings
-- **Host directory** (`OUTPUT_DATA2/emdeddings/`): Where regeneration writes during development; rebuild after updating it.
-- **Image embeddings**: Copied into the Docker image at `/app/OUTPUT_DATA2/emdeddings` during `./build.sh`.
-- **AWS ECR image**: The pushed artifact—rebuild & deploy whenever you refresh embeddings locally.
+---
 
-## Quick Start
+## Configuration
 
-### 🐳 Docker Setup (Recommended - with Persistent Volumes)
-1. **Build and Start**:
-    ```bash
-    # Build the optimized Docker image
-    ./build.sh
+### Environment Variables
 
-    # Start with persistent volumes (data survives rebuilds)
-    docker-compose up
-    ```
-    > Note: `./run.sh` binds only the cache directory by default; the compose profile mounts the full `OUTPUT_DATA2` tree for advanced workflows like local regeneration.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TESSDATA_PREFIX` | — | Path to Tesseract data |
+| `OCR_DPI` | 300 | Rendering DPI |
+| `OMP_NUM_THREADS` | 4 | OCR threads |
+| `CF_EMBED_MAX_BATCH` | 96 | Embedding batch size (≤100) |
+| `CF_EMBED_MAX_TOKENS` | 512 | Max tokens per embedding request |
+| `BILLING_ENABLED` | 0 | Track costs (1/0) |
+| `CF_PRICE_PER_M_TOKENS` | 0.02 | Cloudflare pricing (USD/M tokens) |
+| `COURSEGEN_CACHE_ROOT` | `<repo>/OUTPUT_DATA2` | Base directory for cache files |
+| `COURSEGEN_OUTPUT_ROOT` | `<repo>/OUTPUT_DATA2` | Base directory for output files |
+| `COURSEGEN_DEBUG_DUMP_DIR` | — | Directory for failed Gemini payloads |
+| `COURSEGEN_DISABLE_CACHE_DAILY_RESET` | false | Skip midnight cache reset |
+| `OCR_LANG` | en | OCR language hint |
+| `OCR_ENGINE` | gemini | OCR engine (gemini/hybrid/easyocr) |
+| `EASYOCR_GPU` | — | Enable GPU for EasyOCR |
+| `EMAIL_NOTIFICATIONS_ENABLED` | false | Enable email notifications |
 
-2. **Configure Secrets**:
-    ```bash
-    # Copy and edit environment file
-    cp .env.example .env
-    # Edit .env with your API keys:
-    # - GOOGLE_API_KEY (Gemini)
-    # - CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN
-    # - TESSDATA_PREFIX (Tesseract OCR path)
-    ```
+### API Key Load Balancer
 
-3. **Generate Embeddings** (one-time setup):
-    ```bash
-    # Process PDFs with persistent storage
-    docker-compose run --rm coursegen \
-      python -m services.RAG.convert_to_embeddings \
-      -i data/textbooks/COMPILATION/EEE \
-      --with-chroma \
-      -c pdfs_bge_m3_cloudflare \
-      --workers 4 \
-      --resume
-    ```
+`services/Gemini/api_key_manager.py` rotates across multiple Gemini API keys, enforces per-model quotas, and surfaces exhaustion state to upstream pipelines.
 
-4. **Generate Questions** (20 per subtopic: 10 theory + 10 calculation):
-    ```bash
-    # Generate for all courses
-    docker-compose run --rm coursegen \
-      --theory-per-request 10 \
-      --calc-per-request 5 \
-      --request-delay 2
+#### Core Responsibilities
 
-    # Or for specific course
-    docker-compose run --rm coursegen \
-      --course-code "EEE 315" \
-      --theory-per-request 10 \
-      --calc-per-request 5
+- **Key discovery** — loads keys from `GeminiApiKeys` (list in `services/Gemini/gemini_api_keys.py`) or from explicit arguments.
+- **Persistent usage tracking** — stores daily counters, tokens, and exhaustion flags in `OUTPUT_DATA2/data/gemini_cache/api_key_cache.json`.
+- **Per-model quotas** — enforces rate limits for `flash`, `lite`, `pro`, and `embedding` model families.
+- **RPM throttling** — keeps rolling timestamps per key per model to avoid exceeding per-minute limits.
+- **Failure handling** — marks keys exhausted on fatal errors, escalates to email notifications, and raises a terminating `RuntimeError` when every key is exhausted.
 
-    # Or use the enhanced run script
-    ./run.sh --course-code "EEE 315"
-    ```
+#### Rate Limits (defaults from `rate_limit_data.py`)
 
-5. **Deploy to AWS ECR**:
-    ```bash
-    # ONE COMMAND: Update embeddings and deploy to AWS ECR
-    ./build.sh --update-embeddings
+| Model family | Requests per minute | Requests per day |
+|--------------|---------------------|------------------|
+| `lite` | 15 | 1,000 |
+| `flash` | 10 | 250 |
+| `pro` | 5 | 25 |
+| `embedding` | 5 | 1,000 |
 
-    # OR manually:
-    # Fix credential issues (if needed)
-    ./build.sh --fix-credentials
+Adjust these in `rate_limit_data.py` if your quotas differ.
 
-    # Build and deploy to AWS ECR
-    ./build.sh --deploy
+#### Configuration Steps
 
-    # Run from ECR
-    ./run.sh --course-code "EEE 315"
-    ```
+1. **List your keys** — edit `services/Gemini/gemini_api_keys.py` or load from environment variables / secrets manager.
+2. **Persist cache directory** — ensure `OUTPUT_DATA2/data/gemini_cache` is writable and mounted persistently.
+3. **(Optional) Disable daily reset** — set `COURSEGEN_DISABLE_CACHE_DAILY_RESET=true` (not recommended for production).
 
-6. **Run Tests**:
-    ```bash
-    docker-compose run --rm coursegen pytest tests/ -v
-    ```
+#### Usage
 
-### 💻 Local Development Setup
-1. **Setup Environment**:
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate  # Linux/macOS
-    # or .venv\Scripts\activate  # Windows
-    pip install -r requirements.txt
-    ```
-    Install Tesseract OCR and set `TESSDATA_PREFIX` env var.
+```python
+from services.Gemini.gemini_service import GeminiService
+service = GeminiService()  # Auto-wires ApiKeyManager + GeminiApiKeys
+```
 
-2. **Configure Secrets**: Same as Docker setup above.
+Custom configuration:
 
-3. **Process PDFs** (Embeddings):
-    ```bash
-    python -m services.RAG.convert_to_embeddings \
-      -i data/textbooks/COMPILATION/EEE \
-      --export-dir data/exported_data \
-      --cache-dir data/ocr_cache \
-      --with-chroma \
-      -c pdfs_bge_m3_cloudflare \
-      -p chromadb_storage \
-      --workers 4 \
-      --resume \
-      --ocr-dpi 450
-    ```
+```python
+from services.Gemini.api_key_manager import ApiKeyManager
+from services.Gemini.gemini_service import GeminiService
 
-4. **Generate Questions**:
-    ```bash
-    python -m services.QuestionRag.pipelines.question_generator \
-      --theory-per-request 10 \
-      --calc-per-request 5 \
-      --request-delay 2
-    ```
+manager = ApiKeyManager(["API_KEY_1", "API_KEY_2"])
+service = GeminiService(api_key_manager=manager, model="gemini-2.5-flash")
 
-5. **Run Tests**:
-    ```bash
-    pytest tests/ -v
-    ```
+response = service.generate("Summarise Fourier series.")
+```
 
-## Detailed Documentation
-For in-depth guides:
-- [Course Outline Generation](README_course_outline_generation.md): Automating syllabi from RAG-retrieved content.
-- [Question Generation](README_question_generation.md): Creating MCQs, essays, and more aligned with outlines.
-- [API Key Load Balancer](README_api_key_load_balancer.md): Scaling Gemini requests across multiple keys.
-- [Convert to Embeddings Pipeline](README_convert_to_embeddings.md): Core PDF processing and vectorization.
-- [Other Components](README_other_components.md): Data models, utils, testing, and deployment.
+#### Inspecting Usage
 
-## Environment Variables
-- `TESSDATA_PREFIX`: Path to Tesseract data.
-- `OCR_DPI`: Rendering DPI (default 300).
-- `OMP_NUM_THREADS`: OCR threads (default 4).
-- `CF_EMBED_MAX_BATCH`: Embedding batch size (≤100).
-- `BILLING_ENABLED`: Track costs (1/0).
-- `CF_PRICE_PER_M_TOKENS`: Cloudflare pricing (default 0.02 USD/M tokens).
+```bash
+jq '.' OUTPUT_DATA2/data/gemini_cache/api_key_cache.json
+```
 
-## Project Status
-This CourseGen project is **production-ready** with comprehensive Docker integration and AWS ECR deployment capabilities. All major components have been implemented and tested:
+```python
+from services.Gemini.api_key_manager import ApiKeyManager
+mgr = ApiKeyManager()
+print(mgr.cache_data["keys"])
+mgr.rotate_key(model="flash")
+```
 
-### ✅ Completed Features
-- **Full Docker Integration**: Containerized application with cache/data host volumes
-- **AWS ECR Deployment**: Automated deployment to AWS Elastic Container Registry
-- **Embeddings Management**: Complete workflow for updating ChromaDB embeddings
-- **Question Generation**: Fixed all known issues including solution steps validation
-- **Error Handling**: Comprehensive error recovery and troubleshooting
-- **Documentation**: Complete guides for all features and use cases
+#### Operational Tips
 
-### 🚀 Ready for Production
-- Deploy to AWS ECS, EKS, or other container platforms
-- Scale horizontally with multiple container instances
-- Use in CI/CD pipelines for automated updates
-- Monitor and manage through Docker and AWS tools
+- Keep at least **twice** as many keys as concurrent workers (e.g., 10 keys for 3–4 workers).
+- Rotate compromised keys by editing `api_key_cache.json` or removing them from `GeminiApiKeys`.
+- Back up `api_key_cache.json` before large runs for an audit trail.
+
+---
+
+### Data Models
+
+Pydantic-based schemas in `data_models/` ensure type safety, validation, and serialization across the project.
+
+| Model | File | Purpose |
+|-------|------|---------|
+| `CourseOutline` | `course_outline.py` | Outline structure (modules, objectives, assessments) |
+| `Question` | `question_model.py` | Question schema (type, difficulty, answer, sources, Bloom level) |
+| `Document` | `document_model.py` | PDF metadata (path, size, hash, tags) |
+| `OCRData` | `ocr_data_model.py` | Tesseract outputs (text, confidence, page bounds) |
+| `CourseCatalog` | `course_catalog.py` | Catalog from `data/courses.json` |
+| `GeminiConfig` | `gemini_config.py` | API configs (keys, models, prompts) |
+
+---
+
+### Services Overview
+
+#### RAG Service (`services/RAG/`)
+
+| Module | Purpose |
+|--------|---------|
+| `convert_to_embeddings.py` | Core PDF → embedding pipeline |
+| `chroma_revive.py` | Initialize/resume Chroma collections; handle schema migrations |
+| `chunking.py` | Semantic splitting with configurable overlap |
+| `chroma_store.py` | ChromaDB read/write operations |
+| `ocr_engine.py` | OCR abstraction (Gemini, EasyOCR, hybrid) |
+| `billing.py` | Token counting and cost ledger |
+| `log_utils.py` | Structured logging (`setup_logging`, `get_logger`, `snapshot`) |
+| `progress_store.py` | JSON-based progress ledgers |
+| `cache_utils.py` | Embed/OCR caching by hash |
+| `inspect_chroma.py` | CLI for querying collections |
+| `path_meta.py` | Metadata extraction from file paths |
+
+#### Firestore Service (`services/Firestore/firebase_service.py`)
+
+Cloud storage for outlines and questions:
+
+```bash
+# Setup
+export GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
+
+# Usage in generators
+python -m services.QuestionRag.pipelines.question_generator --with-firestore
+```
+
+#### Cloudflare Service (`services/Cloudflare/`)
+
+- `cf_bge_service.py` — BGE-M3 client with batching and retry
+- Rate limit: 96 chunks/batch; configure via `CF_EMBED_MAX_BATCH`
+
+#### Ollama Service (`services/Ollama/ollama_service.py`)
+
+Local embedding fallback:
+```bash
+# Download model
+ollama pull bge-m3
+
+# Usage
+python -m services.RAG.convert_to_embeddings --embed-provider ollama
+```
+
+---
+
+### Utils (`utils/`)
+
+| Module | Purpose |
+|--------|---------|
+| `utils/Caching/cache.py` | Simple dict/file cache |
+| `utils/Caching/enhanced_cache.py` | TTL-based cache for Gemini responses |
+| `utils/data_cleaning/convert_and_clean.py` | Normalize text post-OCR |
+| `utils/database_transfer/transfer_db.py` | Migrate Chroma collections |
+| `utils/ImagesToPDF/main.py` | Convert image folders to PDFs |
+| `utils/PdfCompression/main.py` | Compress large PDFs (50-80% reduction) |
+| `utils/PdfCompression/upscaling.py` | Enhance low-res scans before OCR |
+| `utils/Remove Duplicates/remove_duplicates.py` | Global dedup across JSONL outputs |
+| `utils/logging_utils.py` | Console/file logging setup |
+| `utils/metadata_extractor.py` | PDF properties extraction |
+| `utils/progress_tracker.py` | CLI progress bars (tqdm) |
+
+### Testing
+
+PyTest suite at `tests/`:
+
+```bash
+pip install pytest
+pytest tests/ -v -q
+pytest --cov=services/          # coverage report
+python run_ocr_sanity.py path/to/pdf  # single-file OCR test
+```
+
+Key test files: `test_batch_utils.py`, `test_chroma_revive.py`, `test_chromadb_query.py`, `test_gemini_question_gen_cache.py`, `test_filter.py`.
+
+Mock external APIs (Gemini/Cloudflare) via `pytest-mock`. Aim for >80% coverage on new code.
+
+---
+
+## Troubleshooting
+
+### Embeddings
+
+| Symptom | Resolution |
+|---------|------------|
+| "No RAG context found" | Regenerate embeddings locally and rebuild the image |
+| "ChromaDB connection failed" | Ensure you rebuilt after uploading the latest SQLite bundle |
+| "Permission denied on embeddings" | Make `OUTPUT_DATA2/emdeddings` writable (`chmod`/`chown`) |
+| "Embeddings outdated" | Follow two-step refresh: `convert_to_embeddings` → `./build.sh --cleanup` |
+| "Disk space full" | Check with `df -h`; embedding databases are large |
+| "ChromaDB locked" | Stop any process using the database, then retry |
+
+### Question Generation
+
+| Symptom | Resolution |
+|---------|------------|
+| "Course code not found" | Check available courses in `data/textbooks/courses.json` |
+| "No RAG context found" | Verify embeddings exist for the course code; lower `--rag-min-sim` |
+| API errors | Verify API keys in `.env` are valid and have sufficient quota |
+| 0 questions generated | Course may lack sufficient RAG context or outlines |
+| Resume stuck on a subtopic | Check `OUTPUT_DATA2/cache/course_progress/`; delete a single file to reset one course |
+| Duplicate questions | Delete the relevant cache entry under `OUTPUT_DATA2/cache/question_gen` and rerun with `--no-resume` |
+| Key rotation stalls | Confirm `gemini_api_keys.py` is populated and cache directory is writable |
+| Firestore errors | Use `--skip-firestore` to continue locally |
+| Validation failures | Inspect dumped payload in `failed_responses/`; use `--structured-output` |
+| Memory issues | Reduce `--theory-per-request` and `--calc-per-request`; reduce `--max-topic-workers` |
+| Slowdowns | Reduce `--max-topic-workers`, bump `--request-delay`, or filter by `--topics`/`--subtopics` |
+
+### Docker & AWS ECR
+
+| Symptom | Resolution |
+|---------|------------|
+| "Error saving credentials" | Run `./build.sh --fix-credentials` |
+| ECR authentication failed | Check AWS CLI configuration and permissions |
+| Image not found locally | Run script auto-pulls from ECR if available |
+| Permission denied on volumes | Ensure host directories have 775 permissions |
+| Build fails with "invalid tag" | Use correct ECR URI format |
+| AWS CLI not found | Install AWS CLI or authenticate manually |
+| Out of disk space | `docker system prune -a && ./build.sh --cleanup` |
+| Memory issues during build | Increase Docker memory limit in Docker Desktop |
+| ChromaDB connection issues | Verify `OUTPUT_DATA2/emdeddings/` exists and has content |
+
+### Dockerfile Optimizations
+
+- **Multi-layer caching** — optimized layer structure for faster incremental builds
+- **Network resilience** — automatic retry logic for apt-get operations
+- **Security** — non-root user (`appuser`) with proper permissions
+- **Health checks** — built-in monitoring and health verification
+- **Resource optimization** — configured for optimal memory and CPU usage
+- **Dependency resolution** — fixed numpy/albumentations version conflicts
+- **Path consistency** — consistent directory paths across all Docker files
+
+---
+
+## Best Practices
+
+- Run question generation nightly so caches stay warm and Firestore progress stays fresh.
+- Keep Gemini keys in sync across environments and mount `OUTPUT_DATA2/data/gemini_cache` in containers.
+- Schedule Chroma scans after large ingestion batches so new courses pick up outlines quickly.
+- Version control `courses.json` but ignore `OUTPUT_DATA2` (runtime caches).
+- Review samples from each course regularly; calculation questions rely on LaTeX rendering.
+- Monitor `OUTPUT_DATA2/cache/course_progress/*.json` and Firestore dashboards to catch stalled subtopics early.
+- Keep prompt templates under `services/QuestionRag/resources` consistent across environments.
+
+## Recent Improvements
+
+- ✅ AWS ECR Deployment — full integration with Elastic Container Registry
+- ✅ Cache Volumes — cache/data directories persist while embeddings ship with the image
+- ✅ Enhanced Reliability — retry logic for network failures during build
+- ✅ Fixed Dependencies — resolved numpy/albumentations version conflicts
+- ✅ Better Error Handling — improved build script with debugging capabilities
+- ✅ Path Consistency — consistent directory paths throughout
+- ✅ Improved Health Checks — container verifies ChromaDB embeddings directory exists
+- ✅ Optimized Docker Compose — cleaner configuration with better defaults
+- ✅ Docker Credential Helper Fix — automatic resolution of credential issues
+- ✅ Question Generation Fix — resolved "missing solution steps" error for calculations
+- ✅ Enhanced Scripts — deployment, credential fixing, and debugging options
+- ✅ Automated Embeddings Update — one-command workflow to regenerate embeddings and rebuild/deploy
+- ✅ Comprehensive Documentation — complete guide for all features and use cases
 
 ## Contributing
+
 - Follow PEP 8; add tests for new features.
 - Use imperative commit messages (e.g., "Add rotation detection to OCR").
 - Report issues at https://github.com/sst/opencode/issues (for tool feedback).
-- For help: Run `/help` in opencode.
+- See `AGENTS.md` for agent-specific instructions.
 
-See `AGENTS.md` for agent-specific instructions. This project is licensed under MIT.
+This project is licensed under MIT.

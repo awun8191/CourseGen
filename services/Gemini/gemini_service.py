@@ -20,32 +20,29 @@ import gc
 
 from typing import Any, Dict, Iterable, List, Optional, Type, TypeVar, get_args, get_origin
 
-# Add the project root to the Python path to allow for absolute imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from data_models.gemini_config import GeminiConfig  # noqa: E402
+from data_models.gemini_config import GeminiConfig
 
 try:
-    from google import genai  # noqa: E402
-    from google.genai import types as gtypes  # noqa: E402
-    from google.genai import errors as genai_errors  # noqa: E402
+    from google import genai
+    from google.genai import types as gtypes
+    from google.genai import errors as genai_errors
 except ImportError:
-    genai = None  # type: ignore
-    gtypes = None  # type: ignore
-    genai_errors = None  # type: ignore
-import httpx  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+    genai = None
+    gtypes = None
+    genai_errors = None
+import httpx
+from pydantic import BaseModel
 
-# --- Project imports ---
-from ..Gemini.api_key_manager import ApiKeyManager  # noqa: E402  # relative import (same folder)
+from ..Gemini.api_key_manager import ApiKeyManager
 try:
-    from ..Gemini.gemini_api_keys import GeminiApiKeys  # noqa: E402  # optional convenience provider
+    from ..Gemini.gemini_api_keys import GeminiApiKeys
 except Exception:
-    GeminiApiKeys = None  # type: ignore
+    GeminiApiKeys = None
 
-# OCR prompt (fallback text if the helper is missing)
 try:
     from ..RAG.helpers import OCR_PROMPT
 except Exception:
@@ -58,14 +55,12 @@ except Exception:
 
 T = TypeVar("T", bound=BaseModel)
 
-# Import centralized configuration
 try:
     from config import load_config
     config = load_config()
     DEFAULT_MODEL = config.gemini_default_model
     EMBEDDING_MODEL = config.gemini_embedding_model
 except ImportError:
-    # Fallback to hardcoded defaults if centralized config not available
     DEFAULT_MODEL = "gemini-2.5-flash-lite"
     EMBEDDING_MODEL = "gemini-embedding-001"
     DEFAULT_TEMPERATURE = 0.8
@@ -73,11 +68,12 @@ except ImportError:
 
 IMAGE_TOKEN_COST = 1000
 
-# --- sample models (you can remove if unused) ---
+
 class CourseOutline(BaseModel):
     course: str
     topics: List[str]
     description: str
+
 
 class CoursesResponse(BaseModel):
     courses: List[CourseOutline]
@@ -97,7 +93,6 @@ class GeminiService:
         self.default_config = generation_config or GeminiConfig()
         self._active_api_key: Optional[str] = None
 
-        # Resolve API keys (prefer explicit manager, else provided list, else optional provider)
         if api_keys is None and api_key_manager is None and GeminiApiKeys is not None:
             try:
                 gemini_keys = GeminiApiKeys()
@@ -107,7 +102,6 @@ class GeminiService:
 
         if api_key_manager is None:
             if not api_keys:
-                # Allow empty manager; user can rely on GOOGLE_API_KEY env fallback in direct calls
                 api_keys = []
             self.api_key_manager = ApiKeyManager(api_keys)
         else:
@@ -115,22 +109,17 @@ class GeminiService:
 
         self._configure_genai()
 
-    # -------------------- Client configuration --------------------
-
     def _configure_genai(self, model: str = "flash") -> None:
         """(Re)configure google-genai Client using the current API key for a model family."""
         if genai is None:
             raise ImportError("google-genai package is not installed. Install with: pip install google-genai")
 
-        # family is 'flash'|'lite'|'pro'|'embedding'
         family = self._get_model_name(model)
         api_key = self.api_key_manager.get_key(family)
-        # If no key is available here, the caller must rely on GOOGLE_API_KEY/GEMINI_API_KEY envs
         if api_key:
             self.client = genai.Client(api_key=api_key)
             self._active_api_key = api_key
         else:
-            # Fall back to default client (will use env var if present)
             self.client = genai.Client()
             self._active_api_key = None
 
@@ -144,9 +133,7 @@ class GeminiService:
             return "pro"
         if "embedding" in s:
             return "embedding"
-        return "flash"  # Default class
-
-    # -------------------- Config translation --------------------
+        return "flash"
 
     def _to_generation_config(
         self, config: Optional[GeminiConfig | Dict[str, Any]]
@@ -165,7 +152,6 @@ class GeminiService:
             if origin is list or origin is List:
                 item_t = args[0] if args else str
                 return {"type": "array", "items": _simple_type_schema(item_t)}
-            # Literal values
             try:
                 from typing import Literal as _Literal
             except Exception:
@@ -173,10 +159,8 @@ class GeminiService:
             if _Literal is not None and get_origin(py_type) is _Literal:
                 vals = list(get_args(py_type))
                 return {"type": "string", "enum": [str(v) for v in vals]}
-            # Nested BaseModel
             if isinstance(py_type, type) and issubclass(py_type, BaseModel):
                 return _pydantic_to_simple_schema(py_type)
-            # Primitives
             if py_type in (str, Any):
                 return {"type": "string"}
             if py_type in (int,):
@@ -210,14 +194,12 @@ class GeminiService:
             response_mime_type=("application/json" if config.response_schema else None),
         )
 
-        # Add thinking configuration if enabled
         if config.use_thinking and config.thinking_budget is not None:
             try:
                 gen_config.thinking_config = gtypes.ThinkingConfig(
                     thinking_budget=config.thinking_budget
                 )
             except Exception:
-                # Fallback for older versions of google-genai that don't support thinking
                 pass
 
         tools = None
@@ -239,14 +221,11 @@ class GeminiService:
                         else:
                             return d
                     simple_schema = _strip(raw)
-                # Attach schema (supported by google-genai)
-                gen_config.response_schema = simple_schema  # type: ignore[attr-defined]
+                gen_config.response_schema = simple_schema
             except Exception:
                 pass
 
         return gen_config, tools
-
-    # -------------------- Low-level generate --------------------
 
     def _generate(
         self,
@@ -282,11 +261,9 @@ class GeminiService:
                                 reason=str(e),
                             )
 
-                        # Force termination if all keys are exhausted
                         try:
                             self.api_key_manager.force_terminate_if_all_exhausted(model_name)
                         except RuntimeError:
-                            # Re-raise the termination error to stop all operations
                             raise
 
                         attempt += 1
@@ -294,7 +271,6 @@ class GeminiService:
                         try:
                             self.api_key_manager.rotate_key(model_name)
                         except ValueError as rot_exc:
-                            # Force termination if rotation fails
                             try:
                                 self.api_key_manager.force_terminate_if_all_exhausted(model_name)
                             except RuntimeError:
@@ -313,7 +289,6 @@ class GeminiService:
                         pass
                     continue
 
-            # Extract text (robustly)
             response_text = getattr(response, "text", "") or ""
             if not response_text:
                 try:
@@ -329,13 +304,11 @@ class GeminiService:
                 except Exception:
                     response_text = ""
 
-            # Update usage heuristically
             tokens = max(1, input_tokens + len(response_text) // 4)
             active_key = getattr(self, "_active_api_key", None)
             if active_key:
                 self.api_key_manager.update_usage(active_key, model_name, int(tokens))
 
-            # If structured output isn't requested, return raw text
             if generation_config and isinstance(generation_config, GeminiConfig) and generation_config.response_schema is None:
                 result = {"result": response_text.strip()}
                 del response
@@ -347,7 +320,6 @@ class GeminiService:
                 gc.collect()
                 return result
 
-            # Otherwise parse to JSON-like structure when possible
             def _extract_function_args(resp) -> Optional[Dict[str, Any]]:
                 try:
                     candidates = getattr(resp, "candidates", None) or []
@@ -389,32 +361,25 @@ class GeminiService:
                     cleaned_text = cleaned_text[:-3]
                 cleaned_text = cleaned_text.strip()
 
-                # Fix common issue where Gemini returns string representations of arrays
-                # Convert "[]" to [] and empty strings to [] for solution_steps and other array fields
                 import ast
                 def fix_string_arrays(text: str) -> str:
                     try:
-                        # Try to parse as JSON first
                         parsed = json.loads(text)
-                        # If parsing succeeded, check for string arrays and fix them
                         if isinstance(parsed, dict):
                             for key, value in parsed.items():
                                 if isinstance(value, str):
-                                    # Handle empty strings and string representations of empty arrays
-                                    if value.strip() in ['', '[]', '[\"\"]', '[""]']:
+                                    if value.strip() in ['', '[]', '[""]', '[""]']:
                                         parsed[key] = []
                                     elif value.strip().startswith('[') and value.strip().endswith(']'):
                                         try:
-                                            # Try to evaluate the string as a Python literal
                                             parsed[key] = ast.literal_eval(value)
                                         except (ValueError, SyntaxError):
-                                            pass  # Keep original value if can't parse
+                                            pass
                         return json.dumps(parsed)
                     except json.JSONDecodeError:
-                        # If JSON parsing fails, try regex approach as fallback
                         import re
                         text = re.sub(r'("solution_steps"\s*:\s*)"(\[\s*\])"', r'\1\2', text)
-                        text = re.sub(r'("solution_steps"\s*:\s*)"\"\"', r'\1[]', text)
+                        text = re.sub(r'("solution_steps"\s*:\s*)"\\"\\""', r'\1[]', text)
                         return text
 
                 cleaned_text = fix_string_arrays(cleaned_text)
@@ -422,7 +387,6 @@ class GeminiService:
                 try:
                     data = json.loads(cleaned_text)
                 except json.JSONDecodeError:
-                    # Try to extract a balanced JSON object/array from the text
                     def _extract_balanced_json(s: str) -> Optional[str]:
                         start = None
                         opener = closer = None
@@ -464,14 +428,12 @@ class GeminiService:
                         try:
                             data = json.loads(candidate)
                         except Exception:
-                            # attempt a trivial repair
                             repaired = self._repair_truncated_json(cleaned_text)
                             data = json.loads(repaired) if repaired else {"result": None, "raw": response_text}
                     else:
                         repaired = self._repair_truncated_json(cleaned_text)
                         data = json.loads(repaired) if repaired else {"result": None, "raw": response_text}
 
-            # Optional response_model validation/shaping
             if response_model:
                 try:
                     if isinstance(data, dict) and isinstance(data.get("questions"), list):
@@ -509,7 +471,6 @@ class GeminiService:
             return result
 
         except genai_errors.ClientError as e:
-            # 4xx (including 429)
             if getattr(e, "code", 0) == 429:
                 model_name = self._get_model_name(model)
                 try:
@@ -517,7 +478,6 @@ class GeminiService:
                     self._configure_genai(model_name)
                 except Exception:
                     pass
-                # retry once
                 return self._generate(parts, model, generation_config, response_model)
             raise
         except genai_errors.ServerError:
@@ -527,7 +487,6 @@ class GeminiService:
                 self._configure_genai(model_name)
             except Exception:
                 pass
-            # retry once
             return self._generate(parts, model, generation_config, response_model)
 
     @staticmethod
@@ -589,7 +548,6 @@ class GeminiService:
         reason = getattr(error, "reason", "").lower() if getattr(error, "reason", None) else ""
         if reason and any(marker in reason for marker in exhaustion_markers):
             return True
-        # Some API errors surface through HTTP exceptions with status 429/403 and quota messaging
         status = getattr(error, "response", None)
         if status is not None:
             try:
@@ -599,8 +557,6 @@ class GeminiService:
             except Exception:
                 pass
         return code == 429 and "quota" in message
-
-    # -------------------- High-level generate --------------------
 
     def generate(
         self,
@@ -612,7 +568,6 @@ class GeminiService:
     ) -> T | Dict[str, Any]:
         """Generate text from a prompt using the specified model."""
         gen_conf = generation_config
-        # If a response model is provided, enable structured output automatically
         if response_model is not None:
             if gen_conf is None:
                 gen_conf = self.default_config.model_copy(deep=True)
@@ -633,8 +588,6 @@ class GeminiService:
             response_model=response_model,
             input_tokens=input_tokens,
         )
-
-    # -------------------- OCR helper (fixed for google-genai v1.x) --------------------
 
     def ocr(
         self,
@@ -658,7 +611,6 @@ class GeminiService:
         if not images:
             raise ValueError("No images provided for OCR")
 
-        # Build typed Parts (required by google-genai v1.x)
         parts: List[Any] = []
         for img in images:
             mt = img.get("mime_type")
@@ -667,10 +619,8 @@ class GeminiService:
                 raise ValueError("Each image must include 'mime_type' and 'data' (bytes)")
             parts.append(gtypes.Part.from_bytes(mime_type=mt, data=data))
 
-        # Append textual instruction last
         parts.append(prompt)
 
-        # Select model/config
         use_model = model or self.model
         use_conf = generation_config if generation_config is not None else self.default_config
         prompt_tokens = len(prompt) // 4
@@ -691,8 +641,6 @@ class GeminiService:
             except Exception:
                 pass
             gc.collect()
-
-    # -------------------- Embeddings with batching & key rotation --------------------
 
     def _estimate_tokens(self, text: str) -> int:
         """Estimate tokens with a simple 4-chars-per-token heuristic."""
@@ -750,7 +698,6 @@ class GeminiService:
                     f"({len(batch)} texts, ≈{approx_tokens} tokens) using {embedding_model}"
                 )
 
-                # Configure per embedding family
                 self._configure_genai("embedding")
 
                 resp = self.client.models.embed_content(
@@ -782,11 +729,9 @@ class GeminiService:
                     rotation_cycles += 1
                 except ValueError as rotate_error:
                     if "All API keys are over their limits" in str(rotate_error):
-                        # Force termination if all keys are exhausted
                         try:
                             self.api_key_manager.force_terminate_if_all_exhausted("embedding")
                         except RuntimeError:
-                            # Re-raise the termination error to stop all operations
                             raise
 
                         if rotation_cycles >= max_cycles_before_delay:
@@ -836,13 +781,13 @@ class GeminiService:
                         f"({len(current_timestamps)}/{rate_limit.per_minute}). "
                         f"Extended wait: {extended_wait:.1f}s..."
                     )
-                    time.sleep(extended_wait)  # type: ignore[name-defined]
+                    time.sleep(extended_wait)
                 else:
                     print(
                         f"⏳ RPM limit reached "
                         f"({len(current_timestamps)}/{rate_limit.per_minute}). "
                         f"Waiting {wait_time:.1f}s..."
                     )
-                    time.sleep(wait_time)  # type: ignore[name-defined]
+                    time.sleep(wait_time)
                 return True
         return False

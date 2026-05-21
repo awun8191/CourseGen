@@ -10,7 +10,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="888429341445.dkr.ecr.us-east-1.amazonaws.com/rag"
+IMAGE_NAME="YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag"
 IMAGE_TAG="latest"
 FULL_IMAGE_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
 HAS_BUILDX=false
@@ -62,7 +62,7 @@ check_prerequisites() {
     # Check if AWS CLI is available for ECR authentication
     if ! command -v aws &> /dev/null; then
         print_warning "AWS CLI not found. You'll need to authenticate with ECR manually:"
-        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
     else
         print_status "AWS CLI found - will authenticate with ECR automatically"
     fi
@@ -265,7 +265,7 @@ show_usage_examples() {
     echo "  ./build.sh --deploy"
     echo ""
     echo "  # Manual ECR authentication:"
-    echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+    echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
     echo ""
     echo "  # Run with default help command:"
     echo "  docker run --rm ${FULL_IMAGE_NAME}"
@@ -300,14 +300,14 @@ push_to_ecr() {
     if ! command -v aws &> /dev/null; then
         print_error "AWS CLI not found. Cannot push to ECR."
         print_status "Install AWS CLI or push manually:"
-        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+        echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
         echo "  docker push ${FULL_IMAGE_NAME}"
         return 1
     fi
 
     # Method 1: Try direct docker login without credential helper
     print_status "Authenticating with AWS ECR (Method 1: Direct login)..."
-    if echo "Logging into AWS ECR..." && aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com 2>/dev/null; then
+    if echo "Logging into AWS ECR..." && aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com 2>/dev/null; then
         print_success "Successfully authenticated with ECR"
     else
         print_warning "Direct login failed, trying alternative method..."
@@ -316,19 +316,19 @@ push_to_ecr() {
         print_status "Authenticating with AWS ECR (Method 2: Environment variables)..."
         AWS_PASSWORD=$(aws ecr get-login-password --region us-east-1)
         if [ $? -eq 0 ] && [ -n "$AWS_PASSWORD" ]; then
-            if echo "$AWS_PASSWORD" | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com; then
+            if echo "$AWS_PASSWORD" | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com; then
                 print_success "Successfully authenticated with ECR"
             else
                 print_error "Failed to authenticate with ECR using environment variables"
                 print_status "Manual authentication required:"
-                echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+                echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
                 echo "  docker push ${FULL_IMAGE_NAME}"
                 return 1
             fi
         else
             print_error "Failed to get ECR login password"
             print_status "Manual authentication required:"
-            echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+            echo "  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
             echo "  docker push ${FULL_IMAGE_NAME}"
             return 1
         fi
@@ -416,7 +416,7 @@ update_embeddings_and_rebuild() {
         -e PYTHONPATH=/app \
         "${FULL_IMAGE_NAME}" \
         -m services.RAG.convert_to_embeddings \
-        -i data/textbooks/COMPILATION/EEE \
+        -i data/textbooks/EEE \
         --with-chroma \
         -c pdfs_bge_m3_cloudflare \
         --workers 4 \
@@ -492,7 +492,7 @@ debug_build_issues() {
     echo ""
     echo "=== ECR Troubleshooting ==="
     echo "1. Fix credential helpers: $0 --fix-credentials"
-    echo "2. Manual ECR login: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 888429341445.dkr.ecr.us-east-1.amazonaws.com"
+    echo "2. Manual ECR login: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
     echo "3. Check AWS CLI: aws sts get-caller-identity"
     echo "4. Verify ECR permissions: aws ecr describe-repositories --repository-names rag"
 

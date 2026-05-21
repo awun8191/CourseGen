@@ -51,7 +51,6 @@ import fitz  # PyMuPDF
 from PIL import Image
 import requests
 
-# New modular imports
 from services.RAG.log_utils import setup_logging, snapshot
 from services.RAG.billing import Billing
 from services.RAG.chroma_store import chroma_client, chroma_upsert_jsonl
@@ -65,7 +64,6 @@ from services.RAG.path_meta import parse_path_meta
 from services.RAG.cache_utils import sha256_file
 from services.RAG.chunking import chunk, dedupe, sha1_text
 
-# Optional OpenCV for image handling
 try:
     import cv2
     import numpy as np
@@ -73,7 +71,6 @@ try:
 except Exception:
     OPENCV_AVAILABLE = False
 
-# ANSI colors for logging
 ANSI = {
     "reset": "\033[0m",
     "bold": "\033[1m",
@@ -180,7 +177,6 @@ class CFEmbeddings:
             except Exception as e:
                 if attempt == self.retry.tries:
                     raise
-                # backoff then retry
                 time.sleep(min(self.retry.max_sleep, sleep))
                 sleep *= self.retry.backoff
         raise RuntimeError("unhandled retry loop")
@@ -250,7 +246,6 @@ class CFEmbeddings:
                 # cur_bsz <= min_floor -> give up
                 raise
 
-# OCR decision
 def need_ocr(doc: fitz.Document, sample_pages: int = 8, min_chars_per_page: int = 200) -> bool:
     n = min(sample_pages, len(doc))
     if n == 0:
@@ -272,7 +267,6 @@ def _pixmap_to_numpy(pix: fitz.Pixmap) -> 'np.ndarray':
     return arr
 
 
-# Text extract wrapper
 def extract_text(pdf_path, cache_dir, force_ocr, ocr_engine, ocr_dpi, ocr_lang):
     from services.RAG.ocr_engine import ocr_pdf
 
@@ -318,7 +312,6 @@ def extract_text(pdf_path, cache_dir, force_ocr, ocr_engine, ocr_dpi, ocr_lang):
     result = ocr_pdf(pdf_path, lang=ocr_lang, dpi=ocr_dpi, engine=engine)
     return result.text
 
-# Per-file processing
 def process_one(pdf_path: str, root: str, export_tmp: str,
                 cache_dir: str, cf_acct: str, cf_token: str,
                 billing_file: str, embed_batch: int,
@@ -435,7 +428,6 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
                 for emb_batch, tok_batch in cf.embed_iter(embed_source, batch_size=embed_batch):
                     batch_count += 1
                     total_tokens += tok_batch
-                    # Stream-write one JSONL row per embedding
                     for j, vec in enumerate(emb_batch):
                         idx = uniq_indices_remaining[k + j]
                         ch = chunks_all[idx]
@@ -461,7 +453,6 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
                     log(f"[EMBED] Processed batch {batch_count}: {len(emb_batch)} vectors, {tok_batch} tokens")
                     k += len(emb_batch)
 
-                # Write duplicate chunks (no embeddings)
                 for idx, (orig_idx, orig_h) in dup_map.items():
                     if idx in seen_chunk_indexes:
                         continue
@@ -503,7 +494,6 @@ def process_one(pdf_path: str, root: str, export_tmp: str,
             "chunks": len(uniq), "dups": len(dup_map), "jsonl_name": jsonl_name,
             "total_tokens": total_tokens}
 
-# Main
 def signal_handler(signum, frame):
     log(f"[INTERRUPT] Received signal {signum}, gracefully shutting down...")
     sys.exit(0)
@@ -606,7 +596,6 @@ def main():
     progress_path = export_dir / "progress_state.json"
     billing = Billing(Path(billing_file))
 
-    # discover PDFs
     pdfs: List[Path] = []
     ignores = {".git", "node_modules", "__pycache__", ".venv", ".idea", ".vscode", "build", "dist"}
     log(f"Scanning directory: {root}")
@@ -637,14 +626,12 @@ def main():
         log(f"Limited to first {args.max_pdfs} PDFs")
     log(f"Final PDF count: {len(pdfs)}")
 
-    # Chroma
     collection = None; client = None
     if args.with_chroma:
         client = chroma_client(str(persist_dir))
         collection = client.get_or_create_collection(name=args.collection, metadata={"hnsw:space": "cosine"})
         log(f"Chroma collection: {args.collection}")
 
-    # progress & seen
     log("[RESUME] Loading previous progress...")
     prog = load_progress(progress_path)
     files_state = prog.setdefault("files", {})
@@ -687,7 +674,6 @@ def main():
             save_progress(progress_path, prog)
             log(f"[DISCOVER] New file: {fp.name}")
 
-        # Check if file should be skipped
         try:
             if should_skip(files_state[file_key], st.st_size, int(st.st_mtime)):
                 # Do not downgrade a previously completed record to "skipped"
@@ -702,7 +688,6 @@ def main():
         except Exception as e:
             log(f"[WARN] Error checking skip status for {fp.name}: {e}")
 
-        # Check for file duplicates
         if fh in seen and seen[fh] != file_key:
             files_state[file_key]["status"] = "skipped"
             files_state[file_key]["reason"] = "file_duplicate"
@@ -712,7 +697,6 @@ def main():
             log(f"[DUPLICATE] Skipping duplicate: {fp.name} (same as {Path(seen[fh]).name})")
             continue
 
-        # Add to processing queue
         seen[fh] = file_key
         try:
             seen_index_path.write_text(json.dumps(seen, indent=2), encoding="utf-8")
@@ -724,7 +708,6 @@ def main():
 
     save_progress(progress_path, prog)
 
-    # Resume summary
     total_files = len(pdfs)
     queued_files = len(tasks)
     skipped_files = total_files - queued_files
@@ -972,4 +955,3 @@ if __name__ == "__main__":
 
 
 
-#  python services/RAG/convert_to_embeddings.py -i "/home/user/Documents/SCHOOL/COMPILATION/EEE/" --engine gemini

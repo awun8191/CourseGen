@@ -100,7 +100,7 @@ def main():
         print("🔍 DRY RUN MODE: Will only show what would be deleted.")
         print("Use --execute to actually delete files.")
     
-    current_dir = r"C:\Users\awun8\Documents\SCHOOL"
+    current_dir = os.getcwd()
     print(f"Searching for duplicates in: {current_dir}")
     
     # Find duplicates

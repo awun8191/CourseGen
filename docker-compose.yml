@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
       args:
         BUILDKIT_INLINE_CACHE: 1
-    image: 888429341445.dkr.ecr.us-east-1.amazonaws.com/rag:latest
+    image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag:latest
     container_name: coursegen-app
     
     # Environment variables

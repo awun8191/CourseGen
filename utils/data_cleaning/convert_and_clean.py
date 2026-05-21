@@ -201,7 +201,7 @@ def process_directory(base_dir: str, max_workers: int = 3, soffice_bin: str = "l
 
 def main():
     parser = argparse.ArgumentParser(description="Multithreaded office-to-PDF converter & cleaner")
-    parser.add_argument("--dir", default="/home/user/Documents/SCHOOL/COMPILATION/", help="Base directory to process")
+    parser.add_argument("--dir", default="./data", help="Base directory to process")
     parser.add_argument("--workers", type=int, default=max(2, min(4, (os.cpu_count() or 4) // 2 + 1)),
                         help="Number of parallel conversions (2–4 recommended)")
     parser.add_argument("--timeout", type=int, default=300, help="Per-file conversion timeout (seconds)")
