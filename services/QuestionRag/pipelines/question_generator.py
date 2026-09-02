@@ -45,7 +45,7 @@ except ImportError:
             self.gemini_use_thinking = central_config.use_thinking
             self.gemini_thinking_budget = central_config.thinking_budget
             self.courses_json_path_resolved = Path(os.environ.get("COURSEGEN_COURSES_JSON", "data/textbooks/courses.json")).expanduser()
-            self.cache_dir_resolved = Path(os.environ.get("COURSEGEN_CACHE_DIR", "OUTPUT_DATA2/cache")).expanduser()
+            self.cache_dir_resolved = Path(os.environ.get("COURSEGEN_CACHE_DIR", "output_data/cache")).expanduser()
             self.coursegen_qg_loglevel = os.environ.get("COURSEGEN_QG_LOGLEVEL", "INFO").upper()
             self.coursegen_debug = os.environ.get("COURSEGEN_DEBUG", "").lower() == "true"
             self.coursegen_use_structured = os.environ.get("COURSEGEN_USE_STRUCTURED", "0").lower() in ("1", "true", "yes")

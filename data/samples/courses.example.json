@@ -1,0 +1,20 @@
+[
+  {
+    "code": "EXAMPLE 101",
+    "title": "Example Course - Replace with your own",
+    "type": "CORE",
+    "units": 3,
+    "levels": ["100"],
+    "semesters": ["FIRST"],
+    "is_elective": false,
+    "offered_by_programs": ["EXAMPLE PROGRAM"],
+    "description": "Example entry. Replace with actual course data or generate from PDFs via the RAG pipeline.",
+    "outline": [
+      {
+        "title": "Introduction",
+        "subtopics": ["Overview", "Fundamentals"],
+        "sources": ["S1"]
+      }
+    ]
+  }
+]

@@ -7,11 +7,11 @@
 - `utils/`: Reusable helpers (caching, data cleaning, PDF/image tools).
 - `data_models/`: Pydantic models and typed schemas.
 - `tests/`: PyTest-style tests (`test_*.py`).
-- `data/`, `chromadb_storage/`: Artifacts/cache (gitignored). Optional `config.json` read by `config.py`.
+- `data/`, `output_data/vector_database/`: Artifacts/cache (gitignored). Optional `config.json` read by `config.py`.
 
 ## Build, Test, and Development Commands
 - Create env + install: `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
-- Run pipeline: `python -m services.RAG.convert_to_embeddings -i <pdf_root> --export-dir data/exported_data --cache-dir data/ocr_cache --with-chroma -c pdfs_bge_m3_cloudflare -p chromadb_storage`
+- Run pipeline: `python -m services.RAG.convert_to_embeddings -i <pdf_root> --export-dir data/exported_data --cache-dir data/ocr_cache --with-chroma -c pdfs_bge_m3_cloudflare -p output_data/vector_database`
 - OCR sanity check: `python run_ocr_sanity.py data/textbooks/.../some.pdf`
 - Tests (pytest): `pip install pytest && pytest -q`
 

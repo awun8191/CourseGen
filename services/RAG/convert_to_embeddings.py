@@ -508,8 +508,8 @@ def main():
     ap = argparse.ArgumentParser("Streamlined BGE-M3 pipeline")
     ap.add_argument("-i", "--input-dir", required=True)
 
-    # Use a single, repo-root anchored default to avoid duplicate OUTPUT_DATA2 trees
-    default_output_root = Path(os.getenv("COURSEGEN_OUTPUT_ROOT", str((repo_root / "OUTPUT_DATA2").resolve())))
+    # Use a single, repo-root anchored default to avoid duplicate output_data trees
+    default_output_root = Path(os.getenv("COURSEGEN_OUTPUT_ROOT", str((repo_root / "output_data").resolve())))
     ap.add_argument("--export-dir", default=str(default_output_root / "progress_report"))
     ap.add_argument("--cache-dir", default=str(default_output_root / "cache"))
     ap.add_argument("--workers", type=int, default=2)
@@ -518,7 +518,7 @@ def main():
     ap.add_argument("--with-chroma", dest="with_chroma", action="store_true", default=True)
     ap.add_argument("--no-chroma", dest="with_chroma", action="store_false")
     ap.add_argument("-c", "--collection", default="course_embeddings")
-    ap.add_argument("--persist-dir", default=str(default_output_root / "emdeddings"))
+    ap.add_argument("--persist-dir", default=str(default_output_root / "vector_database"))
     ap.add_argument("--ocr-on-missing", choices=["fallback", "error", "skip"], default="fallback")
     ap.add_argument("--force-ocr", action="store_true")
     ap.add_argument("--max-pdfs", type=int, default=0)

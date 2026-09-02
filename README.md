@@ -92,14 +92,14 @@ docker-compose run --rm coursegen --course-code "AAE 101" --theory-per-request 1
 
 Only cache and course metadata are mounted from the host at runtime:
 
-- `./OUTPUT_DATA2/cache/` — question generation caches that survive between runs
+- `./output_data/cache/` — question generation caches that survive between runs
 - `./data/` — course inputs, outlines, and configuration files
 
-> Embeddings live inside the Docker image at `/app/OUTPUT_DATA2/emdeddings`. When you refresh them locally, rebuild (and optionally redeploy) the image so every environment picks up the new bundle.
+> Embeddings live inside the Docker image at `/app/output_data/vector_database`. When you refresh them locally, rebuild (and optionally redeploy) the image so every environment picks up the new bundle.
 
 #### Updating Embeddings
 
-1. **Regenerate embeddings on the host** so `OUTPUT_DATA2/emdeddings` contains the new Chroma database:
+1. **Regenerate embeddings on the host** so `output_data/vector_database` contains the new Chroma database:
 
    ```bash
    python -m services.RAG.convert_to_embeddings \
@@ -164,7 +164,7 @@ pip install opencv-python  # image preprocessing
 
 ### Convert to Embeddings
 
-`services/RAG/convert_to_embeddings.py` converts collections of PDFs into searchable vectors with rich metadata, billing information, and resume state. It uses Cloudflare's BGE-M3 embeddings and the CourseGen directory layout (`OUTPUT_DATA2`), with modular code paths for local experimentation.
+`services/RAG/convert_to_embeddings.py` converts collections of PDFs into searchable vectors with rich metadata, billing information, and resume state. It uses Cloudflare's BGE-M3 embeddings and the CourseGen directory layout (`output_data`), with modular code paths for local experimentation.
 
 #### Processing Flow
 
@@ -186,11 +186,11 @@ python -m services.RAG.convert_to_embeddings -i <PDF_ROOT> [options]
 | Flag | Description |
 |------|-------------|
 | `-i, --input-dir` | **Required.** Root directory containing PDFs (traversed recursively). |
-| `--export-dir` | Where JSONL + progress files live (default `OUTPUT_DATA2/progress_report`). |
-| `--cache-dir` | OCR + text cache root (default `OUTPUT_DATA2/cache`). |
+| `--export-dir` | Where JSONL + progress files live (default `output_data/progress_report`). |
+| `--cache-dir` | OCR + text cache root (default `output_data/cache`). |
 | `--with-chroma` / `--no-chroma` | Toggle Chroma upserts (default on). |
 | `-c, --collection` | Chroma collection name (default `course_embeddings`). |
-| `-p, --persist-dir` | Chroma persistence directory (default `OUTPUT_DATA2/emdeddings`). |
+| `-p, --persist-dir` | Chroma persistence directory (default `output_data/vector_database`). |
 | `--workers` | ProcessPool workers for PDF processing (default 2). |
 | `--ocr-dpi` | Render DPI when OCR is needed (default 200). |
 | `--engine` | OCR engine: `gemini`, `hybrid`, `easyocr` (default `gemini`). |
@@ -204,7 +204,7 @@ python -m services.RAG.convert_to_embeddings -i <PDF_ROOT> [options]
 python -m services.RAG.convert_to_embeddings \
   -i data/textbooks/EEE \
   --collection pdfs_bge_m3_cloudflare \
-  --persist-dir OUTPUT_DATA2/emdeddings \
+  --persist-dir output_data/vector_database \
   --workers 4
 
 # OCR-heavy archive (high DPI, Gemini + EasyOCR hybrid)
@@ -224,7 +224,7 @@ python -m services.RAG.convert_to_embeddings \
 
 #### Output Artifacts
 
-- **Per-PDF JSONL** — `OUTPUT_DATA2/progress_report/<stem>.jsonl`
+- **Per-PDF JSONL** — `output_data/progress_report/<stem>.jsonl`
 - **Chroma** — vectors upserted to target collection
 - **Progress** — `progress_state.json` (file status, timing, chunk counts)
 - **Billing** — `billing_state.json` (token counts and cost estimates)
@@ -242,7 +242,7 @@ python -m services.RAG.convert_to_embeddings \
 ```bash
 python services/RAG/inspect_chroma.py \
   -c pdfs_bge_m3_cloudflare \
-  -p OUTPUT_DATA2/emdeddings \
+  -p output_data/vector_database \
   --query "z-transform"
 ```
 
@@ -268,9 +268,9 @@ python services/RAG/inspect_chroma.py \
 | Outline generation core | `services/QuestionRag/pipelines/course_outline_generator.py` |
 | RAG retrieval | `services/QuestionRag/utils/chromadb_query.py` |
 | Course store | `CourseStore` (reads/writes `courses.json`) |
-| Outline cache | `OUTPUT_DATA2/cache/outline_cache_<DEPT>.json` |
-| Progress log | `OUTPUT_DATA2/cache/outline_progress_<DEPT>.json` |
-| Per-course exports | `OUTPUT_DATA2/cache/outlines_by_chroma/course_outline_<CODE>_<timestamp>.json` |
+| Outline cache | `output_data/cache/outline_cache_<DEPT>.json` |
+| Progress log | `output_data/cache/outline_progress_<DEPT>.json` |
+| Per-course exports | `output_data/cache/outlines_by_chroma/course_outline_<CODE>_<timestamp>.json` |
 
 #### CLI Usage
 
@@ -408,7 +408,7 @@ python -m services.QuestionRag.pipelines.question_generator \
   --course-code "EEE 471" \
   --structured-output \
   --request-delay 2.0 \
-  --output-jsonl OUTPUT_DATA2/questions_EEE471.jsonl
+  --output-jsonl output_data/questions_EEE471.jsonl
 
 # Target specific subtopics with metadata filter
 python -m services.QuestionRag.pipelines.question_generator \
@@ -423,9 +423,9 @@ python -m services.QuestionRag.pipelines.question_generator --disable-parallel
 
 #### Caching & Progress
 
-- **Question cache** — `OUTPUT_DATA2/cache/question_gen/cache.json` indexes per-request payloads and metadata.
-- **Course progress** — `OUTPUT_DATA2/cache/course_progress/{course}.json` records theory/calculation counters, state, and timestamps.
-- **Error dumps** — failed Gemini payloads at `OUTPUT_DATA2/cache/failed_responses/`.
+- **Question cache** — `output_data/cache/question_gen/cache.json` indexes per-request payloads and metadata.
+- **Course progress** — `output_data/cache/course_progress/{course}.json` records theory/calculation counters, state, and timestamps.
+- **Error dumps** — failed Gemini payloads at `output_data/cache/failed_responses/`.
 - **Resume workflow** — interrupted batches marked `in_progress`; next run upgrades them to `interrupted`, clears stale cache entries, and retries.
 
 #### Programmatic Usage
@@ -446,7 +446,7 @@ generator = QuestionGenerator(
 config = QuestionBatchConfig(
     course_code="EEE 471",
     courses_json_path=Path("data/textbooks/courses.json"),
-    cache_dir=Path("OUTPUT_DATA2/cache"),
+    cache_dir=Path("output_data/cache"),
     resume=True,
     store_firestore=False,
 )
@@ -474,10 +474,10 @@ Deploy CourseGen to AWS Elastic Container Registry for production use:
 ./run.sh --course-code "EEE 315"
 
 # Manual ECR authentication
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 ```
 
-**ECR Repository:** `YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag:latest`
+**ECR Repository:** `${ECR_REGISTRY:-coursegen}:latest`
 
 #### Embeddings Management Workflow
 
@@ -488,9 +488,9 @@ aws ecr get-login-password --region us-east-1 | docker login --username AWS --pa
 # OR manually (3-step process):
 # Step 1: Update local persistent volume embeddings
 docker run --rm \
-  -v $(pwd)/OUTPUT_DATA2:/app/OUTPUT_DATA2 \
+  -v $(pwd)/output_data:/app/output_data \
   -v $(pwd)/data:/app/data \
-  YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag:latest \
+  ${ECR_REGISTRY:-coursegen}:latest \
   python -m services.RAG.convert_to_embeddings \
   -i data/textbooks/EEE \
   --with-chroma \
@@ -507,13 +507,13 @@ docker run --rm \
 
 #### Host vs Image Embeddings
 
-- **Host directory** (`OUTPUT_DATA2/emdeddings/`): Where regeneration writes during development; rebuild after updating it.
-- **Image embeddings**: Copied into the Docker image at `/app/OUTPUT_DATA2/emdeddings` during `./build.sh`.
+- **Host directory** (`output_data/vector_database/`): Where regeneration writes during development; rebuild after updating it.
+- **Image embeddings**: Copied into the Docker image at `/app/output_data/vector_database` during `./build.sh`.
 - **AWS ECR image**: The pushed artifact — rebuild & deploy whenever you refresh embeddings locally.
 
 ### EC2 Helper Script
 
-`./ec2_execution.sh` wraps an ECR-hosted container, syncs textbook data + embeddings onto the host, mounts persistent volumes (`~/OUTPUT_DATA2/...`), and mirrors the Gemini cache so key rotation survives container churn. Use flags like `--course-code`, `--structured-output`, `--background`, `--skip-sync`, or `--env-file` as needed.
+`./ec2_execution.sh` wraps an ECR-hosted container, syncs textbook data + embeddings onto the host, mounts persistent volumes (`~/output_data/...`), and mirrors the Gemini cache so key rotation survives container churn. Use flags like `--course-code`, `--structured-output`, `--background`, `--skip-sync`, or `--env-file` as needed.
 
 ### Build Script Features
 
@@ -610,8 +610,8 @@ kubectl apply -f .
 | `CF_EMBED_MAX_TOKENS` | 512 | Max tokens per embedding request |
 | `BILLING_ENABLED` | 0 | Track costs (1/0) |
 | `CF_PRICE_PER_M_TOKENS` | 0.02 | Cloudflare pricing (USD/M tokens) |
-| `COURSEGEN_CACHE_ROOT` | `<repo>/OUTPUT_DATA2` | Base directory for cache files |
-| `COURSEGEN_OUTPUT_ROOT` | `<repo>/OUTPUT_DATA2` | Base directory for output files |
+| `COURSEGEN_CACHE_ROOT` | `<repo>/output_data` | Base directory for cache files |
+| `COURSEGEN_OUTPUT_ROOT` | `<repo>/output_data` | Base directory for output files |
 | `COURSEGEN_DEBUG_DUMP_DIR` | — | Directory for failed Gemini payloads |
 | `COURSEGEN_DISABLE_CACHE_DAILY_RESET` | false | Skip midnight cache reset |
 | `OCR_LANG` | en | OCR language hint |
@@ -626,7 +626,7 @@ kubectl apply -f .
 #### Core Responsibilities
 
 - **Key discovery** — loads keys from `GeminiApiKeys` (list in `services/Gemini/gemini_api_keys.py`) or from explicit arguments.
-- **Persistent usage tracking** — stores daily counters, tokens, and exhaustion flags in `OUTPUT_DATA2/data/gemini_cache/api_key_cache.json`.
+- **Persistent usage tracking** — stores daily counters, tokens, and exhaustion flags in `output_data/data/gemini_cache/api_key_cache.json`.
 - **Per-model quotas** — enforces rate limits for `flash`, `lite`, `pro`, and `embedding` model families.
 - **RPM throttling** — keeps rolling timestamps per key per model to avoid exceeding per-minute limits.
 - **Failure handling** — marks keys exhausted on fatal errors, escalates to email notifications, and raises a terminating `RuntimeError` when every key is exhausted.
@@ -645,7 +645,7 @@ Adjust these in `rate_limit_data.py` if your quotas differ.
 #### Configuration Steps
 
 1. **List your keys** — edit `services/Gemini/gemini_api_keys.py` or load from environment variables / secrets manager.
-2. **Persist cache directory** — ensure `OUTPUT_DATA2/data/gemini_cache` is writable and mounted persistently.
+2. **Persist cache directory** — ensure `output_data/data/gemini_cache` is writable and mounted persistently.
 3. **(Optional) Disable daily reset** — set `COURSEGEN_DISABLE_CACHE_DAILY_RESET=true` (not recommended for production).
 
 #### Usage
@@ -670,7 +670,7 @@ response = service.generate("Summarise Fourier series.")
 #### Inspecting Usage
 
 ```bash
-jq '.' OUTPUT_DATA2/data/gemini_cache/api_key_cache.json
+jq '.' output_data/data/gemini_cache/api_key_cache.json
 ```
 
 ```python
@@ -792,7 +792,7 @@ Mock external APIs (Gemini/Cloudflare) via `pytest-mock`. Aim for >80% coverage 
 |---------|------------|
 | "No RAG context found" | Regenerate embeddings locally and rebuild the image |
 | "ChromaDB connection failed" | Ensure you rebuilt after uploading the latest SQLite bundle |
-| "Permission denied on embeddings" | Make `OUTPUT_DATA2/emdeddings` writable (`chmod`/`chown`) |
+| "Permission denied on embeddings" | Make `output_data/vector_database` writable (`chmod`/`chown`) |
 | "Embeddings outdated" | Follow two-step refresh: `convert_to_embeddings` → `./build.sh --cleanup` |
 | "Disk space full" | Check with `df -h`; embedding databases are large |
 | "ChromaDB locked" | Stop any process using the database, then retry |
@@ -805,8 +805,8 @@ Mock external APIs (Gemini/Cloudflare) via `pytest-mock`. Aim for >80% coverage 
 | "No RAG context found" | Verify embeddings exist for the course code; lower `--rag-min-sim` |
 | API errors | Verify API keys in `.env` are valid and have sufficient quota |
 | 0 questions generated | Course may lack sufficient RAG context or outlines |
-| Resume stuck on a subtopic | Check `OUTPUT_DATA2/cache/course_progress/`; delete a single file to reset one course |
-| Duplicate questions | Delete the relevant cache entry under `OUTPUT_DATA2/cache/question_gen` and rerun with `--no-resume` |
+| Resume stuck on a subtopic | Check `output_data/cache/course_progress/`; delete a single file to reset one course |
+| Duplicate questions | Delete the relevant cache entry under `output_data/cache/question_gen` and rerun with `--no-resume` |
 | Key rotation stalls | Confirm `gemini_api_keys.py` is populated and cache directory is writable |
 | Firestore errors | Use `--skip-firestore` to continue locally |
 | Validation failures | Inspect dumped payload in `failed_responses/`; use `--structured-output` |
@@ -825,7 +825,7 @@ Mock external APIs (Gemini/Cloudflare) via `pytest-mock`. Aim for >80% coverage 
 | AWS CLI not found | Install AWS CLI or authenticate manually |
 | Out of disk space | `docker system prune -a && ./build.sh --cleanup` |
 | Memory issues during build | Increase Docker memory limit in Docker Desktop |
-| ChromaDB connection issues | Verify `OUTPUT_DATA2/emdeddings/` exists and has content |
+| ChromaDB connection issues | Verify `output_data/vector_database/` exists and has content |
 
 ### Dockerfile Optimizations
 
@@ -842,11 +842,11 @@ Mock external APIs (Gemini/Cloudflare) via `pytest-mock`. Aim for >80% coverage 
 ## Best Practices
 
 - Run question generation nightly so caches stay warm and Firestore progress stays fresh.
-- Keep Gemini keys in sync across environments and mount `OUTPUT_DATA2/data/gemini_cache` in containers.
+- Keep Gemini keys in sync across environments and mount `output_data/data/gemini_cache` in containers.
 - Schedule Chroma scans after large ingestion batches so new courses pick up outlines quickly.
-- Version control `courses.json` but ignore `OUTPUT_DATA2` (runtime caches).
+- Version control `courses.json` but ignore `output_data` (runtime caches).
 - Review samples from each course regularly; calculation questions rely on LaTeX rendering.
-- Monitor `OUTPUT_DATA2/cache/course_progress/*.json` and Firestore dashboards to catch stalled subtopics early.
+- Monitor `output_data/cache/course_progress/*.json` and Firestore dashboards to catch stalled subtopics early.
 - Keep prompt templates under `services/QuestionRag/resources` consistent across environments.
 
 ## Recent Improvements

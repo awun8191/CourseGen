@@ -31,7 +31,7 @@ except ImportError:
         )
     ).expanduser()
     DEFAULT_CACHE_ROOT = Path(
-        os.environ.get("COURSEGEN_CACHE_DIR", str(REPO_ROOT / "OUTPUT_DATA2/cache"))
+        os.environ.get("COURSEGEN_CACHE_DIR", str(REPO_ROOT / "output_data/cache"))
     ).expanduser()
     DEFAULT_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
     DEFAULT_MODEL = os.environ.get("COURSEGEN_QUESTION_MODEL", "gemini-2.5-flash-lite")

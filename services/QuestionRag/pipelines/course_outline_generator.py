@@ -77,7 +77,7 @@ except ImportError:
             # Paths
             self.repo_root = Path(__file__).resolve().parents[3]
             self.courses_json_path_resolved = Path(os.environ.get("COURSEGEN_COURSES_JSON", str(self.repo_root / "data/textbooks/courses.json"))).expanduser().resolve()
-            self.cache_dir_resolved = Path(os.environ.get("COURSEGEN_CACHE_DIR", str(self.repo_root / "OUTPUT_DATA2/cache"))).expanduser().resolve()
+            self.cache_dir_resolved = Path(os.environ.get("COURSEGEN_CACHE_DIR", str(self.repo_root / "output_data/cache"))).expanduser().resolve()
             self.chroma_out_dir_resolved = Path(os.environ.get("COURSEGEN_CHROMA_OUT_DIR", str(self.cache_dir_resolved / "outlines_by_chroma"))).expanduser().resolve()
 
             # Logging

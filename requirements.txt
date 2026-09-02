@@ -1,78 +1,15 @@
-# Core dependencies - ESSENTIAL for CourseGen functionality
+# Core — only direct imports used in code
 chromadb==1.0.20
-google-generativeai==0.8.5
+google-genai==1.32.0
 pydantic==2.11.7
-pydantic_core==2.33.2
 PyMuPDF==1.26.4
-pypdfium2==4.30.0
 opencv-python-headless==4.11.0.86
 pillow==11.3.0
-python-docx==1.2.0
 python-dotenv==1.1.1
-PyYAML==6.0.2
 requests==2.32.5
-tqdm==4.67.1
-typer==0.17.3
+numpy>=1.24.4
+httpx==0.28.1
 
-# AI/ML and embeddings
-google-genai==1.32.0
-aistudio-sdk==0.3.6
-openai==1.104.2
-tenacity==9.1.2
-
-# Database and storage
+# Firebase (optional — only if STORE_FIRESTORE=1)
 firebase_admin==7.1.0
 google-cloud-firestore==2.21.0
-google-cloud-storage==3.3.1
-
-# Communication and notifications
-twilio==9.4.2
-
-# Image processing and OCR
-albumentations==1.4.10
-albucore==0.0.13
-imageio==2.37.0
-tifffile==2025.8.28
-shapely==2.1.1
-scikit-image==0.24.0
-
-# Data processing and analysis
-pandas==2.3.2
-numpy>=1.24.4
-joblib==1.5.2
-networkx==3.3
-
-# Text processing and cleaning
-beautifulsoup4==4.13.5
-lxml==6.0.1
-bleach==6.2.0
-rapidfuzz==3.14.0
-
-# Caching and utilities
-cachetools==5.5.2
-ujson==5.11.0
-orjson==3.11.3
-psutil==7.0.0
-
-# Async and HTTP clients
-httpx==0.28.1
-aiohttp==3.9.1
-
-# Development and testing (install separately for dev)
-pytest==8.4.2
-black==23.12.1
-flake8==6.1.0
-pre-commit==3.6.0
-
-# Optional: Web server components (uncomment if needed)
-# fastapi==0.104.1
-# uvicorn==0.35.0
-# websockets==15.0.1
-
-# Optional: Jupyter support (uncomment if needed)
-# ipykernel==6.27.1
-# jupyter==1.0.0
-
-# Optional: Documentation (uncomment if needed)
-# mkdocs==1.5.3
-# mkdocs-material==9.4.8

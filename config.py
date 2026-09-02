@@ -14,22 +14,20 @@ def get_config(key: str, default=None):
     value = os.environ.get(key)
     if value is None:
         return default
-    # Try parsing as JSON for complex types (lists, dicts, etc.)
     try:
         return json.loads(value)
     except (json.JSONDecodeError, TypeError):
         return value
 
 
-# Common configuration accessors
 def get_data_dir() -> str:
     """Get the data directory path from environment."""
     return os.environ.get("DATA_DIR", "data")
 
 
-def get_chromadb_storage() -> str:
-    """Get ChromaDB storage path from environment."""
-    return os.environ.get("CHROMADB_STORAGE", "chromadb_storage")
+def get_vector_database() -> str:
+    """Get ChromaDB vector database path from environment."""
+    return os.environ.get("CHROMA_PERSIST_DIR", "output_data/vector_database")
 
 
 def get_ocr_cache_dir() -> str:

@@ -42,9 +42,9 @@ class ApiKeyManager:
             gemini_keys = GeminiApiKeys()
             api_keys = gemini_keys.get_keys()
         
-        # Set cache file to OUTPUT_DATA2/data/gemini_cache directory (persistent volume)
+        # Set cache file to output_data/data/gemini_cache directory (persistent volume)
         if cache_file is None:
-            default_root = Path(__file__).resolve().parents[2] / "OUTPUT_DATA2"
+            default_root = Path(__file__).resolve().parents[2] / "output_data"
             cache_root = Path(os.environ.get("COURSEGEN_CACHE_ROOT", str(default_root)))
             cache_dir = cache_root / "data" / "gemini_cache"
             cache_dir.mkdir(parents=True, exist_ok=True)

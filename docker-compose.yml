@@ -1,59 +1,42 @@
-version: '3.8'
-
 services:
   coursegen:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        BUILDKIT_INLINE_CACHE: 1
-    image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rag:latest
+    image: ${ECR_REGISTRY:-coursegen}:latest
     container_name: coursegen-app
-    
-    # Environment variables
     environment:
       - PYTHONUNBUFFERED=1
       - COURSEGEN_COURSES_JSON=/app/data/textbooks/courses.json
-      - COURSEGEN_CACHE_DIR=/app/OUTPUT_DATA2/cache
-      - CHROMA_PERSIST_DIR=/app/OUTPUT_DATA2/emdeddings
+      - COURSEGEN_CACHE_DIR=/app/output_data/cache
+      - CHROMA_PERSIST_DIR=/app/output_data/vector_database
       - OMP_NUM_THREADS=2
-      - WORKERS=2   # configurable worker count
+      - WORKERS=2
     env_file:
       - .env
-    
-    # Volume mounts for data persistence
     volumes:
-      - ./OUTPUT_DATA2:/app/OUTPUT_DATA2       # embeddings, cache, exports
-      - ./data:/app/data                       # data files
-    
-    # ✅ Real resource limits (works in plain Compose)
+      - ./output_data:/app/output_data
+      - ./data:/app/data
     mem_limit: 8g
     cpus: "2.0"
-    
-    # Health check - verify ChromaDB embeddings directory exists
     healthcheck:
-      test: ["CMD", "test", "-d", "/app/OUTPUT_DATA2/emdeddings"]
+      test: ["CMD", "test", "-d", "/app/output_data/vector_database"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-
-    # Default command - run question generation
     command: ["--theory-per-request", "10", "--calc-per-request", "5", "--request-delay", "2"]
-    
     stdin_open: true
     tty: true
     restart: unless-stopped
 
-  # Optional: Add a service for question generation with specific configuration
   coursegen-questions:
     extends: coursegen
     container_name: coursegen-questions
     command: ["--generate-questions"]
     profiles:
       - questions
-    
-  # Optional: Add a service for outline generation
+
   coursegen-outlines:
     extends: coursegen
     container_name: coursegen-outlines

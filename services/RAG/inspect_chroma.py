@@ -11,7 +11,7 @@ Inspect and export a ChromaDB collection.
 - Export compact metadata CSV
 
 Examples (PowerShell):
-  $PERSIST = "./chromadb_storage"
+  $PERSIST = "./output_data/vector_database"
   $COLL    = "course_embeddings"
 
   # list collections

@@ -48,21 +48,21 @@ ENV/
 ###########################
 # Project Specific
 ###########################
-chromadb_storage/
 pdf_cache.json
 uploads/
 *.sqlite3
 *.log
+output_data/*
+!output_data/vector_database/.gitkeep
+!output_data/cache/.gitkeep
+*.service_account.json
+api_key_cache*.json
+data/gemini_cache/
+*.csv
+*.jsonl
 
 ###########################
-# Secrets & Credentials
-###########################
-**/service_token.json
-*.pem
-*.key
-
-###########################
-# Node.js
+# Node.js (leftover)
 ###########################
 node_modules/
 npm-debug.log*
@@ -70,7 +70,7 @@ yarn-debug.log*
 yarn-error.log*
 
 ###########################
-# Compiled Test/Reporting Artifacts
+# Tests / Coverage
 ###########################
 .pytest_cache/
 htmlcov/
@@ -80,54 +80,18 @@ coverage.xml
 *.cover
 
 ###########################
-# Optional: Ignore PDF files
+# Data — user-provided PDFs (not committed)
 ###########################
-
-
-###########################
-# Textbooks
-###########################
-# Data directories
-data/exports/
-TEXTBOOKS/**/*.pdf
-
-###########################
-# Cache and large files
-###########################
-**/pdf_cache.json
-**/chromadb_storage/
-**/*.pyc
-compressed/
-**/__pycache__/
-
-###########################
-# Large binary files
-###########################
-**/*.pdf
-**/*.docx
-**/*.sgy
+data/textbooks/*.pdf
+data/textbooks/*.docx
 TEXTBOOKS/**/*.pdf
 TEXTBOOKS/**/*.docx
-TEXTBOOKS/**/*.sgy
-
-
-
-chroma_db_bge_m3
-
-OUTPUT_DATA2
-
-
-.cache
 
 ###########################
-# Secrets & Credentials (purge)
+# Secrets
 ###########################
-*.service_account.json
-api_key_cache*.json
-data/gemini_cache/
-*.csv
-*.jsonl
-
-# Runtime caches
+**/service_token.json
+*.pem
+*.key
 services/data/gemini_cache/
 **/api_key_cache*.json
